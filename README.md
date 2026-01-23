@@ -10,7 +10,6 @@ Programming language for photonic computing. Write light-based programs!
 - Open source (MIT License)
 
 ## 🚀 Quick Start
-
 ```bash
 # Clone the repository
 git clone https://github.com/Dimius0/spectravortex.git
