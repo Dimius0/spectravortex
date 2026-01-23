@@ -1,3 +1,4 @@
+markdown
 # 🌀 SpectraVortex
 
 Programming language for photonic computing. Write light-based programs!
