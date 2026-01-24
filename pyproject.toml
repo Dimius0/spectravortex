@@ -8,22 +8,12 @@ version = "0.1.0"
 description = "Programming language for photonic computing"
 readme = "README.md"
 authors = [{name = "Dimius0"}]
-license = "MIT"  # Изменено с таблицы на строку
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Programming Language :: Python :: 3",
-]
+license = "MIT"
 
 dependencies = [
     "numpy",
 ]
 
-# КРИТИЧЕСКИЙ ФИКС: явно указываем пакеты для сборки
-[project.packages.find]
-where = ["."]  # Искать пакеты в корневой директории
-include = ["compiler", "simulator"]  # Конкретно указываем, какие папки включать
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-]
+# РАБОЧАЯ КОНФИГУРАЦИЯ: Используем автоматическое обнаружение пакетов (find)
+[tool.setuptools.packages.find]
+# Пакеты будут найдены автоматически. Это работает для 'compiler/' и 'simulator/'
