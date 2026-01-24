@@ -28,8 +28,6 @@ class PhotonState:
             raise ValueError(f"Amplitude must be between 0 and 1, got {self.amplitude}")
         # Нормализуем фазу при создании объекта
         self.phase = self.phase % (2 * math.pi)
-        if not isinstance(self.oam, int):
-            raise ValueError(f"OAM must be integer, got {self.oam}")
 
 class OpticalField:
     """Represents an optical field with spatial properties."""
@@ -95,6 +93,10 @@ class OpticalField:
             2 * self.amplitude * other.amplitude * math.cos(phase_diff)
         )
         
+        # ВАЖНО: Нормализуем амплитуду, чтобы не превышала 1.0
+        if new_amplitude > 1.0:
+            new_amplitude = 1.0
+        
         new_state = PhotonState(
             frequency=self.state.frequency,
             amplitude=new_amplitude,
@@ -113,6 +115,12 @@ class OpticalField:
         # Amplitudes after split
         amp1 = self.amplitude * math.sqrt(ratio)
         amp2 = self.amplitude * math.sqrt(1 - ratio)
+        
+        # Проверяем, что амплитуды не превышают 1.0
+        if amp1 > 1.0:
+            amp1 = 1.0
+        if amp2 > 1.0:
+            amp2 = 1.0
         
         # Same phase for both outputs
         field1 = OpticalField(
