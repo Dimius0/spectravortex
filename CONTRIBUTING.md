@@ -1,11 +1,3 @@
-text
-
----
-
-### 📄 Содержимое для нового файла `CONTRIBUTING.md`
-
-Создайте этот файл в корневой папке репозитория (`/spectravortex/CONTRIBUTING.md`).
-
 ```markdown
 # Contributing to SpectraVortex
 
