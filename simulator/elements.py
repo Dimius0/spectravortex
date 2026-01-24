@@ -1,208 +1,213 @@
 """
-Optical elements for SpectraVortex simulator
+Optical elements simulation for SpectraVortex.
 """
 
-import numpy as np
-from dataclasses import dataclass
-from typing import Tuple, Optional
+import math
+from typing import Tuple, List
 from .field import OpticalField, PhotonState, Polarization
 
-@dataclass
-class Lens:
-    """Optical lens element"""
-    focal_length: float  # meters
-    diameter: float      # meters
-    material: str = "SiO2"
-    
-    def apply(self, field: OpticalField) -> OpticalField:
-        """Apply lens to optical field (simplified - phase shift)"""
-        result_states = []
-        
-        for state in field.states:
-            # Simple thin lens approximation: φ = -πr²/(λf)
-            # For now, just add a constant phase shift
-            wavelength = state.wavelength()
-            phase_shift = -np.pi / (wavelength * self.focal_length)  # simplified
-            
-            new_state = PhotonState(
-                frequency=state.frequency,
-                amplitude=state.amplitude,
-                phase=(state.phase + phase_shift) % (2 * np.pi),
-                oam_charge=state.oam_charge,
-                polarization=state.polarization,
-                duration=state.duration
-            )
-            result_states.append(new_state)
-        
-        return OpticalField(result_states)
 
-@dataclass
-class Beamsplitter:
-    """Beam splitter element"""
-    ratio: float          # transmission ratio [0, 1]
-    phase_shift: float = 0.0  # phase shift on reflection
+class OpticalElement:
+    """Base class for all optical elements."""
+    
+    def __init__(self, name: str):
+        self.name = name
+    
+    def process(self, field: OpticalField) -> OpticalField:
+        """Process an optical field through this element."""
+        raise NotImplementedError("Subclasses must implement process()")
+    
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.name})"
+
+
+class Lens(OpticalElement):
+    """Thin lens element."""
+    
+    def __init__(self, name: str, focal_length: float):
+        super().__init__(name)
+        self.focal_length = focal_length
+    
+    def process(self, field: OpticalField) -> OpticalField:
+        """Apply lens phase transformation."""
+        # Simplified thin lens formula
+        # Phase change = -π*r²/(λ*f)
+        x, y = field.position
+        r_squared = x**2 + y**2
+        
+        phase_change = -math.pi * r_squared / (field.wavelength * self.focal_length)
+        
+        # Нормализуем новую фазу
+        new_phase = (field.state.phase + phase_change) % (2 * math.pi)
+        
+        new_state = PhotonState(
+            frequency=field.state.frequency,
+            amplitude=field.amplitude,
+            phase=new_phase,
+            oam=field.state.oam,
+            polarization=field.state.polarization
+        )
+        
+        return OpticalField(new_state, field.position)
+
+
+class BeamSplitter(OpticalElement):
+    """Beam splitter element."""
+    
+    def __init__(self, name: str, transmission: float = 0.5):
+        super().__init__(name)
+        if not 0 <= transmission <= 1:
+            raise ValueError(f"Transmission must be between 0 and 1, got {transmission}")
+        self.transmission = transmission
+    
+    def process(self, field: OpticalField) -> Tuple[OpticalField, OpticalField]:
+        """Split input field into transmitted and reflected outputs."""
+        # Transmitted amplitude
+        amp_t = field.amplitude * math.sqrt(self.transmission)
+        
+        # Reflected amplitude (with π/2 phase shift for lossless beam splitter)
+        amp_r = field.amplitude * math.sqrt(1 - self.transmission)
+        
+        # Transmitted field (same phase)
+        transmitted_state = PhotonState(
+            frequency=field.state.frequency,
+            amplitude=amp_t,
+            phase=field.state.phase,
+            oam=field.state.oam,
+            polarization=field.state.polarization
+        )
+        transmitted_field = OpticalField(transmitted_state, field.position)
+        
+        # Reflected field (π/2 phase shift)
+        reflected_phase = (field.state.phase + math.pi/2) % (2 * math.pi)
+        reflected_state = PhotonState(
+            frequency=field.state.frequency,
+            amplitude=amp_r,
+            phase=reflected_phase,
+            oam=field.state.oam,
+            polarization=field.state.polarization
+        )
+        reflected_field = OpticalField(reflected_state, field.position)
+        
+        return transmitted_field, reflected_field
     
     def split(self, field: OpticalField) -> Tuple[OpticalField, OpticalField]:
-        """Split beam into transmitted and reflected parts"""
-        transmitted_states = []
-        reflected_states = []
-        
-        for state in field.states:
-            # Transmitted beam
-            trans_state = PhotonState(
-                frequency=state.frequency,
-                amplitude=state.amplitude * np.sqrt(self.ratio),
-                phase=state.phase,
-                oam_charge=state.oam_charge,
-                polarization=state.polarization,
-                duration=state.duration
-            )
-            transmitted_states.append(trans_state)
-            
-            # Reflected beam
-            refl_state = PhotonState(
-                frequency=state.frequency,
-                amplitude=state.amplitude * np.sqrt(1 - self.ratio),
-                phase=(state.phase + self.phase_shift + np.pi) % (2 * np.pi),  # π phase shift on reflection
-                oam_charge=state.oam_charge,
-                polarization=state.polarization,
-                duration=state.duration
-            )
-            reflected_states.append(refl_state)
-        
-        return OpticalField(transmitted_states), OpticalField(reflected_states)
+        """Alias for process()."""
+        return self.process(field)
 
-@dataclass
-class MachZehnderInterferometer:
-    """Mach-Zehnder interferometer"""
-    arm_length_difference: float = 0.0  # meters
-    coupling_ratio: float = 0.5         # beam splitter ratio
+
+class PhaseShifter(OpticalElement):
+    """Optical phase shifter."""
     
-    def process(self, input_field: OpticalField) -> OpticalField:
-        """Process field through MZI"""
-        # First beamsplitter
-        bs1 = Beamsplitter(ratio=self.coupling_ratio)
-        arm1, arm2 = bs1.split(input_field)
-        
-        # Arm length difference (phase shift)
-        c = 299792458  # speed of light
-        if arm1.states:
-            freq = arm1.states[0].frequency
-            phase_shift = 2 * np.pi * freq * self.arm_length_difference / c
-            
-            # Apply phase shift to arm2
-            shifted_arm2_states = []
-            for state in arm2.states:
-                new_state = PhotonState(
-                    frequency=state.frequency,
-                    amplitude=state.amplitude,
-                    phase=(state.phase + phase_shift) % (2 * np.pi),
-                    oam_charge=state.oam_charge,
-                    polarization=state.polarization,
-                    duration=state.duration
-                )
-                shifted_arm2_states.append(new_state)
-            
-            shifted_arm2 = OpticalField(shifted_arm2_states)
-        else:
-            shifted_arm2 = arm2
-        
-        # Second beamsplitter and interference
-        bs2 = Beamsplitter(ratio=0.5)
-        output1, output2 = bs2.split(arm1.interfere(shifted_arm2))
-        
-        # Return output1 (could be either output)
-        return output1
-
-@dataclass
-class OAMGenerator:
-    """OAM (Orbital Angular Momentum) mode generator"""
-    target_charge: int      # desired OAM charge
-    efficiency: float = 0.8  # conversion efficiency
+    def __init__(self, name: str, phase_shift: float):
+        super().__init__(name)
+        self.phase_shift = phase_shift
     
-    def apply(self, field: OpticalField) -> OpticalField:
-        """Convert field to specific OAM mode"""
-        result_states = []
+    def process(self, field: OpticalField) -> OpticalField:
+        """Apply phase shift to field."""
+        new_phase = (field.state.phase + self.phase_shift) % (2 * math.pi)
         
-        for state in field.states:
-            new_state = PhotonState(
-                frequency=state.frequency,
-                amplitude=state.amplitude * self.efficiency,
-                phase=state.phase,
-                oam_charge=self.target_charge,
-                polarization=state.polarization,
-                duration=state.duration
-            )
-            result_states.append(new_state)
+        new_state = PhotonState(
+            frequency=field.state.frequency,
+            amplitude=field.amplitude,
+            phase=new_phase,
+            oam=field.state.oam,
+            polarization=field.state.polarization
+        )
         
-        return OpticalField(result_states)
+        return OpticalField(new_state, field.position)
 
-@dataclass
-class Detector:
-    """Optical detector"""
-    quantum_efficiency: float = 0.9  # detector efficiency
-    noise_level: float = 0.01        # relative noise level
+
+class Mirror(OpticalElement):
+    """Perfect mirror."""
     
-    def measure(self, field: OpticalField) -> float:
-        """Measure field intensity"""
-        total_intensity = field.total_intensity()
+    def __init__(self, name: str):
+        super().__init__(name)
+    
+    def process(self, field: OpticalField) -> OpticalField:
+        """Reflect field (π phase shift)."""
+        new_phase = (field.state.phase + math.pi) % (2 * math.pi)
         
-        # Add detector noise
-        noise = np.random.normal(0, self.noise_level * total_intensity)
-        measured = total_intensity * self.quantum_efficiency + noise
+        new_state = PhotonState(
+            frequency=field.state.frequency,
+            amplitude=field.amplitude,
+            phase=new_phase,
+            oam=field.state.oam,
+            polarization=field.state.polarization
+        )
         
-        return max(measured, 0)  # intensity can't be negative
+        return OpticalField(new_state, field.position)
 
-def test_elements():
-    """Test optical elements"""
+
+class MachZehnderInterferometer(OpticalElement):
+    """Mach-Zehnder interferometer."""
+    
+    def __init__(self, name: str, arm_length_diff: float = 0.0):
+        super().__init__(name)
+        self.arm_length_diff = arm_length_diff
+        self.bs1 = BeamSplitter("BS1", 0.5)
+        self.bs2 = BeamSplitter("BS2", 0.5)
+        self.phase_shifter = PhaseShifter("PS", 0.0)
+    
+    def process(self, field: OpticalField) -> Tuple[OpticalField, OpticalField]:
+        """Process field through MZI."""
+        # First beam splitter
+        arm1, arm2 = self.bs1.split(field)
+        
+        # Arm 2 phase shift (due to path difference)
+        phase_shift = 2 * math.pi * self.arm_length_diff / field.wavelength
+        self.phase_shifter.phase_shift = phase_shift
+        shifted_arm2 = self.phase_shifter.process(arm2)
+        
+        # Recombine at second beam splitter
+        output1, output2 = self.bs2.split(arm1.interfere(shifted_arm2))
+        
+        return output1, output2
+
+
+# Test functions
+def test_elements() -> None:
+    """Test optical elements."""
     print("Testing Optical Elements...")
     
     # Create test photon
     test_photon = PhotonState(
-        frequency=193.414e12,
+        frequency=193.414e12,  # 1550 nm
         amplitude=1.0,
         phase=0.0,
-        oam_charge=0,
-        polarization=Polarization.LINEAR,
-        duration=100e-12
+        oam=0,
+        polarization=Polarization.LINEAR
     )
     
-    field = OpticalField([test_photon])
+    test_field = OpticalField(test_photon)
     
     # Test lens
-    lens = Lens(focal_length=0.1, diameter=0.01)
-    focused = lens.apply(field)
-    print(f"Lens applied. Original phase: {field.states[0].phase:.3f}, "
-          f"After lens: {focused.states[0].phase:.3f}")
+    lens = Lens("TestLens", focal_length=0.1)
+    lens_output = lens.process(test_field)
+    print(f"Lens applied. Original phase: {test_field.state.phase:.3f}, "
+          f"After lens: {lens_output.state.phase:.3f}")
     
-    # Test beamsplitter
-    bs = Beamsplitter(ratio=0.5)
-    trans, refl = bs.split(field)
-    print(f"Beamsplitter: Transmitted intensity: {trans.total_intensity():.3f}, "
-          f"Reflected: {refl.total_intensity():.3f}")
+    # Test beam splitter
+    bs = BeamSplitter("TestBS", transmission=0.5)
+    transmitted, reflected = bs.split(test_field)
+    print(f"Beamsplitter: Transmitted intensity: {transmitted.intensity:.3f}, "
+          f"Reflected: {reflected.intensity:.3f}")
+    
+    # Test phase shifter
+    ps = PhaseShifter("TestPS", phase_shift=math.pi/4)
+    ps_output = ps.process(test_field)
+    print(f"Phase shifter: Phase shift: {ps_output.state.phase - test_field.state.phase:.3f}")
+    
+    # Test mirror
+    mirror = Mirror("TestMirror")
+    mirror_output = mirror.process(test_field)
+    print(f"Mirror: Phase shifted by π: {mirror_output.state.phase:.3f}")
     
     # Test MZI
-    mzi = MachZehnderInterferometer(arm_length_difference=0.001)  # 1 mm difference
-    mzi_output = mzi.process(field)
-    print(f"MZI output intensity: {mzi_output.total_intensity():.3f}")
-    
-    # Test OAM generator
-    oam_gen = OAMGenerator(target_charge=+2)
-    oam_field = oam_gen.apply(field)
-    print(f"OAM generated. Charge: {oam_field.states[0].oam_charge}")
-    
-    # Test detector
-    detector = Detector()
-    measurement = detector.measure(field)
-    print(f"Detector measurement: {measurement:.3f}")
-    
-    return {
-        'lens': focused,
-        'beamsplitter': (trans, refl),
-        'mzi': mzi_output,
-        'oam': oam_field,
-        'measurement': measurement
-    }
+    mzi = MachZehnderInterferometer("TestMZI", arm_length_diff=1e-6)
+    mzi_output1, mzi_output2 = mzi.process(test_field)
+    print(f"MZI: Output intensities: {mzi_output1.intensity:.3f}, {mzi_output2.intensity:.3f}")
+
 
 if __name__ == "__main__":
     test_elements()
