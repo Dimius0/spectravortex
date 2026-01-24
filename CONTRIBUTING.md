@@ -1,4 +1,3 @@
-markdown
 # Contributing to SpectraVortex
 
 Thank you for your interest in contributing to SpectraVortex! This guide will help you get set up to make changes and submit improvements.
