@@ -209,3 +209,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+# В main.py добавьте:
+elif args.compile and "interference" in args.compile:
+    print("Compiling interference example...")
+    # Здесь будет вызов компилятора для interference.svx
+    run_example("interference")
