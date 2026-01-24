@@ -4,7 +4,14 @@ Optical field and photon state simulation for SpectraVortex.
 
 import math
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple
+from enum import Enum
+
+class Polarization(str, Enum):
+    """Polarization types."""
+    LINEAR = "linear"
+    CIRCULAR = "circular"
+    ELLIPTICAL = "elliptical"
 
 @dataclass
 class PhotonState:
@@ -13,7 +20,7 @@ class PhotonState:
     amplitude: float  # normalized to [0, 1]
     phase: float      # in radians, normalized to [0, 2π)
     oam: int          # orbital angular momentum (topological charge)
-    polarization: str # "linear", "circular", "elliptical"
+    polarization: Polarization
     
     def __post_init__(self):
         """Validate photon state parameters."""
@@ -23,8 +30,6 @@ class PhotonState:
         self.phase = self.phase % (2 * math.pi)
         if not isinstance(self.oam, int):
             raise ValueError(f"OAM must be integer, got {self.oam}")
-        if self.polarization not in ["linear", "circular", "elliptical"]:
-            raise ValueError(f"Unknown polarization: {self.polarization}")
 
 class OpticalField:
     """Represents an optical field with spatial properties."""
@@ -155,7 +160,7 @@ def test_field() -> None:
         amplitude=0.8,
         phase=0.0,
         oam=0,
-        polarization="linear"
+        polarization=Polarization.LINEAR
     )
     
     state2 = PhotonState(
@@ -163,7 +168,7 @@ def test_field() -> None:
         amplitude=0.6,
         phase=math.pi,  # 180° phase shift
         oam=0,
-        polarization="linear"
+        polarization=Polarization.LINEAR
     )
     
     field1 = OpticalField(state1)
