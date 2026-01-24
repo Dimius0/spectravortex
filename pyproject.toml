@@ -1,33 +1,25 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "spectravortex"
 version = "0.1.0"
-authors = [
-  {name = "Your Name", email = "your.email@example.com"},
-]
-description = "A high-level programming language for photonic computing."
+authors = [{name = "Dimius0"}]
+description = "A declarative language for photonic computing"
 readme = "README.md"
 license = {text = "MIT"}
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering :: Physics",
-]
 requires-python = ">=3.8"
-dependencies = [
-    "numpy>=1.21",
+dependencies = ["numpy>=1.21"]
+
+# ЯВНО УКАЗЫВАЕМ ПАКЕТЫ (решает ошибку "Multiple top-level packages")
+packages = [
+    {include = "compiler"},
+    {include = "simulator"},
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "black>=23.0",
-    "ruff>=0.1.0",
-]
+dev = ["pytest", "black", "ruff"]
 
 [project.urls]
-"Homepage" = "https://github.com/Dimius0/spectravortex"
-"Bug Tracker" = "https://github.com/Dimius0/spectravortex/issues"
+Homepage = "https://github.com/Dimius0/spectravortex"
