@@ -48,7 +48,7 @@ jobs:
           echo "::error::Тесты упали! Проверьте логи выше."
           echo "Локально можно запустить: make test-fast"
 
-    lint:
+  lint:
     name: Lint and Format Check
     runs-on: ubuntu-latest
     steps:
