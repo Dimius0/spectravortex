@@ -1,5 +1,5 @@
 """
-Lexer (Tokenizer) for SpectraVortex language with full expression support
+Lexer (Tokenizer) for SpectraVortex language with OAM support
 """
 
 from enum import Enum
@@ -26,6 +26,20 @@ class TokenType(Enum):
     TRUE = "TRUE"
     FALSE = "FALSE"
     
+    # OAM and vortex light keywords
+    VORTEX = "VORTEX"
+    OAM_CHARGE = "OAM_CHARGE"
+    HELICAL = "HELICAL"
+    TOPOLOGICAL = "TOPOLOGICAL"
+    INTERFERE = "INTERFERE"
+    SUPERPOSE = "SUPERPOSE"
+    MULTIPLEX = "MULTIPLEX"
+    DEMULTIPLEX = "DEMULTIPLEX"
+    WAVELENGTH = "WAVELENGTH"
+    WAIST = "WAIST"
+    VORTEX_BEAM = "VORTEX_BEAM"
+    LAGUERRE_GAUSSIAN = "LAGUERRE_GAUSSIAN"
+    
     # Types and properties
     FREQUENCY = "FREQUENCY"
     AMPLITUDE = "AMPLITUDE"
@@ -50,6 +64,11 @@ class TokenType(Enum):
     LESS_EQUAL = "LESS_EQUAL"       # '<='
     GREATER = "GREATER"             # '>'
     GREATER_EQUAL = "GREATER_EQUAL" # '>='
+    
+    # OAM operators
+    OAM_PLUS = "OAM_PLUS"          # ⊕ - специальное сложение OAM
+    OAM_MINUS = "OAM_MINUS"        # ⊖
+    VORTEX_PROD = "VORTEX_PROD"    # ⊗ - тензорное произведение OAM
     
     # Brackets and punctuation
     LPAREN = "LPAREN"       # '('
@@ -81,7 +100,7 @@ class Token:
         return self.__str__()
 
 class Lexer:
-    """Lexer for SpectraVortex with full expression and matrix support"""
+    """Lexer for SpectraVortex with OAM and vortex light support"""
     
     def __init__(self, source: str):
         self.source = source
@@ -109,11 +128,34 @@ class Lexer:
             'not': TokenType.NOT,
             'true': TokenType.TRUE,
             'false': TokenType.FALSE,
+            
+            # OAM keywords
+            'vortex': TokenType.VORTEX,
+            'oam_charge': TokenType.OAM_CHARGE,
+            'helical': TokenType.HELICAL,
+            'topological': TokenType.TOPOLOGICAL,
+            'interfere': TokenType.INTERFERE,
+            'superpose': TokenType.SUPERPOSE,
+            'multiplex': TokenType.MULTIPLEX,
+            'demultiplex': TokenType.DEMULTIPLEX,
+            'wavelength': TokenType.WAVELENGTH,
+            'waist': TokenType.WAIST,
+            'vortex_beam': TokenType.VORTEX_BEAM,
+            'laguerre_gaussian': TokenType.LAGUERRE_GAUSSIAN,
+            
+            # Physical properties
             'frequency': TokenType.FREQUENCY,
             'amplitude': TokenType.AMPLITUDE,
             'phase': TokenType.PHASE,
             'oam': TokenType.OAM,
             'polarization': TokenType.POLARIZATION,
+        }
+        
+        # Special character mappings
+        self.special_chars = {
+            '⊕': TokenType.OAM_PLUS,
+            '⊖': TokenType.OAM_MINUS,
+            '⊗': TokenType.VORTEX_PROD,
         }
     
     def tokenize(self) -> List[Token]:
@@ -142,6 +184,12 @@ class Lexer:
             
             if char == '/' and self._peek() == '*':
                 self._skip_block_comment()
+                continue
+            
+            # Check for special OAM characters
+            if char in self.special_chars:
+                self.tokens.append(Token(self.special_chars[char], char, self.line, start_column))
+                self._advance()
                 continue
             
             # Numbers (integers and floats)
@@ -354,179 +402,39 @@ class Lexer:
 
 
 def test_lexer():
-    """Test the lexer with various language features"""
-    print("Testing Lexer with full expression support...")
-    
-    test_cases = [
-        # Basic photon definition
-        """
-        photon laser = {
-            frequency: 193.414e12,
-            amplitude: 0.8,
-            polarization: "linear"
-        }
-        """,
-        
-        # Matrix definition
-        """
-        matrix = { rows: 2, cols: 2, value: [[1, 2], [3, 4]] }
-        """,
-        
-        # Program with expressions
-        """
-        program test() {
-            x = 10 + 5 * 2;
-            y = x < 20 and x > 5;
-            print("Result:", x);
-            
-            if (x == 20) {
-                print("x is 20");
-            } else {
-                print("x is not 20");
-            }
-            
-            while (x > 0) {
-                x = x - 1;
-            }
-        }
-        """,
-        
-        # Function definition
-        """
-        function encode_matrix(data) {
-            return data * 2;
-        }
-        """,
-        
-        # Complex expressions for optical computing
-        """
-        // Optical interference simulation
-        beam1 = beam(laser, phase: 0.0);
-        beam2 = beam(laser, phase: 3.14159);
-        
-        interference = beam1 + beam2;
-        intensity = amplitude(interference) * amplitude(interference);
-        """
-    ]
-    
-    for i, source in enumerate(test_cases, 1):
-        print(f"\n{'='*60}")
-        print(f"Test Case {i}:")
-        print(f"{'='*60}")
-        print(f"Source:\n{source.strip()}")
-        print(f"\nTokens:")
-        
-        try:
-            lexer = Lexer(source)
-            tokens = lexer.tokenize()
-            
-            for token in tokens:
-                if token.type != TokenType.NEWLINE:  # Skip newline tokens for readability
-                    print(f"  {token}")
-            
-            print(f"\n✅ Parsed {len(tokens)} tokens successfully")
-            
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    return True
-
-
-def test_optical_matrix_example():
-    """Test the optical matrix multiplier example specifically"""
-    print(f"\n{'='*60}")
-    print("Testing Optical Matrix Multiplier Example")
-    print(f"{'='*60}")
+    """Test the lexer with OAM support"""
+    print("Testing Lexer with OAM support...")
     
     source = """
-// Optical Matrix Multiplier Demo
-photon source = {
-    frequency: 193.414e12,
-    amplitude: 1.0,
-    phase: 0.0,
-    oam: 0,
-    polarization: "linear"
+vortex photon_plus1 = {
+    oam_charge: +1,
+    wavelength: 1550e-9
 }
 
-function encode_matrix(matrix_data) {
-    print("Encoding matrix of size:", matrix_data.rows, "x", matrix_data.cols);
-    return matrix_data;
-}
+vortex_beam lg_mode = laguerre_gaussian(
+    oam_charge: +3,
+    radial_order: 0
+)
 
-function optical_matmul(matrix_a, matrix_b) {
-    if (matrix_a.cols != matrix_b.rows) {
-        print("Error: Matrix dimensions incompatible!");
-        return { rows: 0, cols: 0, value: [[]] };
-    }
-    
-    print("Performing optical matrix multiplication...");
-    
-    // Simulate optical computation
-    result_matrix = { 
-        rows: matrix_a.rows, 
-        cols: matrix_b.cols, 
-        value: [[0, 0], [0, 0]] 
-    };
-    
-    return result_matrix;
-}
-
-program optical_demo() {
-    print("=== Optical Matrix Multiplier Demo ===");
-    
-    // Define test matrices
-    matrix_a = { rows: 2, cols: 2, value: [[1.0, 2.0], [3.0, 4.0]] };
-    matrix_b = { rows: 2, cols: 2, value: [[0.5, 1.0], [1.5, 2.0]] };
-    
-    // Encode matrices as optical signals
-    optical_a = encode_matrix(matrix_a);
-    optical_b = encode_matrix(matrix_b);
-    
-    // Perform optical multiplication
-    result = optical_matmul(optical_a, optical_b);
-    
-    print("Demo completed!");
+program oam_demo() {
+    result = interfere(beam1, beam2);
+    multiplexed = multiplex([mode1, mode2, mode3]);
 }
 """
-    
-    print("Source code loaded successfully")
     
     lexer = Lexer(source)
     tokens = lexer.tokenize()
     
-    print(f"\nGenerated {len(tokens)} tokens")
+    print(f"Generated {len(tokens)} tokens")
     
-    # Count token types
-    token_counts = {}
+    # Show OAM-related tokens
+    print("\nOAM-related tokens found:")
     for token in tokens:
-        if token.type != TokenType.NEWLINE and token.type != TokenType.EOF:
-            token_counts[token.type] = token_counts.get(token.type, 0) + 1
+        if any(keyword in token.type.name for keyword in ['VORTEX', 'OAM', 'INTERFERE', 'MULTIPLEX']):
+            print(f"  {token}")
     
-    print("\nToken counts:")
-    for token_type, count in sorted(token_counts.items()):
-        print(f"  {token_type.name}: {count}")
-    
-    # Show first 20 non-newline tokens
-    print("\nFirst 20 tokens (excluding newlines):")
-    non_newline_tokens = [t for t in tokens if t.type != TokenType.NEWLINE]
-    for i, token in enumerate(non_newline_tokens[:20]):
-        print(f"  {i:2d}: {token}")
-    
-    print(f"\n✅ Optical matrix example lexed successfully!")
     return tokens
 
 
 if __name__ == "__main__":
-    print("SpectraVortex Lexer Test Suite")
-    print("=" * 60)
-    
-    # Run basic tests
     test_lexer()
-    
-    # Run optical matrix example test
-    test_optical_matrix_example()
-    
-    print(f"\n{'='*60}")
-    print("✅ All lexer tests completed successfully!")
