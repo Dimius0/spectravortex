@@ -13,7 +13,7 @@ class OAMPhysics:
     def laguerre_gaussian_intensity(
         r: float, 
         phi: float, 
-        l: int,  # OAM charge
+        oam_charge: int,  # Changed from 'l' to 'oam_charge'
         p: int = 0,  # Radial order
         w0: float = 1.0,  # Waist
         wavelength: float = 1550e-9
@@ -24,7 +24,7 @@ class OAMPhysics:
         Args:
             r: Radial coordinate
             phi: Azimuthal angle
-            l: OAM charge (topological charge)
+            oam_charge: OAM charge (topological charge)
             p: Radial order
             w0: Beam waist
             wavelength: Wavelength in meters
@@ -32,11 +32,11 @@ class OAMPhysics:
         Returns:
             intensity: Normalized intensity
         """
-        # Rayleigh range
-        z_r = math.pi * w0**2 / wavelength
+        # Rayleigh range (commented out since not used, or use it)
+        # z_r = math.pi * w0**2 / wavelength
         
         # Simplified LG mode (at beam waist z=0)
-        if l == 0 and p == 0:
+        if oam_charge == 0 and p == 0:
             # Gaussian beam
             return math.exp(-2 * r**2 / w0**2)
         
@@ -44,36 +44,36 @@ class OAMPhysics:
         r_norm = math.sqrt(2) * r / w0
         
         # Calculate associated Laguerre polynomial
-        laguerre_poly = OAMPhysics._laguerre_poly(p, abs(l), r_norm**2)
+        laguerre_poly = OAMPhysics._laguerre_poly(p, abs(oam_charge), r_norm**2)
         
         # LG mode intensity profile
         intensity = (
-            (r_norm**(2 * abs(l))) * 
+            (r_norm**(2 * abs(oam_charge))) * 
             math.exp(-r_norm**2) * 
             (laguerre_poly**2)
         )
         
         # Normalization factor
-        norm = math.sqrt(2 * math.factorial(p) / (math.pi * math.factorial(p + abs(l))))
+        norm = math.sqrt(2 * math.factorial(p) / (math.pi * math.factorial(p + abs(oam_charge))))
         
         return intensity * (norm**2)
     
     @staticmethod
-    def _laguerre_poly(p: int, l: int, x: float) -> float:
+    def _laguerre_poly(p: int, abs_oam: int, x: float) -> float:  # Changed 'l' to 'abs_oam'
         """Calculate associated Laguerre polynomial L_p^l(x)"""
         if p == 0:
             return 1
         elif p == 1:
-            return 1 + l - x
+            return 1 + abs_oam - x
         elif p == 2:
-            return (x**2 - 2*(l+2)*x + (l+1)*(l+2)) / 2
+            return (x**2 - 2*(abs_oam+2)*x + (abs_oam+1)*(abs_oam+2)) / 2
         
         # For higher orders, use recursion
         L_prev2 = 1
-        L_prev1 = 1 + l - x
+        L_prev1 = 1 + abs_oam - x
         
         for n in range(2, p + 1):
-            L_current = ((2*n - 1 + l - x) * L_prev1 - (n - 1 + l) * L_prev2) / n
+            L_current = ((2*n - 1 + abs_oam - x) * L_prev1 - (n - 1 + abs_oam) * L_prev2) / n
             L_prev2, L_prev1 = L_prev1, L_current
         
         return L_prev1
