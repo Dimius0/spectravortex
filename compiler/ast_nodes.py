@@ -1,5 +1,5 @@
 """
-AST Nodes for SpectraVortex
+AST Nodes for SpectraVortex with OAM support
 """
 
 from typing import List, Dict, Optional, Any, Union
@@ -22,11 +22,32 @@ class PhotonDefNode(ASTNode):
     parameters: Dict[str, Any]
 
 @dataclass
+class VortexPhotonNode(ASTNode):
+    """Vortex photon with OAM charge"""
+    name: str
+    parameters: Dict[str, Any]
+    
+    def __post_init__(self):
+        """Extract OAM charge from parameters"""
+        self.oam_charge = self.parameters.get('oam_charge', 0)
+
+@dataclass
 class BeamDefNode(ASTNode):
     """Beam definition: beam name = beam(...)"""
     name: str
     base_photon: str
     modifiers: Dict[str, Any]
+
+@dataclass
+class VortexBeamNode(ASTNode):
+    """Vortex beam (LG mode)"""
+    name: str
+    beam_type: str  # "laguerre_gaussian", "helical", etc.
+    parameters: Dict[str, Any]
+    
+    def __post_init__(self):
+        """Extract OAM charge from parameters"""
+        self.oam_charge = self.parameters.get('oam_charge', 0)
 
 @dataclass
 class ProgramDefNode(ASTNode):
@@ -78,6 +99,35 @@ class WhileNode(ASTNode):
     body: List['ASTNode']
 
 @dataclass
+class OAMOperationNode(ASTNode):
+    """Base class for OAM operations"""
+    pass
+
+@dataclass
+class InterfereNode(OAMOperationNode):
+    """Optical interference of two beams"""
+    beam1: 'ExpressionNode'
+    beam2: 'ExpressionNode'
+
+@dataclass
+class SuperposeNode(OAMOperationNode):
+    """Quantum superposition of OAM states"""
+    beams: List['ExpressionNode']
+    coefficients: List['ExpressionNode']
+
+@dataclass
+class MultiplexNode(OAMOperationNode):
+    """Spatial multiplexing of OAM modes"""
+    beams: List['ExpressionNode']
+    method: str = "mode"
+
+@dataclass
+class DemultiplexNode(OAMOperationNode):
+    """Demultiplexing OAM modes"""
+    input_beam: 'ExpressionNode'
+    output_modes: List['ExpressionNode']
+
+@dataclass
 class ExpressionNode(ASTNode):
     """Base class for expressions"""
     pass
@@ -97,7 +147,7 @@ class IdentifierNode(ExpressionNode):
 class BinaryOpNode(ExpressionNode):
     """Binary operation: left op right"""
     left: 'ExpressionNode'
-    op: str  # '+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>=', 'and', 'or'
+    op: str  # '+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>=', 'and', 'or', '⊕', '⊖', '⊗'
     right: 'ExpressionNode'
 
 @dataclass
@@ -129,12 +179,25 @@ class ParenExprNode(ExpressionNode):
     """Parenthesized expression: (expr)"""
     expression: 'ExpressionNode'
 
-# Explicit export list to avoid linting issues
+@dataclass
+class OAMChargeNode(ExpressionNode):
+    """OAM charge value"""
+    charge: int
+
+@dataclass
+class TypeAnnotationNode(ASTNode):
+    """Type annotation for OAM checking"""
+    variable: 'IdentifierNode'
+    type_expr: str  # "vortex", "beam", "matrix", etc.
+
+# Explicit export list
 __all__ = [
     'ASTNode',
     'ProgramNode',
-    'PhotonDefNode', 
+    'PhotonDefNode',
+    'VortexPhotonNode',
     'BeamDefNode',
+    'VortexBeamNode',
     'ProgramDefNode',
     'PrintNode',
     'VariableDeclNode',
@@ -143,6 +206,11 @@ __all__ = [
     'ReturnNode',
     'IfNode',
     'WhileNode',
+    'OAMOperationNode',
+    'InterfereNode',
+    'SuperposeNode',
+    'MultiplexNode',
+    'DemultiplexNode',
     'ExpressionNode',
     'LiteralNode',
     'IdentifierNode',
@@ -151,5 +219,7 @@ __all__ = [
     'ArrayLiteralNode',
     'MatrixLiteralNode',
     'FunctionCallNode',
-    'ParenExprNode'
+    'ParenExprNode',
+    'OAMChargeNode',
+    'TypeAnnotationNode'
 ]
