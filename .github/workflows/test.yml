@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:  # Можно запускать вручную
+    branches: [main]
+  workflow_dispatch: # Можно запускать вручную
   schedule:
-    - cron: '0 8 * * 1'  # Каждый понедельник в 8 утра
+    - cron: "0 8 * * 1" # Каждый понедельник в 8 утра
 
 jobs:
   test:
@@ -16,61 +16,61 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip
-        pip install .[dev]
-        pip install black ruff pytest pytest-cov
-    
-    - name: Run tests
-      run: make test
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      if: success()
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
-    
-    - name: Check for failed tests
-      if: failure()
-      run: |
-        echo "::error::Тесты упали! Проверьте логи выше."
-        echo "Локально можно запустить: make test-fast"
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install .[dev]
+          pip install black ruff pytest pytest-cov
+
+      - name: Run tests
+        run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: success()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+      - name: Check for failed tests
+        if: failure()
+        run: |
+          echo "::error::Тесты упали! Проверьте логи выше."
+          echo "Локально можно запустить: make test-fast"
 
   lint:
     name: Lint and Format Check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12"
-    
-    - name: Install linting tools
-      run: |
-        pip install black ruff
-    
-    - name: Check formatting
-      run: black --check --diff .
-    
-    - name: Run linter
-      run: ruff check .
-    
-    - name: Auto-fix formatting
-      if: failure()
-      run: |
-        echo "::warning::Код нуждается в форматировании"
-        echo "Локально исправьте командой: make format"
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linting tools
+        run: |
+          pip install black ruff
+
+      - name: Check formatting
+        run: black --check --diff .
+
+      - name: Run linter
+        run: ruff check .
+
+      - name: Auto-fix formatting
+        if: failure()
+        run: |
+          echo "::warning::Код нуждается в форматировании"
+          echo "Локально исправьте командой: make format"
