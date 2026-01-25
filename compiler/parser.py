@@ -3,9 +3,19 @@ Parser for SpectraVortex language with OAM support
 """
 
 from typing import List, Dict, Optional, Any, Union
-from dataclasses import dataclass
 from .lexer import Lexer, Token, TokenType
-from .ast_nodes import *
+
+# Явно импортируем все классы из ast_nodes
+from .ast_nodes import (
+    ASTNode, ProgramNode, PhotonDefNode, VortexPhotonNode,
+    BeamDefNode, VortexBeamNode, ProgramDefNode, PrintNode,
+    VariableDeclNode, AssignmentNode, FunctionDeclNode, ReturnNode,
+    IfNode, WhileNode, OAMOperationNode, InterfereNode,
+    SuperposeNode, MultiplexNode, DemultiplexNode, ExpressionNode,
+    LiteralNode, IdentifierNode, BinaryOpNode, UnaryOpNode,
+    ArrayLiteralNode, MatrixLiteralNode, FunctionCallNode,
+    ParenExprNode, OAMChargeNode
+)
 
 class Parser:
     """Recursive descent parser for SpectraVortex with OAM support"""
