@@ -1,9 +1,8 @@
-# compiler/ast_nodes.py
 """
 AST Nodes for SpectraVortex
 """
 
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from dataclasses import dataclass
 
 @dataclass
@@ -14,7 +13,7 @@ class ASTNode:
 @dataclass
 class ProgramNode(ASTNode):
     """Root node of the program"""
-    statements: List[ASTNode]
+    statements: List['ASTNode']
 
 @dataclass
 class PhotonDefNode(ASTNode):
@@ -33,7 +32,7 @@ class BeamDefNode(ASTNode):
 class ProgramDefNode(ASTNode):
     """Program definition: program name() { ... }"""
     name: str
-    body: List[ASTNode]
+    body: List['ASTNode']
 
 @dataclass
 class PrintNode(ASTNode):
@@ -58,7 +57,7 @@ class FunctionDeclNode(ASTNode):
     """Function declaration: function name(params) { ... }"""
     name: str
     parameters: List[str]
-    body: List[ASTNode]
+    body: List['ASTNode']
 
 @dataclass
 class ReturnNode(ASTNode):
@@ -69,14 +68,14 @@ class ReturnNode(ASTNode):
 class IfNode(ASTNode):
     """If statement: if (condition) { ... } else { ... }"""
     condition: 'ExpressionNode'
-    then_branch: List[ASTNode]
-    else_branch: List[ASTNode]
+    then_branch: List['ASTNode']
+    else_branch: List['ASTNode']
 
 @dataclass
 class WhileNode(ASTNode):
     """While statement: while (condition) { ... }"""
     condition: 'ExpressionNode'
-    body: List[ASTNode]
+    body: List['ASTNode']
 
 @dataclass
 class ExpressionNode(ASTNode):
@@ -97,38 +96,60 @@ class IdentifierNode(ExpressionNode):
 @dataclass
 class BinaryOpNode(ExpressionNode):
     """Binary operation: left op right"""
-    left: ExpressionNode
+    left: 'ExpressionNode'
     op: str  # '+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>=', 'and', 'or'
-    right: ExpressionNode
+    right: 'ExpressionNode'
 
 @dataclass
 class UnaryOpNode(ExpressionNode):
     """Unary operation: op operand"""
     op: str  # '-', 'not'
-    operand: ExpressionNode
+    operand: 'ExpressionNode'
 
 @dataclass
 class ArrayLiteralNode(ExpressionNode):
     """Array literal: [value1, value2, ...]"""
-    elements: List[ExpressionNode]
+    elements: List['ExpressionNode']
 
 @dataclass
 class MatrixLiteralNode(ExpressionNode):
     """Matrix literal: { rows: N, cols: M, value: [[...], ...] }"""
     rows: int
     cols: int
-    value: List[List[ExpressionNode]]
+    value: List[List['ExpressionNode']]
 
 @dataclass
 class FunctionCallNode(ExpressionNode):
     """Function call: name(arg1, arg2, ...)"""
     name: str
-    arguments: List[ExpressionNode]
+    arguments: List['ExpressionNode']
 
 @dataclass
 class ParenExprNode(ExpressionNode):
     """Parenthesized expression: (expr)"""
-    expression: ExpressionNode
+    expression: 'ExpressionNode'
 
-# Add to parser.py import section:
-# from .ast_nodes import (all the classes above)
+# Explicit export list to avoid linting issues
+__all__ = [
+    'ASTNode',
+    'ProgramNode',
+    'PhotonDefNode', 
+    'BeamDefNode',
+    'ProgramDefNode',
+    'PrintNode',
+    'VariableDeclNode',
+    'AssignmentNode',
+    'FunctionDeclNode',
+    'ReturnNode',
+    'IfNode',
+    'WhileNode',
+    'ExpressionNode',
+    'LiteralNode',
+    'IdentifierNode',
+    'BinaryOpNode',
+    'UnaryOpNode',
+    'ArrayLiteralNode',
+    'MatrixLiteralNode',
+    'FunctionCallNode',
+    'ParenExprNode'
+]
