@@ -1,1 +1,202 @@
+# examples/vortex_oam_demo.svx
+"""
+Vortex OAM Light Demo
+Demonstrates Orbital Angular Momentum manipulation
+"""
 
+// Define vortex photons with different OAM charges
+vortex photon_plus1 = {
+    oam_charge: +1,
+    wavelength: 1550e-9,
+    waist: 2.0,
+    profile: "laguerre_gaussian",
+    power: 1.0
+}
+
+vortex photon_minus2 = {
+    oam_charge: -2,
+    wavelength: 1550e-9,
+    waist: 2.0,
+    profile: "laguerre_gaussian",
+    power: 1.0
+}
+
+vortex photon_zero = {
+    oam_charge: 0,
+    wavelength: 1550e-9,
+    waist: 2.0,
+    profile: "laguerre_gaussian",
+    power: 1.0
+}
+
+vortex photon_plus3 = {
+    oam_charge: +3,
+    wavelength: 1550e-9,
+    waist: 1.5,
+    profile: "helical",
+    power: 0.8
+}
+
+// Create vortex beams
+vortex_beam lg_plus1 = laguerre_gaussian(
+    oam_charge: +1,
+    radial_order: 0,
+    waist: 1.5,
+    wavelength: 1550e-9,
+    power: 1.0
+)
+
+vortex_beam lg_minus2 = laguerre_gaussian(
+    oam_charge: -2,
+    radial_order: 0,
+    waist: 1.5,
+    wavelength: 1550e-9,
+    power: 1.0
+)
+
+vortex_beam lg_zero = laguerre_gaussian(
+    oam_charge: 0,
+    radial_order: 0,
+    waist: 2.0,
+    wavelength: 1550e-9,
+    power: 1.0
+)
+
+// Type-safe OAM operations
+program oam_demo() {
+    print("=== OAM Vortex Light Demo ===");
+    print("Orbital Angular Momentum in Photonic Computing");
+    print();
+    
+    // 1. Show OAM charges
+    print("1. Defined vortex photons:");
+    print("   photon_plus1:  OAM = +1  (left-handed helical)");
+    print("   photon_minus2: OAM = -2  (right-handed double-helix)");
+    print("   photon_zero:   OAM = 0   (Gaussian beam)");
+    print("   photon_plus3:  OAM = +3  (triple-helix)");
+    print();
+    
+    // 2. Demonstrate interference
+    print("2. Optical interference experiments:");
+    
+    // Same OAM - perfect interference
+    result1 = interfere(lg_plus1, lg_plus1);
+    print("   Experiment 1: OAM+1 ⊕ OAM+1");
+    print("   → Perfect interference ✓ (visibility =", result1.visibility, ")");
+    
+    // Different OAM - reduced interference
+    result2 = interfere(lg_plus1, lg_minus2);
+    print("   Experiment 2: OAM+1 ⊕ OAM-2");
+    print("   → Reduced interference (different OAM)");
+    print("   → Visibility =", result2.visibility);
+    print("   → Resulting OAM =", result2.resulting_oam);
+    print();
+    
+    // 3. OAM multiplexing
+    print("3. OAM Mode Division Multiplexing:");
+    
+    // Create array of OAM modes
+    modes = [photon_plus1, photon_minus2, photon_zero, photon_plus3];
+    
+    // Multiplex them using different methods
+    multiplexed_spatial = multiplex(modes, method: "spatial");
+    multiplexed_mode = multiplex(modes, method: "mode");
+    
+    print("   Multiplexed", len(modes), "OAM modes");
+    print("   Spatial method: Capacity =", multiplexed_spatial.capacity, "channels");
+    print("   Mode method: Capacity =", multiplexed_mode.capacity, "channels");
+    print("   Efficiency:", (multiplexed_mode.efficiency * 100), "%");
+    print();
+    
+    // 4. Quantum superposition
+    print("4. Quantum Superposition of OAM States:");
+    
+    // Create superposition state
+    superposition = superpose(
+        beams: [lg_plus1, lg_minus2, lg_zero],
+        coefficients: [0.577, 0.577, 0.577]  // 1/√3 each
+    );
+    
+    print("   Created: ψ = 0.577|OAM+1⟩ + 0.577|OAM-2⟩ + 0.577|OAM0⟩");
+    print("   Number of states:", superposition.num_states);
+    print("   Entangled:", superposition.is_entangled ? "Yes" : "No");
+    print("   OAM charges:", superposition.oam_charges);
+    print();
+    
+    // 5. OAM spectrum analysis
+    print("5. OAM Spectrum Analysis:");
+    
+    all_beams = [photon_plus1, photon_minus2, photon_zero, photon_plus3];
+    spectrum = calculate_oam_spectrum(all_beams);
+    
+    print("   OAM charges present: [-2, 0, +1, +3]");
+    print("   Spectrum calculated for analysis");
+    print("   Unique OAM states:", len(set([-2, 0, 1, 3])));
+    print();
+    
+    // 6. Vortex array creation
+    print("6. Vortex Beam Array:");
+    
+    vortex_array = create_vortex_array([+1, -1, +2, -2, 0]);
+    print("   Created array with", vortex_array.num_modes, "modes");
+    print("   Total OAM:", vortex_array.total_oam);
+    print("   Average OAM:", vortex_array.average_oam);
+    print("   Configuration:", vortex_array.config);
+    print();
+    
+    // 7. OAM conservation demonstration
+    print("7. OAM Conservation Principle:");
+    print("   ✓ Physical law: Total OAM is conserved");
+    print("   ✓ Compiler checks OAM charge matching");
+    print("   ✓ Error if trying to add different OAM modes");
+    print("   ✓ Ensures physical correctness at compile time");
+    print();
+    
+    // 8. Applications
+    print("8. Applications of OAM:");
+    print("   • High-capacity optical communications");
+    print("   • Quantum information processing");
+    print("   • Optical tweezers and micromanipulation");
+    print("   • Super-resolution microscopy");
+    print("   • Enhanced sensing and imaging");
+    print();
+    
+    print("=== Demo Complete ===");
+    print();
+    print("Summary: OAM provides infinite orthogonal states");
+    print("for increasing bandwidth in photonic systems.");
+    print("SpectraVortex enforces OAM conservation for");
+    print("physically correct photonic circuit design.");
+}
+
+// Helper functions
+function calculate_oam_spectrum(beams) {
+    print("[Physics] Calculating OAM spectrum...");
+    
+    // Return simulated spectrum
+    return {
+        type: "oam_spectrum",
+        charges: [-3, -2, -1, 0, +1, +2, +3],
+        intensities: [0.1, 0.8, 0.0, 0.5, 0.9, 0.0, 0.3]
+    };
+}
+
+// Example of OAM addition (valid - same OAM)
+program valid_oam_addition() {
+    vortex v1 = { oam_charge: +2 };
+    vortex v2 = { oam_charge: +2 };
+    
+    // This is valid - same OAM
+    result = v1 ⊕ v2;  // OAM addition operator
+    print("Valid OAM addition: OAM+2 ⊕ OAM+2");
+}
+
+// Uncomment to see type error:
+// program invalid_oam_addition() {
+//     vortex v1 = { oam_charge: +1 };
+//     vortex v2 = { oam_charge: -1 };
+//     
+//     // ERROR: Cannot add photons with different OAM charges
+//     // The type system will catch this at compile time
+//     result = v1 + v2;
+// }
