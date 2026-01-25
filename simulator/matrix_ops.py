@@ -1,13 +1,26 @@
 # simulator/matrix_ops.py
+"""
+Matrix operations for SpectraVortex interpreter
+"""
+
 class MatrixOperations:
+    """Matrix operations for optical computing simulation"""
+    
     @staticmethod
     def multiply(a, b):
-        """Умножение двух матриц"""
-        a_rows, a_cols = len(a['value']), len(a['value'][0])
-        b_rows, b_cols = len(b['value']), len(b['value'][0])
+        """Multiply two matrices"""
+        # Проверяем, что это матрицы
+        if not isinstance(a, dict) or a.get('type') != 'matrix':
+            raise TypeError(f"First argument must be a matrix, got {type(a)}")
+        if not isinstance(b, dict) or b.get('type') != 'matrix':
+            raise TypeError(f"Second argument must be a matrix, got {type(b)}")
+        
+        # Используем сохраненные размеры
+        a_rows, a_cols = a['rows'], a['cols']
+        b_rows, b_cols = b['rows'], b['cols']
         
         if a_cols != b_rows:
-            raise ValueError(f"Matrix dimensions mismatch: {a_rows}x{a_cols} vs {b_rows}x{b_cols}")
+            raise ValueError(f"Cannot multiply {a_rows}x{a_cols} matrix by {b_rows}x{b_cols} matrix")
         
         result = [[0.0 for _ in range(b_cols)] for _ in range(a_rows)]
         
@@ -17,6 +30,7 @@ class MatrixOperations:
                     result[i][j] += a['value'][i][k] * b['value'][k][j]
         
         return {
+            'type': 'matrix',
             'rows': a_rows,
             'cols': b_cols,
             'value': result
@@ -25,10 +39,41 @@ class MatrixOperations:
     @staticmethod
     def simulate_mzi_mesh(matrix_data):
         """
-        Симуляция интерферометра Маха-Цендера для оптического
-        матричного умножения
+        Simulate Mach-Zehnder Interferometer mesh for optical
+        matrix multiplication
         """
-        # Упрощенная модель: каждый MZI реализует элементарное вращение
-        # В реальности это была бы сложная оптическая схема
-        print(f"[MZI Mesh] Configuring {len(matrix_data)}x{len(matrix_data[0])} interferometer array")
+        print(f"[MatrixOps] Configuring {matrix_data['rows']}x{matrix_data['cols']} MZI mesh")
+        
+        # В реальной реализации здесь была бы оптическая симуляция
+        # интерференции в массиве интерферометров Маха-Цендера
         return matrix_data
+    
+    @staticmethod
+    def format_matrix(matrix):
+        """Format matrix for display"""
+        if not isinstance(matrix, dict) or matrix.get('type') != 'matrix':
+            return str(matrix)
+        
+        rows = matrix['value']
+        if not rows:
+            return "[]"
+        
+        formatted = "["
+        for i, row in enumerate(rows):
+            if i > 0:
+                formatted += " "
+            formatted += "["
+            formatted += ", ".join(f"{val:.4f}" if isinstance(val, float) else str(val) for val in row)
+            formatted += "]"
+            if i < len(rows) - 1:
+                formatted += "\n"
+        formatted += "]"
+        return formatted
+    
+    @staticmethod
+    def matrix_to_string(matrix):
+        """Convert matrix to string representation (compatible with print)"""
+        if not isinstance(matrix, dict) or matrix.get('type') != 'matrix':
+            return str(matrix)
+        
+        return f"Matrix({matrix['rows']}x{matrix['cols']}): {MatrixOperations.format_matrix(matrix)}"
