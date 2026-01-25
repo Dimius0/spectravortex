@@ -6,8 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch: # Можно запускать вручную
-  schedule:
-    - cron: "0 8 * * 1" # Каждый понедельник в 8 утра
 
 jobs:
   test:
@@ -30,7 +28,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install .[dev]
-          pip install black ruff pytest pytest-cov
+          pip install pytest pytest-cov
 
       - name: Run tests
         run: make test
@@ -53,9 +51,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ github.head_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -66,33 +61,27 @@ jobs:
         run: |
           pip install black ruff
 
-      - name: Check and FIX formatting
+      - name: Check and Fix Formatting
         run: |
           echo "Проверяю форматирование..."
-          black --check --diff . || echo "Найдены ошибки форматирования"
-          
-          echo "Исправляю автоматически..."
-          black .
-          
-          echo "Проверяю исправленные файлы..."
-          if git diff --exit-code; then
-            echo "✓ Все файлы уже отформатированы правильно"
+          if black --check .; then
+            echo "✅ Все файлы отформатированы правильно."
           else
-            echo "Файлы были исправлены:"
-            git diff --name-only
-            
-            echo "Создаю коммит с исправлениями..."
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
-            
-            git commit -m "style: auto-format with black [skip ci]" || echo "Нет изменений для коммита"
-            
-            git push origin HEAD:${{ github.ref }}
+            echo "🔄 Найдены ошибки форматирования. Исправляю локально..."
+            black .
+            echo "✅ Код отформатирован."
+            echo "ℹ️ Чтобы сохранить изменения, выполните команды локально:"
+            echo "   git add ."
+            echo "   git commit -m 'style: auto-format with black'"
+            echo "   git push"
           fi
 
       - name: Run linter
         run: |
           echo "Запускаю линтер..."
           ruff check . --fix
-          ruff check . || echo "Внимание: остались проблемы с кодом"
+          if ruff check .; then
+            echo "✅ Линтер не нашёл проблем."
+          else
+            echo "⚠️ Внимание: остались проблемы с кодом."
+          fi
