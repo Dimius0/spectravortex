@@ -53,6 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.head_ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -77,12 +80,15 @@ jobs:
           else
             echo "Файлы были исправлены:"
             git diff --name-only
+            
             echo "Создаю коммит с исправлениями..."
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             git add .
-            git commit -m "style: auto-format with black" || echo "Нет изменений для коммита"
-            git push
+            
+            git commit -m "style: auto-format with black [skip ci]" || echo "Нет изменений для коммита"
+            
+            git push origin HEAD:${{ github.ref }}
           fi
 
       - name: Run linter
