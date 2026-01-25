@@ -1,181 +1,294 @@
 #!/usr/bin/env python3
 """
-SpectraVortex - Main entry point
-Photonic Programming Language
+SpectraVortex Main Entry Point
+Photonic Computing Language with OAM Support
 """
 
 import sys
-import argparse
-import math
-from simulator.field import OpticalField, PhotonState, Polarization, test_field
-from simulator.elements import test_elements
+import os
+from typing import Optional
 
+def add_project_to_path():
+    """Add project directories to Python path"""
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, project_root)
 
-def compile_file(filename: str):
-    """Compile a SpectraVortex file"""
+def run_file(filename: str):
+    """Run a SpectraVortex file"""
     try:
-        with open(filename, "r", encoding="utf-8") as f:
+        from compiler import compile_source
+        from simulator import Interpreter
+        
+        with open(filename, 'r') as f:
             source = f.read()
-
-        print(f"=== Compiling {filename} ===")
-        print(f"File size: {len(source)} characters")
-
-        # Basic compilation (placeholder)
-        print("Compilation successful (simulated)")
+        
+        print(f"Running {filename}...")
+        print("=" * 60)
+        
+        # Compile
+        ast = compile_source(source)
+        
+        # Execute
+        interpreter = Interpreter()
+        interpreter.run(ast)
+        
         return True
-
+        
     except FileNotFoundError:
-        print(f"Error: File '{filename}' not found")
+        print(f"Error: File not found: {filename}")
         return False
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
+def run_oam_demo():
+    """Run OAM vortex light demo"""
+    from compiler import compile_source
+    from simulator import Interpreter
+    
+    demo_source = """
+// Quick OAM demo
+vortex photon_plus3 = {
+    oam_charge: +3,
+    wavelength: 1550e-9,
+    waist: 2.0,
+    profile: "laguerre_gaussian"
+}
 
-def run_simulation():
-    """Run a simple simulation"""
-    print("\n=== Running Simulation ===")
+vortex_beam lg_plus1 = laguerre_gaussian(
+    oam_charge: +1,
+    radial_order: 0,
+    waist: 1.5
+)
 
-    # Create photons - ИСПРАВЛЕНО: используем правильные параметры
-    photon1 = PhotonState(
-        frequency=193.414e12,  # 1550 nm
-        amplitude=0.7,
-        phase=0.0,
-        oam=0,  # ИСПРАВЛЕНО: было oam_charge=0
-        polarization=Polarization.LINEAR,
-        # duration=100e-12  # УБРАНО: нет в PhotonState
-    )
+program quick_oam_demo() {
+    print("=== Quick OAM Demo ===");
+    print("Testing OAM charge +3 and LG beam +1");
+    print();
+    
+    // Create interference
+    interference = interfere(photon_plus3, lg_plus1);
+    print("Interference created");
+    print("Visibility:", interference.visibility);
+    print();
+    
+    print("Demo completed!");
+}
+"""
+    
+    print("Running OAM demo...")
+    print("=" * 60)
+    
+    ast = compile_source(demo_source)
+    interpreter = Interpreter()
+    interpreter.run(ast)
+    
+    print("=" * 60)
+    print("OAM demo completed successfully!")
+    return True
 
-    photon2 = PhotonState(
-        frequency=193.414e12,
-        amplitude=0.5,
-        phase=3.14159,  # π phase difference
-        oam=0,  # ИСПРАВЛЕНО: было oam_charge=0
-        polarization=Polarization.LINEAR,
-        # duration=100e-12  # УБРАНО: нет в PhotonState
-    )
+def run_matrix_demo():
+    """Run matrix multiplication demo"""
+    from compiler import compile_source
+    from simulator import Interpreter
+    
+    demo_source = """
+// Matrix multiplication demo
+matrix_a = { 
+    rows: 2, 
+    cols: 2, 
+    value: [
+        [1.0, 2.0],
+        [3.0, 4.0]
+    ] 
+}
 
-    # Create fields
-    field1 = OpticalField(photon1)
-    field2 = OpticalField(photon2)
+matrix_b = { 
+    rows: 2, 
+    cols: 2, 
+    value: [
+        [0.5, 1.0],
+        [1.5, 2.0]
+    ] 
+}
 
-    # Interfere
-    result = field1.interfere(field2)
+program matrix_demo() {
+    print("=== Matrix Multiplication Demo ===");
+    print("Matrix A:", matrix_a);
+    print("Matrix B:", matrix_b);
+    
+    // Encode matrices
+    encoded_a = encode_matrix(matrix_a);
+    encoded_b = encode_matrix(matrix_b);
+    
+    // Optical multiplication
+    result = optical_matmul(encoded_a, encoded_b);
+    print("Result:", result);
+    
+    print("Demo completed!");
+}
+"""
+    
+    print("Running Matrix demo...")
+    print("=" * 60)
+    
+    ast = compile_source(demo_source)
+    interpreter = Interpreter()
+    interpreter.run(ast)
+    
+    print("=" * 60)
+    print("Matrix demo completed successfully!")
+    return True
 
-    print(f"Field 1 intensity: {field1.intensity:.3f}")
-    print(f"Field 2 intensity: {field2.intensity:.3f}")
-    print(f"Interference result: {result.intensity:.3f}")
-
-    return result
-
-
-def interactive_mode():
-    """Interactive mode"""
-    print("\n" + "=" * 50)
-    print("🌀 SpectraVortex Interactive Mode")
-    print("=" * 50)
-    print("Commands:")
-    print("  compile <file>  - Compile SpectraVortex file")
-    print("  simulate        - Run simulation")
-    print("  test            - Run tests")
-    print("  exit            - Exit")
-    print()
-
+def run_interactive():
+    """Run interactive REPL session"""
+    from compiler import compile_source
+    from simulator import Interpreter
+    
+    print("SpectraVortex Interactive REPL")
+    print("Type 'exit' to quit, 'help' for commands")
+    print("=" * 60)
+    
+    interpreter = Interpreter()
+    line_buffer = []
+    
     while True:
         try:
-            command = input("svx> ").strip().lower()
-
-            if not command:
-                continue
-
-            if command == "exit" or command == "quit":
+            if line_buffer:
+                prompt = "... "
+            else:
+                prompt = "svx> "
+            
+            line = input(prompt).strip()
+            
+            if line.lower() == 'exit':
                 print("Goodbye!")
                 break
-
-            elif command.startswith("compile "):
-                filename = command[8:].strip()
-                compile_file(filename)
-
-            elif command == "simulate":
-                run_simulation()
-
-            elif command == "test":
-                print("\n=== Running Tests ===")
-                test_field()
-                print()
-                test_elements()
-
-            elif command == "help":
-                print("Commands: compile, simulate, test, exit")
-
-            else:
-                print(f"Unknown command: {command}")
-                print("Type 'help' for commands")
-
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            break
+            elif line.lower() == 'help':
+                print("Commands: exit, help, clear, run <file>")
+                print("OAM examples:")
+                print("  vortex v = { oam_charge: +1, wavelength: 1550e-9 }")
+                print("  interfere(v, v)")
+                continue
+            elif line.lower() == 'clear':
+                line_buffer = []
+                print("[Buffer cleared]")
+                continue
+            elif line.startswith('run '):
+                filename = line[4:].strip()
+                run_file(filename)
+                continue
+            
+            # Add to buffer
+            line_buffer.append(line)
+            
+            # Check if we have a complete statement
+            source = "\n".join(line_buffer)
+            
+            # Simple check for completeness
+            if ';' in line or line.endswith('}') or not line:
+                try:
+                    ast = compile_source(source)
+                    interpreter.run(ast)
+                    line_buffer = []
+                except SyntaxError as e:
+                    print(f"Syntax error: {e}")
+                    line_buffer = []
+                except Exception as e:
+                    print(f"Error: {e}")
+                    line_buffer = []
+        
         except EOFError:
             print("\nGoodbye!")
             break
+        except KeyboardInterrupt:
+            print("\nInterrupted. Type 'exit' to quit.")
+            line_buffer = []
 
+def show_version():
+    """Show version information"""
+    from compiler import get_version as get_compiler_version
+    from simulator import get_version as get_simulator_version
+    
+    print(f"SpectraVortex Compiler v{get_compiler_version()}")
+    print(f"SpectraVortex Simulator v{get_simulator_version()}")
+    print("With OAM (Orbital Angular Momentum) support")
+    print("MIT License")
+
+def show_help():
+    """Show help information"""
+    print("SpectraVortex - Photonic Computing Language")
+    print()
+    print("Usage: python main.py [OPTION] [FILE]")
+    print()
+    print("Options:")
+    print("  --run FILE         Run a SpectraVortex file (.svx)")
+    print("  --oam-demo         Run OAM vortex light demo")
+    print("  --matrix-demo      Run matrix multiplication demo")
+    print("  --interactive      Start interactive REPL session")
+    print("  --version          Show version information")
+    print("  --help             Show this help message")
+    print()
+    print("Examples:")
+    print("  python main.py --run examples/optical_matrix_multiplier.svx")
+    print("  python main.py --oam-demo")
+    print("  python main.py --interactive")
+    print()
+    print("Features:")
+    print("  • Matrix operations for optical computing")
+    print("  • OAM (vortex light) with physical validation")
+    print("  • Type checking for physical correctness")
+    print("  • Photon and beam definitions")
 
 def main():
-    """Main function"""
-    parser = argparse.ArgumentParser(
-        description="SpectraVortex - Photonic Programming Language",
-        epilog="Example: python main.py --compile example.svx",
-    )
-
-    parser.add_argument("--compile", "-c", help="Compile a SpectraVortex file")
-
-    parser.add_argument(
-        "--simulate", "-s", action="store_true", help="Run simulation"
-    )
-
-    parser.add_argument("--test", "-t", action="store_true", help="Run tests")
-
-    parser.add_argument(
-        "--interactive", "-i", action="store_true", help="Interactive mode"
-    )
-
-    parser.add_argument("--version", "-v", action="store_true", help="Show version")
-
-    args = parser.parse_args()
-
-    # Show banner
-    print("=" * 50)
-    print("🌀 SpectraVortex v0.1.0")
-    print("Photonic Programming Language")
-    print("=" * 50)
-
-    if args.version:
-        print("Version: 0.1.0")
-        print("License: MIT")
-        return
-
-    if args.compile:
-        compile_file(args.compile)
-
-    if args.simulate:
-        run_simulation()
-
-    if args.test:
-        print("\n=== Running Tests ===")
-        test_field()
-        print()
-        test_elements()
-
-    if args.interactive:
-        interactive_mode()
-
-    # If no arguments, show help
-    if not any(
-        [args.compile, args.simulate, args.test, args.interactive, args.version]
-    ):
-        parser.print_help()
-        print("\nTry: python main.py --interactive")
-
+    """Main entry point"""
+    add_project_to_path()
+    
+    if len(sys.argv) < 2:
+        show_help()
+        sys.exit(1)
+    
+    command = sys.argv[1]
+    
+    if command == "--run":
+        if len(sys.argv) < 3:
+            print("Error: Please specify a file to run")
+            print("Usage: python main.py --run <filename.svx>")
+            sys.exit(1)
+        
+        filename = sys.argv[2]
+        if not filename.endswith('.svx'):
+            print(f"Warning: Expected .svx file, got {filename}")
+        
+        success = run_file(filename)
+        sys.exit(0 if success else 1)
+    
+    elif command == "--oam-demo":
+        success = run_oam_demo()
+        sys.exit(0 if success else 1)
+    
+    elif command == "--matrix-demo":
+        success = run_matrix_demo()
+        sys.exit(0 if success else 1)
+    
+    elif command == "--interactive":
+        run_interactive()
+        sys.exit(0)
+    
+    elif command == "--version":
+        show_version()
+        sys.exit(0)
+    
+    elif command == "--help":
+        show_help()
+        sys.exit(0)
+    
+    else:
+        print(f"Error: Unknown command '{command}'")
+        show_help()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
