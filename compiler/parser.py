@@ -1,8 +1,8 @@
 """
-Parser for SpectraVortex language
+Parser for SpectraVortex language with matrix support
 """
 
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from dataclasses import dataclass
 from .lexer import Lexer, Token, TokenType
 
@@ -36,6 +36,49 @@ class ProgramDefNode(ASTNode):
     body: List[ASTNode]
 
 @dataclass
+class PrintNode(ASTNode):
+    """Print statement: print(...)"""
+    expression: 'ExpressionNode'
+
+@dataclass
+class VariableDeclNode(ASTNode):
+    """Variable declaration: name: type = value"""
+    name: str
+    var_type: Optional[str]
+    initializer: Optional['ExpressionNode']
+
+@dataclass
+class AssignmentNode(ASTNode):
+    """Assignment statement: name = value"""
+    name: 'IdentifierNode'
+    value: 'ExpressionNode'
+
+@dataclass
+class FunctionDeclNode(ASTNode):
+    """Function declaration: function name(params) { ... }"""
+    name: str
+    parameters: List[str]
+    body: List[ASTNode]
+
+@dataclass
+class ReturnNode(ASTNode):
+    """Return statement: return value"""
+    value: Optional['ExpressionNode']
+
+@dataclass
+class IfNode(ASTNode):
+    """If statement: if (condition) { ... } else { ... }"""
+    condition: 'ExpressionNode'
+    then_branch: List[ASTNode]
+    else_branch: List[ASTNode]
+
+@dataclass
+class WhileNode(ASTNode):
+    """While statement: while (condition) { ... }"""
+    condition: 'ExpressionNode'
+    body: List[ASTNode]
+
+@dataclass
 class ExpressionNode(ASTNode):
     """Base class for expressions"""
     pass
@@ -55,11 +98,40 @@ class IdentifierNode(ExpressionNode):
 class BinaryOpNode(ExpressionNode):
     """Binary operation: left op right"""
     left: ExpressionNode
-    op: str  # '+', '-', '*', '/', '='
+    op: str  # '+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>=', 'and', 'or'
     right: ExpressionNode
 
+@dataclass
+class UnaryOpNode(ExpressionNode):
+    """Unary operation: op operand"""
+    op: str  # '-', 'not'
+    operand: ExpressionNode
+
+@dataclass
+class ArrayLiteralNode(ExpressionNode):
+    """Array literal: [value1, value2, ...]"""
+    elements: List[ExpressionNode]
+
+@dataclass
+class MatrixLiteralNode(ExpressionNode):
+    """Matrix literal: { rows: N, cols: M, value: [[...], ...] }"""
+    rows: int
+    cols: int
+    value: List[List[ExpressionNode]]
+
+@dataclass
+class FunctionCallNode(ExpressionNode):
+    """Function call: name(arg1, arg2, ...)"""
+    name: str
+    arguments: List[ExpressionNode]
+
+@dataclass
+class ParenExprNode(ExpressionNode):
+    """Parenthesized expression: (expr)"""
+    expression: ExpressionNode
+
 class Parser:
-    """Recursive descent parser for SpectraVortex"""
+    """Recursive descent parser for SpectraVortex with matrix support"""
     
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
@@ -75,10 +147,11 @@ class Parser:
         else:
             self.current_token = None
     
-    def _peek(self) -> Optional[Token]:
-        """Look at next token without consuming it"""
-        if self.position < len(self.tokens):
-            return self.tokens[self.position]
+    def _peek(self, offset: int = 0) -> Optional[Token]:
+        """Look ahead at token without consuming it"""
+        pos = self.position + offset
+        if pos < len(self.tokens):
+            return self.tokens[pos]
         return None
     
     def _expect(self, token_type: TokenType, error_msg: str) -> Token:
@@ -87,7 +160,7 @@ class Parser:
             token = self.current_token
             self._advance()
             return token
-        raise SyntaxError(error_msg)
+        raise SyntaxError(f"{error_msg}. Got {self.current_token}")
     
     def _match(self, token_type: TokenType) -> bool:
         """Try to match a token type"""
@@ -96,34 +169,62 @@ class Parser:
             return True
         return False
     
+    def _is_at_end(self) -> bool:
+        """Check if we're at the end of tokens"""
+        return self.current_token is None or self.current_token.type == TokenType.EOF
+    
     def parse(self) -> ProgramNode:
         """Parse entire program"""
         statements = []
         
-        while self.current_token and self.current_token.type != TokenType.EOF:
-            # Skip newlines and whitespace
+        while not self._is_at_end():
+            # Skip newlines
             while self._match(TokenType.NEWLINE):
                 pass
             
-            if self.current_token is None:
+            if self._is_at_end():
                 break
             
-            # Parse different statement types
-            if self.current_token.type == TokenType.PHOTON:
-                stmt = self._parse_photon_def()
-            elif self.current_token.type == TokenType.BEAM:
-                stmt = self._parse_beam_def()
-            elif self.current_token.type == TokenType.PROGRAM:
-                stmt = self._parse_program_def()
-            else:
-                # Skip unknown tokens
-                self._advance()
-                continue
-            
+            stmt = self._parse_statement()
             if stmt:
                 statements.append(stmt)
+            
+            # Optional semicolon
+            self._match(TokenType.SEMICOLON)
         
         return ProgramNode(statements)
+    
+    def _parse_statement(self) -> Optional[ASTNode]:
+        """Parse a statement"""
+        if self._is_at_end():
+            return None
+        
+        # Check statement type based on current token
+        if self.current_token.type == TokenType.PHOTON:
+            return self._parse_photon_def()
+        elif self.current_token.type == TokenType.BEAM:
+            return self._parse_beam_def()
+        elif self.current_token.type == TokenType.PROGRAM:
+            return self._parse_program_def()
+        elif self.current_token.type == TokenType.FUNCTION:
+            return self._parse_function_decl()
+        elif self.current_token.type == TokenType.PRINT:
+            return self._parse_print_statement()
+        elif self.current_token.type == TokenType.IF:
+            return self._parse_if_statement()
+        elif self.current_token.type == TokenType.WHILE:
+            return self._parse_while_statement()
+        elif self.current_token.type == TokenType.RETURN:
+            return self._parse_return_statement()
+        elif self.current_token.type == TokenType.IDENTIFIER:
+            # Could be variable declaration or assignment
+            if self._peek() and self._peek().type == TokenType.COLON:
+                return self._parse_variable_decl()
+            else:
+                return self._parse_assignment_or_expression()
+        else:
+            # Expression statement
+            return self._parse_expression()
     
     def _parse_photon_def(self) -> PhotonDefNode:
         """Parse photon definition: photon name = { ... }"""
@@ -147,20 +248,16 @@ class Parser:
             param_name = self._expect(TokenType.IDENTIFIER, "Expected parameter name").value
             self._expect(TokenType.COLON, "Expected ':'")
             
-            # Parse value
-            if self.current_token.type == TokenType.NUMBER:
-                value = float(self.current_token.value)
-                self._advance()
-            elif self.current_token.type == TokenType.STRING:
-                value = self.current_token.value
-                self._advance()
-            elif self.current_token.type == TokenType.IDENTIFIER:
-                value = self.current_token.value
-                self._advance()
-            else:
-                raise SyntaxError(f"Unexpected token in photon parameter: {self.current_token}")
+            # Parse value expression
+            value_expr = self._parse_expression()
             
-            parameters[param_name] = value
+            # Evaluate simple literals for parameters
+            if isinstance(value_expr, LiteralNode):
+                parameters[param_name] = value_expr.value
+            elif isinstance(value_expr, IdentifierNode):
+                parameters[param_name] = value_expr.name
+            else:
+                raise SyntaxError("Complex expressions not allowed in photon parameters")
             
             # Optional comma
             if self.current_token and self.current_token.type == TokenType.COMMA:
@@ -199,17 +296,14 @@ class Parser:
                 mod_name = self._expect(TokenType.IDENTIFIER, "Expected modifier name").value
                 self._expect(TokenType.COLON, "Expected ':'")
                 
-                # Parse value
-                if self.current_token.type == TokenType.NUMBER:
-                    value = float(self.current_token.value)
-                    self._advance()
-                elif self.current_token.type == TokenType.STRING:
-                    value = self.current_token.value
-                    self._advance()
-                else:
-                    raise SyntaxError(f"Unexpected token in beam modifier: {self.current_token}")
+                # Parse value expression
+                value_expr = self._parse_expression()
                 
-                modifiers[mod_name] = value
+                # Evaluate simple literals for modifiers
+                if isinstance(value_expr, LiteralNode):
+                    modifiers[mod_name] = value_expr.value
+                else:
+                    raise SyntaxError("Complex expressions not allowed in beam modifiers")
                 
                 # Optional comma
                 if self.current_token and self.current_token.type == TokenType.COMMA:
@@ -238,38 +332,485 @@ class Parser:
         # {
         self._expect(TokenType.LBRACE, "Expected '{'")
         
-        # Parse body (simplified - just skip for now)
+        # Parse body
         body = []
         while self.current_token and self.current_token.type != TokenType.RBRACE:
-            # Skip everything in body for now
-            self._advance()
+            stmt = self._parse_statement()
+            if stmt:
+                body.append(stmt)
+            
+            # Optional semicolon
+            self._match(TokenType.SEMICOLON)
         
         # }
         self._expect(TokenType.RBRACE, "Expected '}'")
         
         return ProgramDefNode(name, body)
     
+    def _parse_function_decl(self) -> FunctionDeclNode:
+        """Parse function declaration: function name(params) { ... }"""
+        # function
+        self._expect(TokenType.FUNCTION, "Expected 'function'")
+        
+        # name
+        name_token = self._expect(TokenType.IDENTIFIER, "Expected function name")
+        name = name_token.value
+        
+        # (
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # Parse parameters
+        parameters = []
+        if self.current_token.type != TokenType.RPAREN:
+            while True:
+                param_token = self._expect(TokenType.IDENTIFIER, "Expected parameter name")
+                parameters.append(param_token.value)
+                
+                if not self._match(TokenType.COMMA):
+                    break
+        
+        # )
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        # {
+        self._expect(TokenType.LBRACE, "Expected '{'")
+        
+        # Parse body
+        body = []
+        while self.current_token and self.current_token.type != TokenType.RBRACE:
+            stmt = self._parse_statement()
+            if stmt:
+                body.append(stmt)
+            
+            # Optional semicolon
+            self._match(TokenType.SEMICOLON)
+        
+        # }
+        self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        return FunctionDeclNode(name, parameters, body)
+    
+    def _parse_print_statement(self) -> PrintNode:
+        """Parse print statement: print(expression)"""
+        # print
+        self._expect(TokenType.PRINT, "Expected 'print'")
+        
+        # (
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # expression
+        expr = self._parse_expression()
+        
+        # )
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        return PrintNode(expr)
+    
+    def _parse_variable_decl(self) -> VariableDeclNode:
+        """Parse variable declaration: name: type = value"""
+        # name
+        name_token = self._expect(TokenType.IDENTIFIER, "Expected variable name")
+        name = name_token.value
+        
+        # :
+        self._expect(TokenType.COLON, "Expected ':'")
+        
+        # type (optional)
+        var_type = None
+        if self.current_token.type == TokenType.IDENTIFIER:
+            var_type_token = self._expect(TokenType.IDENTIFIER, "Expected type")
+            var_type = var_type_token.value
+        
+        # = value (optional)
+        initializer = None
+        if self._match(TokenType.EQUALS):
+            initializer = self._parse_expression()
+        
+        return VariableDeclNode(name, var_type, initializer)
+    
+    def _parse_assignment_or_expression(self) -> ASTNode:
+        """Parse assignment or expression statement"""
+        # Try to parse as expression first
+        expr = self._parse_expression()
+        
+        # Check if it's an assignment
+        if self._match(TokenType.EQUALS):
+            if isinstance(expr, IdentifierNode):
+                value = self._parse_expression()
+                return AssignmentNode(expr, value)
+            else:
+                raise SyntaxError("Left side of assignment must be an identifier")
+        
+        # If not an assignment, return as expression statement
+        return expr
+    
+    def _parse_if_statement(self) -> IfNode:
+        """Parse if statement: if (condition) { ... } else { ... }"""
+        # if
+        self._expect(TokenType.IF, "Expected 'if'")
+        
+        # (
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # condition
+        condition = self._parse_expression()
+        
+        # )
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        # {
+        self._expect(TokenType.LBRACE, "Expected '{'")
+        
+        # Parse then branch
+        then_branch = []
+        while self.current_token and self.current_token.type != TokenType.RBRACE:
+            stmt = self._parse_statement()
+            if stmt:
+                then_branch.append(stmt)
+            
+            # Optional semicolon
+            self._match(TokenType.SEMICOLON)
+        
+        # }
+        self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        # Optional else branch
+        else_branch = []
+        if self._match(TokenType.ELSE):
+            self._expect(TokenType.LBRACE, "Expected '{'")
+            
+            while self.current_token and self.current_token.type != TokenType.RBRACE:
+                stmt = self._parse_statement()
+                if stmt:
+                    else_branch.append(stmt)
+                
+                # Optional semicolon
+                self._match(TokenType.SEMICOLON)
+            
+            self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        return IfNode(condition, then_branch, else_branch)
+    
+    def _parse_while_statement(self) -> WhileNode:
+        """Parse while statement: while (condition) { ... }"""
+        # while
+        self._expect(TokenType.WHILE, "Expected 'while'")
+        
+        # (
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # condition
+        condition = self._parse_expression()
+        
+        # )
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        # {
+        self._expect(TokenType.LBRACE, "Expected '{'")
+        
+        # Parse body
+        body = []
+        while self.current_token and self.current_token.type != TokenType.RBRACE:
+            stmt = self._parse_statement()
+            if stmt:
+                body.append(stmt)
+            
+            # Optional semicolon
+            self._match(TokenType.SEMICOLON)
+        
+        # }
+        self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        return WhileNode(condition, body)
+    
+    def _parse_return_statement(self) -> ReturnNode:
+        """Parse return statement: return value"""
+        # return
+        self._expect(TokenType.RETURN, "Expected 'return'")
+        
+        # Optional value
+        value = None
+        if not (self.current_token.type in [TokenType.SEMICOLON, TokenType.RBRACE, TokenType.NEWLINE]):
+            value = self._parse_expression()
+        
+        return ReturnNode(value)
+    
+    # ========== Expression Parsing ==========
+    
     def _parse_expression(self) -> ExpressionNode:
         """Parse an expression"""
-        # Simplified - just parse literals and identifiers
+        return self._parse_logical_or()
+    
+    def _parse_logical_or(self) -> ExpressionNode:
+        """Parse logical OR: and_expr ('or' and_expr)*"""
+        expr = self._parse_logical_and()
+        
+        while self._match(TokenType.OR):
+            op = "or"
+            right = self._parse_logical_and()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_logical_and(self) -> ExpressionNode:
+        """Parse logical AND: equality ('and' equality)*"""
+        expr = self._parse_equality()
+        
+        while self._match(TokenType.AND):
+            op = "and"
+            right = self._parse_equality()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_equality(self) -> ExpressionNode:
+        """Parse equality: comparison (('==' | '!=') comparison)*"""
+        expr = self._parse_comparison()
+        
+        while True:
+            if self._match(TokenType.EQUAL_EQUAL):
+                op = "=="
+            elif self._match(TokenType.BANG_EQUAL):
+                op = "!="
+            else:
+                break
+            
+            right = self._parse_comparison()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_comparison(self) -> ExpressionNode:
+        """Parse comparison: term (('<' | '<=' | '>' | '>=') term)*"""
+        expr = self._parse_term()
+        
+        while True:
+            if self._match(TokenType.LESS):
+                op = "<"
+            elif self._match(TokenType.LESS_EQUAL):
+                op = "<="
+            elif self._match(TokenType.GREATER):
+                op = ">"
+            elif self._match(TokenType.GREATER_EQUAL):
+                op = ">="
+            else:
+                break
+            
+            right = self._parse_term()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_term(self) -> ExpressionNode:
+        """Parse term: factor (('+' | '-') factor)*"""
+        expr = self._parse_factor()
+        
+        while True:
+            if self._match(TokenType.PLUS):
+                op = "+"
+            elif self._match(TokenType.MINUS):
+                op = "-"
+            else:
+                break
+            
+            right = self._parse_factor()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_factor(self) -> ExpressionNode:
+        """Parse factor: unary (('*' | '/') unary)*"""
+        expr = self._parse_unary()
+        
+        while True:
+            if self._match(TokenType.STAR):
+                op = "*"
+            elif self._match(TokenType.SLASH):
+                op = "/"
+            else:
+                break
+            
+            right = self._parse_unary()
+            expr = BinaryOpNode(expr, op, right)
+        
+        return expr
+    
+    def _parse_unary(self) -> ExpressionNode:
+        """Parse unary: ('-' | 'not') unary | primary"""
+        if self._match(TokenType.MINUS):
+            op = "-"
+            operand = self._parse_unary()
+            return UnaryOpNode(op, operand)
+        elif self._match(TokenType.NOT):
+            op = "not"
+            operand = self._parse_unary()
+            return UnaryOpNode(op, operand)
+        
+        return self._parse_primary()
+    
+    def _parse_primary(self) -> ExpressionNode:
+        """Parse primary expression"""
+        if self._is_at_end():
+            raise SyntaxError("Unexpected end of input")
+        
+        # Matrix literal
+        if self.current_token.type == TokenType.LBRACE:
+            return self._parse_matrix_literal()
+        
+        # Array literal
+        if self.current_token.type == TokenType.LBRACKET:
+            return self._parse_array_literal()
+        
+        # Literals
         if self.current_token.type == TokenType.NUMBER:
             value = float(self.current_token.value)
             self._advance()
             return LiteralNode(value, "number")
-        elif self.current_token.type == TokenType.STRING:
+        
+        if self.current_token.type == TokenType.STRING:
             value = self.current_token.value
             self._advance()
             return LiteralNode(value, "string")
-        elif self.current_token.type == TokenType.IDENTIFIER:
-            name = self.current_token.value
-            self._advance()
+        
+        # Identifier or function call
+        if self.current_token.type == TokenType.IDENTIFIER:
+            name_token = self._expect(TokenType.IDENTIFIER, "Expected identifier")
+            name = name_token.value
+            
+            # Check if it's a function call
+            if self.current_token and self.current_token.type == TokenType.LPAREN:
+                return self._parse_function_call(name)
+            
             return IdentifierNode(name)
-        else:
-            raise SyntaxError(f"Unexpected token in expression: {self.current_token}")
+        
+        # Parenthesized expression
+        if self._match(TokenType.LPAREN):
+            expr = self._parse_expression()
+            self._expect(TokenType.RPAREN, "Expected ')'")
+            return ParenExprNode(expr)
+        
+        raise SyntaxError(f"Unexpected token: {self.current_token}")
+    
+    def _parse_matrix_literal(self) -> MatrixLiteralNode:
+        """Parse matrix literal: { rows: N, cols: M, value: [[...], ...] }"""
+        self._expect(TokenType.LBRACE, "Expected '{'")
+        
+        rows = None
+        cols = None
+        matrix_data = None
+        
+        # Parse rows, cols, and value
+        while self.current_token and self.current_token.type != TokenType.RBRACE:
+            # Parse key
+            key_token = self._expect(TokenType.IDENTIFIER, "Expected 'rows', 'cols', or 'value'")
+            key = key_token.value
+            
+            self._expect(TokenType.COLON, "Expected ':'")
+            
+            if key == "rows" or key == "cols":
+                # Parse number
+                if self.current_token.type != TokenType.NUMBER:
+                    raise SyntaxError(f"Expected number for '{key}', got {self.current_token}")
+                
+                value = int(self.current_token.value)
+                self._advance()
+                
+                if key == "rows":
+                    rows = value
+                else:
+                    cols = value
+            elif key == "value":
+                # Parse nested array
+                matrix_data = self._parse_nested_array_literal()
+            else:
+                raise SyntaxError(f"Unknown matrix key: '{key}'. Expected 'rows', 'cols', or 'value'")
+            
+            # Optional comma
+            if self.current_token and self.current_token.type == TokenType.COMMA:
+                self._advance()
+        
+        self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        # Validate matrix
+        if rows is None or cols is None or matrix_data is None:
+            raise SyntaxError("Matrix must have 'rows', 'cols', and 'value'")
+        
+        # Validate dimensions
+        if len(matrix_data) != rows:
+            raise SyntaxError(f"Matrix row count mismatch: declared {rows}, got {len(matrix_data)}")
+        
+        for i, row in enumerate(matrix_data):
+            if len(row) != cols:
+                raise SyntaxError(f"Matrix column count mismatch in row {i}: declared {cols}, got {len(row)}")
+        
+        return MatrixLiteralNode(rows, cols, matrix_data)
+    
+    def _parse_nested_array_literal(self) -> List[List[ExpressionNode]]:
+        """Parse nested array for matrix values: [[...], [...], ...]"""
+        self._expect(TokenType.LBRACKET, "Expected '[' for matrix values")
+        
+        rows = []
+        
+        # Parse rows
+        while self.current_token and self.current_token.type != TokenType.RBRACKET:
+            # Parse a row (array)
+            row = self._parse_array_literal()
+            rows.append(row)
+            
+            # Optional comma between rows
+            if self.current_token and self.current_token.type == TokenType.COMMA:
+                self._advance()
+        
+        self._expect(TokenType.RBRACKET, "Expected ']'")
+        
+        return rows
+    
+    def _parse_array_literal(self) -> List[ExpressionNode]:
+        """Parse array literal: [expr1, expr2, ...]"""
+        self._expect(TokenType.LBRACKET, "Expected '['")
+        
+        elements = []
+        
+        # Empty array
+        if self.current_token and self.current_token.type == TokenType.RBRACKET:
+            self._advance()
+            return elements
+        
+        # Parse elements
+        while True:
+            element = self._parse_expression()
+            elements.append(element)
+            
+            if not self._match(TokenType.COMMA):
+                break
+        
+        self._expect(TokenType.RBRACKET, "Expected ']'")
+        
+        return elements
+    
+    def _parse_function_call(self, name: str) -> FunctionCallNode:
+        """Parse function call: name(arg1, arg2, ...)"""
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        arguments = []
+        
+        # Parse arguments if any
+        if self.current_token and self.current_token.type != TokenType.RPAREN:
+            while True:
+                arg = self._parse_expression()
+                arguments.append(arg)
+                
+                if not self._match(TokenType.COMMA):
+                    break
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        return FunctionCallNode(name, arguments)
+
 
 def test_parser():
-    """Test the parser"""
-    print("Testing Parser...")
+    """Test the parser with matrix support"""
+    print("Testing Parser with Matrix Support...")
     
     source = """
 photon laser = {
@@ -278,31 +819,50 @@ photon laser = {
     polarization: "linear"
 }
 
-beam laser_beam = beam(laser)
+matrix = { rows: 2, cols: 2, value: [[1, 2], [3, 4]] }
+
+function encode_matrix(data) {
+    print("Encoding matrix:", data);
+    return data;
+}
 
 program test() {
-    // Simple test program
+    print("Matrix demo");
+    result = encode_matrix(matrix);
+    print("Result:", result);
 }
 """
     
     lexer = Lexer(source)
     tokens = lexer.tokenize()
+    print(f"Tokens: {len(tokens)}")
     
     parser = Parser(tokens)
     ast = parser.parse()
     
-    print(f"Parsed {len(ast.statements)} statements:")
+    print(f"\nParsed {len(ast.statements)} statements:")
     for i, stmt in enumerate(ast.statements):
-        print(f"  {i}: {stmt.__class__.__name__}")
+        print(f"\n{i}: {stmt.__class__.__name__}")
+        
         if isinstance(stmt, PhotonDefNode):
-            print(f"     Name: {stmt.name}")
-            print(f"     Parameters: {stmt.parameters}")
-        elif isinstance(stmt, BeamDefNode):
-            print(f"     Name: {stmt.name}")
-            print(f"     Base photon: {stmt.base_photon}")
-            print(f"     Modifiers: {stmt.modifiers}")
+            print(f"   Name: {stmt.name}")
+            print(f"   Parameters: {stmt.parameters}")
+        
+        elif isinstance(stmt, MatrixLiteralNode):
+            print(f"   Matrix: {stmt.rows}x{stmt.cols}")
+            print(f"   Has {len(stmt.value)} rows")
+        
+        elif isinstance(stmt, FunctionDeclNode):
+            print(f"   Name: {stmt.name}")
+            print(f"   Parameters: {stmt.parameters}")
+            print(f"   Body has {len(stmt.body)} statements")
+        
+        elif isinstance(stmt, ProgramDefNode):
+            print(f"   Name: {stmt.name}")
+            print(f"   Body has {len(stmt.body)} statements")
     
     return ast
+
 
 if __name__ == "__main__":
     test_parser()
