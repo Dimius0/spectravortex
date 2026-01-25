@@ -1,11 +1,19 @@
- # simulator/interpreter.py
+# simulator/interpreter.py
 """
 Interpreter for SpectraVortex AST
 """
 
 from typing import Dict, List, Any, Optional
-from compiler.ast_nodes import *
 from .matrix_ops import MatrixOperations  # Импортируем MatrixOperations
+
+# Явно импортируем все используемые классы из ast_nodes
+from compiler.ast_nodes import (
+    ASTNode, ProgramNode, PhotonDefNode, BeamDefNode,
+    ProgramDefNode, PrintNode, VariableDeclNode, AssignmentNode,
+    FunctionDeclNode, ReturnNode, IfNode, WhileNode, LiteralNode,
+    IdentifierNode, BinaryOpNode, UnaryOpNode, ArrayLiteralNode,
+    MatrixLiteralNode, FunctionCallNode, ParenExprNode, ExpressionNode
+)
 
 class Interpreter:
     """Interprets and executes SpectraVortex AST"""
@@ -248,7 +256,11 @@ class Interpreter:
             
             raise RuntimeError(f"Unknown function: {node.name}")
     
-    def _execute_user_function(self, func_node: FunctionDeclNode, args: List[ExpressionNode]) -> Any:
+    def _execute_user_function(
+        self, 
+        func_node: FunctionDeclNode, 
+        args: List[ExpressionNode]
+    ) -> Any:
         """Execute user-defined function"""
         print(f"[Interpreter] Executing user function: {func_node.name}")
         
