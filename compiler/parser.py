@@ -1,137 +1,14 @@
 """
-Parser for SpectraVortex language with matrix support
+Parser for SpectraVortex language with OAM support
 """
 
 from typing import List, Dict, Optional, Any, Union
 from dataclasses import dataclass
 from .lexer import Lexer, Token, TokenType
-
-@dataclass
-class ASTNode:
-    """Base class for AST nodes"""
-    pass
-
-@dataclass
-class ProgramNode(ASTNode):
-    """Root node of the program"""
-    statements: List[ASTNode]
-
-@dataclass
-class PhotonDefNode(ASTNode):
-    """Photon definition: photon name = { ... }"""
-    name: str
-    parameters: Dict[str, Any]
-
-@dataclass
-class BeamDefNode(ASTNode):
-    """Beam definition: beam name = beam(...)"""
-    name: str
-    base_photon: str
-    modifiers: Dict[str, Any]
-
-@dataclass
-class ProgramDefNode(ASTNode):
-    """Program definition: program name() { ... }"""
-    name: str
-    body: List[ASTNode]
-
-@dataclass
-class PrintNode(ASTNode):
-    """Print statement: print(...)"""
-    expression: 'ExpressionNode'
-
-@dataclass
-class VariableDeclNode(ASTNode):
-    """Variable declaration: name: type = value"""
-    name: str
-    var_type: Optional[str]
-    initializer: Optional['ExpressionNode']
-
-@dataclass
-class AssignmentNode(ASTNode):
-    """Assignment statement: name = value"""
-    name: 'IdentifierNode'
-    value: 'ExpressionNode'
-
-@dataclass
-class FunctionDeclNode(ASTNode):
-    """Function declaration: function name(params) { ... }"""
-    name: str
-    parameters: List[str]
-    body: List[ASTNode]
-
-@dataclass
-class ReturnNode(ASTNode):
-    """Return statement: return value"""
-    value: Optional['ExpressionNode']
-
-@dataclass
-class IfNode(ASTNode):
-    """If statement: if (condition) { ... } else { ... }"""
-    condition: 'ExpressionNode'
-    then_branch: List[ASTNode]
-    else_branch: List[ASTNode]
-
-@dataclass
-class WhileNode(ASTNode):
-    """While statement: while (condition) { ... }"""
-    condition: 'ExpressionNode'
-    body: List[ASTNode]
-
-@dataclass
-class ExpressionNode(ASTNode):
-    """Base class for expressions"""
-    pass
-
-@dataclass
-class LiteralNode(ExpressionNode):
-    """Literal value: number or string"""
-    value: Any
-    type: str  # "number", "string"
-
-@dataclass
-class IdentifierNode(ExpressionNode):
-    """Identifier: variable or function name"""
-    name: str
-
-@dataclass
-class BinaryOpNode(ExpressionNode):
-    """Binary operation: left op right"""
-    left: ExpressionNode
-    op: str  # '+', '-', '*', '/', '=', '==', '!=', '<', '>', '<=', '>=', 'and', 'or'
-    right: ExpressionNode
-
-@dataclass
-class UnaryOpNode(ExpressionNode):
-    """Unary operation: op operand"""
-    op: str  # '-', 'not'
-    operand: ExpressionNode
-
-@dataclass
-class ArrayLiteralNode(ExpressionNode):
-    """Array literal: [value1, value2, ...]"""
-    elements: List[ExpressionNode]
-
-@dataclass
-class MatrixLiteralNode(ExpressionNode):
-    """Matrix literal: { rows: N, cols: M, value: [[...], ...] }"""
-    rows: int
-    cols: int
-    value: List[List[ExpressionNode]]
-
-@dataclass
-class FunctionCallNode(ExpressionNode):
-    """Function call: name(arg1, arg2, ...)"""
-    name: str
-    arguments: List[ExpressionNode]
-
-@dataclass
-class ParenExprNode(ExpressionNode):
-    """Parenthesized expression: (expr)"""
-    expression: ExpressionNode
+from .ast_nodes import *
 
 class Parser:
-    """Recursive descent parser for SpectraVortex with matrix support"""
+    """Recursive descent parser for SpectraVortex with OAM support"""
     
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
@@ -202,8 +79,12 @@ class Parser:
         # Check statement type based on current token
         if self.current_token.type == TokenType.PHOTON:
             return self._parse_photon_def()
+        elif self.current_token.type == TokenType.VORTEX:
+            return self._parse_vortex_def()
         elif self.current_token.type == TokenType.BEAM:
             return self._parse_beam_def()
+        elif self.current_token.type == TokenType.VORTEX_BEAM:
+            return self._parse_vortex_beam_def()
         elif self.current_token.type == TokenType.PROGRAM:
             return self._parse_program_def()
         elif self.current_token.type == TokenType.FUNCTION:
@@ -216,6 +97,9 @@ class Parser:
             return self._parse_while_statement()
         elif self.current_token.type == TokenType.RETURN:
             return self._parse_return_statement()
+        elif self.current_token.type in [TokenType.INTERFERE, TokenType.SUPERPOSE, 
+                                         TokenType.MULTIPLEX, TokenType.DEMULTIPLEX]:
+            return self._parse_oam_operation()
         elif self.current_token.type == TokenType.IDENTIFIER:
             # Could be variable declaration or assignment
             if self._peek() and self._peek().type == TokenType.COLON:
@@ -268,6 +152,67 @@ class Parser:
         
         return PhotonDefNode(name, parameters)
     
+    def _parse_vortex_def(self) -> VortexPhotonNode:
+        """Parse vortex photon definition: vortex name = { oam_charge: N, ... }"""
+        # vortex
+        self._expect(TokenType.VORTEX, "Expected 'vortex'")
+        
+        # name
+        name_token = self._expect(TokenType.IDENTIFIER, "Expected vortex name")
+        name = name_token.value
+        
+        # =
+        self._expect(TokenType.EQUALS, "Expected '='")
+        
+        # {
+        self._expect(TokenType.LBRACE, "Expected '{'")
+        
+        # Parse parameters
+        parameters = {}
+        while self.current_token and self.current_token.type != TokenType.RBRACE:
+            param_name = self._expect(TokenType.IDENTIFIER, "Expected parameter name").value
+            self._expect(TokenType.COLON, "Expected ':'")
+            
+            if param_name == 'oam_charge':
+                # OAM charge must be integer
+                if self.current_token.type != TokenType.NUMBER:
+                    raise SyntaxError("OAM charge must be a number")
+                value = int(self.current_token.value)
+                self._advance()
+                parameters[param_name] = value
+            elif param_name in ['wavelength', 'waist', 'power']:
+                # Physical parameters
+                if self.current_token.type != TokenType.NUMBER:
+                    raise SyntaxError(f"{param_name} must be a number")
+                value = float(self.current_token.value)
+                self._advance()
+                parameters[param_name] = value
+            elif param_name == 'profile':
+                # Beam profile type
+                if self.current_token.type != TokenType.STRING:
+                    raise SyntaxError("Profile must be a string")
+                value = self.current_token.value
+                self._advance()
+                parameters[param_name] = value
+            elif param_name == 'polarization':
+                # Polarization state
+                value_expr = self._parse_expression()
+                if isinstance(value_expr, (LiteralNode, IdentifierNode)):
+                    parameters[param_name] = value_expr.value if isinstance(value_expr, LiteralNode) else value_expr.name
+                else:
+                    raise SyntaxError("Polarization must be a literal or identifier")
+            else:
+                raise SyntaxError(f"Unknown vortex parameter: {param_name}")
+            
+            # Optional comma
+            if self.current_token and self.current_token.type == TokenType.COMMA:
+                self._advance()
+        
+        # }
+        self._expect(TokenType.RBRACE, "Expected '}'")
+        
+        return VortexPhotonNode(name, parameters)
+    
     def _parse_beam_def(self) -> BeamDefNode:
         """Parse beam definition: beam name = beam(...)"""
         # beam
@@ -313,6 +258,140 @@ class Parser:
         self._expect(TokenType.RPAREN, "Expected ')'")
         
         return BeamDefNode(name, base_photon, modifiers)
+    
+    def _parse_vortex_beam_def(self) -> VortexBeamNode:
+        """Parse vortex beam definition: vortex_beam name = laguerre_gaussian(...)"""
+        # vortex_beam
+        self._expect(TokenType.VORTEX_BEAM, "Expected 'vortex_beam'")
+        
+        # name
+        name_token = self._expect(TokenType.IDENTIFIER, "Expected beam name")
+        name = name_token.value
+        
+        # =
+        self._expect(TokenType.EQUALS, "Expected '='")
+        
+        # Expect laguerre_gaussian or similar function
+        func_token = self._expect(TokenType.IDENTIFIER, "Expected beam function")
+        func_name = func_token.value
+        
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # Parse parameters
+        parameters = {}
+        while self.current_token and self.current_token.type != TokenType.RPAREN:
+            param_name = self._expect(TokenType.IDENTIFIER, "Expected parameter name").value
+            self._expect(TokenType.COLON, "Expected ':'")
+            
+            if param_name in ['oam_charge', 'radial_order']:
+                # Integer parameters
+                if self.current_token.type != TokenType.NUMBER:
+                    raise SyntaxError(f"{param_name} must be an integer")
+                value = int(self.current_token.value)
+                self._advance()
+                parameters[param_name] = value
+            elif param_name in ['wavelength', 'waist', 'power']:
+                # Float parameters
+                if self.current_token.type != TokenType.NUMBER:
+                    raise SyntaxError(f"{param_name} must be a number")
+                value = float(self.current_token.value)
+                self._advance()
+                parameters[param_name] = value
+            else:
+                # Other parameters
+                value_expr = self._parse_expression()
+                if isinstance(value_expr, LiteralNode):
+                    parameters[param_name] = value_expr.value
+                elif isinstance(value_expr, IdentifierNode):
+                    parameters[param_name] = value_expr.name
+                else:
+                    raise SyntaxError("Complex expressions not allowed in beam parameters")
+            
+            if self.current_token and self.current_token.type == TokenType.COMMA:
+                self._advance()
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        
+        return VortexBeamNode(name, func_name, parameters)
+    
+    def _parse_oam_operation(self) -> Optional[OAMOperationNode]:
+        """Parse OAM-specific operations: interfere, superpose, multiplex"""
+        if self.current_token.type == TokenType.INTERFERE:
+            return self._parse_interfere_operation()
+        elif self.current_token.type == TokenType.SUPERPOSE:
+            return self._parse_superpose_operation()
+        elif self.current_token.type == TokenType.MULTIPLEX:
+            return self._parse_multiplex_operation()
+        elif self.current_token.type == TokenType.DEMULTIPLEX:
+            return self._parse_demultiplex_operation()
+        return None
+    
+    def _parse_interfere_operation(self) -> InterfereNode:
+        """Parse interference: interfere(beam1, beam2)"""
+        self._expect(TokenType.INTERFERE, "Expected 'interfere'")
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        beam1 = self._parse_expression()
+        self._expect(TokenType.COMMA, "Expected ','")
+        beam2 = self._parse_expression()
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        return InterfereNode(beam1, beam2)
+    
+    def _parse_superpose_operation(self) -> SuperposeNode:
+        """Parse superposition: superpose(beams: [...], coefficients: [...])"""
+        self._expect(TokenType.SUPERPOSE, "Expected 'superpose'")
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # Parse beams array
+        self._expect(TokenType.IDENTIFIER, "Expected 'beams' parameter")
+        self._expect(TokenType.COLON, "Expected ':'")
+        beams = self._parse_array_literal()
+        
+        self._expect(TokenType.COMMA, "Expected ','")
+        
+        # Parse coefficients array
+        self._expect(TokenType.IDENTIFIER, "Expected 'coefficients' parameter")
+        self._expect(TokenType.COLON, "Expected ':'")
+        coefficients = self._parse_array_literal()
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        return SuperposeNode(beams, coefficients)
+    
+    def _parse_multiplex_operation(self) -> MultiplexNode:
+        """Parse multiplexing: multiplex(beams, method: "mode")"""
+        self._expect(TokenType.MULTIPLEX, "Expected 'multiplex'")
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        # Parse beams array
+        beams = self._parse_expression()
+        
+        # Parse optional method parameter
+        method = "mode"  # default
+        if self._match(TokenType.COMMA):
+            self._expect(TokenType.IDENTIFIER, "Expected 'method'")
+            self._expect(TokenType.COLON, "Expected ':'")
+            if self.current_token.type == TokenType.STRING:
+                method = self.current_token.value
+                self._advance()
+            else:
+                raise SyntaxError("Method must be a string")
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        beams_list = beams if isinstance(beams, list) else [beams]
+        return MultiplexNode(beams_list, method)
+    
+    def _parse_demultiplex_operation(self) -> DemultiplexNode:
+        """Parse demultiplexing: demultiplex(input_beam, output_modes)"""
+        self._expect(TokenType.DEMULTIPLEX, "Expected 'demultiplex'")
+        self._expect(TokenType.LPAREN, "Expected '('")
+        
+        input_beam = self._parse_expression()
+        self._expect(TokenType.COMMA, "Expected ','")
+        output_modes = self._parse_array_literal()
+        
+        self._expect(TokenType.RPAREN, "Expected ')'")
+        return DemultiplexNode(input_beam, output_modes)
     
     def _parse_program_def(self) -> ProgramDefNode:
         """Parse program definition: program name() { ... }"""
@@ -602,7 +681,7 @@ class Parser:
         return expr
     
     def _parse_term(self) -> ExpressionNode:
-        """Parse term: factor (('+' | '-') factor)*"""
+        """Parse term: factor (('+' | '-' | OAM_PLUS | OAM_MINUS) factor)*"""
         expr = self._parse_factor()
         
         while True:
@@ -610,6 +689,10 @@ class Parser:
                 op = "+"
             elif self._match(TokenType.MINUS):
                 op = "-"
+            elif self._match(TokenType.OAM_PLUS):
+                op = "⊕"
+            elif self._match(TokenType.OAM_MINUS):
+                op = "⊖"
             else:
                 break
             
@@ -619,7 +702,7 @@ class Parser:
         return expr
     
     def _parse_factor(self) -> ExpressionNode:
-        """Parse factor: unary (('*' | '/') unary)*"""
+        """Parse factor: unary (('*' | '/' | VORTEX_PROD) unary)*"""
         expr = self._parse_unary()
         
         while True:
@@ -627,6 +710,8 @@ class Parser:
                 op = "*"
             elif self._match(TokenType.SLASH):
                 op = "/"
+            elif self._match(TokenType.VORTEX_PROD):
+                op = "⊗"
             else:
                 break
             
@@ -655,7 +740,17 @@ class Parser:
         
         # Matrix literal
         if self.current_token.type == TokenType.LBRACE:
-            return self._parse_matrix_literal()
+            # Check if it's a matrix or vortex definition
+            if self._peek(1) and self._peek(1).type == TokenType.IDENTIFIER:
+                if self._peek(1).value in ['rows', 'oam_charge']:
+                    # Check second token to decide
+                    if self._peek(1).value == 'rows':
+                        return self._parse_matrix_literal()
+                    else:
+                        # This should have been caught by _parse_statement
+                        raise SyntaxError("Vortex definition in expression context")
+            else:
+                return self._parse_matrix_literal()
         
         # Array literal
         if self.current_token.type == TokenType.LBRACKET:
@@ -682,6 +777,18 @@ class Parser:
                 return self._parse_function_call(name)
             
             return IdentifierNode(name)
+        
+        # OAM charge literal
+        if self.current_token.type == TokenType.OAM_CHARGE:
+            self._advance()
+            self._expect(TokenType.COLON, "Expected ':' after 'oam_charge'")
+            
+            if self.current_token.type != TokenType.NUMBER:
+                raise SyntaxError("OAM charge must be a number")
+            
+            charge = int(self.current_token.value)
+            self._advance()
+            return OAMChargeNode(charge)
         
         # Parenthesized expression
         if self._match(TokenType.LPAREN):
@@ -809,27 +916,25 @@ class Parser:
 
 
 def test_parser():
-    """Test the parser with matrix support"""
-    print("Testing Parser with Matrix Support...")
+    """Test the parser with OAM support"""
+    print("Testing Parser with OAM Support...")
     
     source = """
-photon laser = {
-    frequency: 193.414e12,
-    amplitude: 0.8,
-    polarization: "linear"
+vortex photon_plus1 = {
+    oam_charge: +1,
+    wavelength: 1550e-9,
+    waist: 2.0
 }
 
-matrix = { rows: 2, cols: 2, value: [[1, 2], [3, 4]] }
+vortex_beam lg_mode = laguerre_gaussian(
+    oam_charge: +3,
+    radial_order: 0,
+    waist: 1.5
+)
 
-function encode_matrix(data) {
-    print("Encoding matrix:", data);
-    return data;
-}
-
-program test() {
-    print("Matrix demo");
-    result = encode_matrix(matrix);
-    print("Result:", result);
+program oam_demo() {
+    print("OAM Demo");
+    result = interfere(photon_plus1, lg_mode);
 }
 """
     
@@ -844,22 +949,15 @@ program test() {
     for i, stmt in enumerate(ast.statements):
         print(f"\n{i}: {stmt.__class__.__name__}")
         
-        if isinstance(stmt, PhotonDefNode):
+        if isinstance(stmt, VortexPhotonNode):
             print(f"   Name: {stmt.name}")
+            print(f"   OAM charge: {stmt.oam_charge}")
             print(f"   Parameters: {stmt.parameters}")
         
-        elif isinstance(stmt, MatrixLiteralNode):
-            print(f"   Matrix: {stmt.rows}x{stmt.cols}")
-            print(f"   Has {len(stmt.value)} rows")
-        
-        elif isinstance(stmt, FunctionDeclNode):
+        elif isinstance(stmt, VortexBeamNode):
             print(f"   Name: {stmt.name}")
+            print(f"   Beam type: {stmt.beam_type}")
             print(f"   Parameters: {stmt.parameters}")
-            print(f"   Body has {len(stmt.body)} statements")
-        
-        elif isinstance(stmt, ProgramDefNode):
-            print(f"   Name: {stmt.name}")
-            print(f"   Body has {len(stmt.body)} statements")
     
     return ast
 
