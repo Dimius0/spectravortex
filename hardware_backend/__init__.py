@@ -13,7 +13,8 @@ __all__ = [
     "TECH_220NM",
     "SiliconPhotonic220nm",
     "GDSIIGenerator",
-    "ChipVisualizer",  # NEW: Chip visualization
+    "ChipVisualizer",
+    "AutoRouter",  # NEW: AutoRouter
 ]
 
 # Core components
