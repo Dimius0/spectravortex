@@ -8,8 +8,10 @@ __all__ = [
     "Waveguide",
     "MZIInterferometer",
     "OAMModeConverter",
+    "PhotonicComponent",  # Добавлено
     "ChipDesigner",
     "TECH_220NM",
+    "SiliconPhotonic220nm",  # Добавлено
     "GDSIIGenerator",
 ]
 
@@ -56,8 +58,14 @@ if __name__ == "__main__":
     print(f"   Target OAM: {oam.target_oam}")
     print(f"   Efficiency: {oam.efficiency * 100:.1f}%")
     
-    # 4. ChipDesigner demo
-    print("\n4. Testing ChipDesigner...")
+    # 4. PhotonicComponent base class demo
+    print("\n4. Testing PhotonicComponent base class...")
+    print(f"   Base class: {PhotonicComponent.__name__}")
+    print(f"   Is waveguide subclass? {issubclass(Waveguide, PhotonicComponent)}")
+    print(f"   Is MZI subclass? {issubclass(MZIInterferometer, PhotonicComponent)}")
+    
+    # 5. ChipDesigner demo
+    print("\n5. Testing ChipDesigner...")
     designer = ChipDesigner(technology="silicon_photonic_220nm")
     print(f"   Technology: {designer.technology}")
     
@@ -75,12 +83,27 @@ if __name__ == "__main__":
         else:
             print(f"   Tech report: {tech_report}")
     
-    # 5. GDSII generator demo
-    print("\n5. Testing GDSII Generator...")
+    # 6. SiliconPhotonic220nm technology demo
+    print("\n6. Testing SiliconPhotonic220nm technology kit...")
+    tech = SiliconPhotonic220nm()
+    print(f"   Technology name: {tech.name}")
+    print(f"   Waveguide stack: {tech.waveguide_stack}")
+    print(f"   Min feature size: {tech.rules.get('min_feature_size', 'N/A')}μm")
+    
+    # 7. GDSII generator demo
+    print("\n7. Testing GDSII Generator...")
     gds = GDSIIGenerator()
     print(f"   Scale: {gds.scale} database units per micron")
     print(f"   Layer count: {len(gds.layers)}")
     
+    # Добавляем тестовую геометрию
+    gds.add_rectangle(
+        layer=1,
+        x=0, y=0,
+        width=10, height=5
+    )
+    print(f"   Added rectangle to layer 1")
+    
     print("\n" + "=" * 60)
-    print("✅ All components initialized successfully!")
+    print("✅ All components initialized and tested successfully!")
     print("=" * 60)
