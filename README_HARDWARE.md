@@ -1,3 +1,4 @@
+markdown
 # SpectraVortex Hardware Backend
 ## From Photonic Code to Physical Chips
 
@@ -15,6 +16,7 @@ This module completes the SpectraVortex development cycle by converting abstract
 
 ### Step 1: Verify Installation & Run Demo
 Run the built-in demo to see all backend components in action:
+
 ```bash
 python -m hardware_backend
 Expected Output:
