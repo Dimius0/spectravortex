@@ -90,6 +90,77 @@ class ChipDesigner:
         self.metrics.component_count = len(self.components)
         print(f"[ChipDesigner] Added component: {component.name}")
     
+    def auto_route(self) -> List[Waveguide]:
+        """
+        Automatically route connections between all components.
+        
+        Returns:
+            List of created waveguide objects
+        """
+        print("[ChipDesigner] Starting automatic routing...")
+        
+        try:
+            # Import here to avoid circular dependencies
+            from .auto_router import AutoRouter
+            
+            # Create router with our technology
+            router = AutoRouter(technology=self.technology)
+            
+            # Add all existing components to router
+            component_ids = []
+            spacing = 80.0  # Distance between components
+            x_pos, y_pos = 50.0, 50.0
+            
+            for i, component in enumerate(self.components):
+                # Give components a name if they don't have one
+                if not hasattr(component, 'name') or not component.name:
+                    component.name = f"component_{i}"
+                
+                # Add component to router at calculated position
+                comp_id = router.add_component(component, x_pos, y_pos)
+                component_ids.append((comp_id, component))
+                
+                # Update position for next component
+                x_pos += spacing
+                if x_pos > 300:  # Start new row
+                    x_pos = 50.0
+                    y_pos += spacing
+            
+            print(f"   Added {len(component_ids)} components to router")
+            
+            # Create connections between components
+            connections = []
+            for i in range(len(component_ids) - 1):
+                comp_id1, comp1 = component_ids[i]
+                comp_id2, comp2 = component_ids[i + 1]
+                
+                # Determine port types based on component types
+                port1 = "output" if hasattr(comp1, 'get_transfer_matrix') else "port1"
+                port2 = "input" if hasattr(comp2, 'get_transfer_matrix') else "port2"
+                
+                connections.append((comp_id1, port1, comp_id2, port2))
+            
+            print(f"   Created {len(connections)} connections to route")
+            
+            # Perform routing
+            waveguides = router.route_all(connections)
+            
+            # Add created waveguides to our design
+            for waveguide in waveguides:
+                self.add_component(waveguide)
+            
+            print(f"✅ Auto-routing complete: {len(waveguides)} waveguides created")
+            return waveguides
+            
+        except ImportError as e:
+            print(f"❌ Auto-routing failed: Could not import AutoRouter - {e}")
+            return []
+        except Exception as e:
+            print(f"❌ Auto-routing failed with error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
     def _calculate_metrics(self) -> None:
         """Calculate design metrics."""
         # Reset metrics
@@ -156,10 +227,16 @@ class ChipDesigner:
         for i, component in enumerate(self.components):
             if isinstance(component, Waveguide):
                 # Draw waveguide as path
-                points = [
-                    [x_pos, y_pos],
-                    [x_pos + component.length, y_pos]
-                ]
+                if hasattr(component, 'path_points'):
+                    # Use path points from auto-router
+                    points = component.path_points
+                else:
+                    # Default straight waveguide
+                    points = [
+                        [x_pos, y_pos],
+                        [x_pos + component.length, y_pos]
+                    ]
+                
                 generator.add_path(
                     layer=1,
                     points=points,
