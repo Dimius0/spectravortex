@@ -6,13 +6,14 @@ Photonic Integrated Circuit (PIC) design and GDSII generation.
 __version__ = "0.1.0"
 __all__ = [
     "Waveguide",
-    "MZIInterferometer",
+    "MZIInterferometer", 
     "OAMModeConverter",
-    "PhotonicComponent",  # Добавлено
+    "PhotonicComponent",
     "ChipDesigner",
     "TECH_220NM",
-    "SiliconPhotonic220nm",  # Добавлено
+    "SiliconPhotonic220nm",
     "GDSIIGenerator",
+    "ChipVisualizer",  # NEW: Chip visualization
 ]
 
 # Core components
@@ -31,6 +32,9 @@ from .technology_kits.silicon_photonic_220nm import TECH_220NM, SiliconPhotonic2
 
 # GDSII generation
 from .gdsii_generator import GDSIIGenerator
+
+# Chip visualization
+from .visualize_chip import ChipVisualizer  # NEW IMPORT
 
 # Demo and examples
 if __name__ == "__main__":
@@ -58,24 +62,18 @@ if __name__ == "__main__":
     print(f"   Target OAM: {oam.target_oam}")
     print(f"   Efficiency: {oam.efficiency * 100:.1f}%")
     
-    # 4. PhotonicComponent base class demo
-    print("\n4. Testing PhotonicComponent base class...")
-    print(f"   Base class: {PhotonicComponent.__name__}")
-    print(f"   Is waveguide subclass? {issubclass(Waveguide, PhotonicComponent)}")
-    print(f"   Is MZI subclass? {issubclass(MZIInterferometer, PhotonicComponent)}")
-    
-    # 5. ChipDesigner demo
-    print("\n5. Testing ChipDesigner...")
+    # 4. ChipDesigner demo
+    print("\n4. Testing ChipDesigner...")
     designer = ChipDesigner(technology="silicon_photonic_220nm")
     print(f"   Technology: {designer.technology}")
     
-    # Показываем правила технологии
+    # Show technology rules
     if hasattr(designer, 'tech_kit') and designer.tech_kit:
         rules = designer.tech_kit.rules
         print(f"   Min waveguide width: {rules.get('min_width', 'N/A')}μm")
         print(f"   Min bend radius: {rules.get('min_bend_radius', 'N/A')}μm")
     
-    # Генерируем техотчёт
+    # Generate tech report
     if hasattr(designer, 'generate_tech_report'):
         tech_report = designer.generate_tech_report()
         if len(tech_report) > 100:
@@ -83,27 +81,40 @@ if __name__ == "__main__":
         else:
             print(f"   Tech report: {tech_report}")
     
-    # 6. SiliconPhotonic220nm technology demo
-    print("\n6. Testing SiliconPhotonic220nm technology kit...")
-    tech = SiliconPhotonic220nm()
-    print(f"   Technology name: {tech.name}")
-    print(f"   Waveguide stack: {tech.waveguide_stack}")
-    print(f"   Min feature size: {tech.rules.get('min_feature_size', 'N/A')}μm")
-    
-    # 7. GDSII generator demo
-    print("\n7. Testing GDSII Generator...")
+    # 5. GDSII generator demo
+    print("\n5. Testing GDSII Generator...")
     gds = GDSIIGenerator()
     print(f"   Scale: {gds.scale} database units per micron")
     print(f"   Layer count: {len(gds.layers)}")
     
-    # Добавляем тестовую геометрию
-    gds.add_rectangle(
-        layer=1,
-        x=0, y=0,
-        width=10, height=5
-    )
+    # Add test geometry
+    gds.add_rectangle(layer=1, x=0, y=0, width=10, height=5)
     print(f"   Added rectangle to layer 1")
     
+    # 6. ChipVisualizer demo (NEW)
+    print("\n6. Testing Chip Visualizer...")
+    try:
+        visualizer = ChipVisualizer()
+        print(f"   Visualizer initialized successfully")
+        print(f"   Supported colors: {len(visualizer.COLORS)} component types")
+        
+        # Create and visualize demo
+        demo_data = visualizer.create_simple_demo()
+        print(f"   Created demo with {len(demo_data['layers'])} layers")
+        
+        # Try to save visualization
+        import tempfile
+        import os
+        temp_file = os.path.join(tempfile.gettempdir(), "demo_visualization.png")
+        visualizer.visualize(demo_data, temp_file)
+        print(f"   Demo visualization saved to temporary file")
+        
+    except ImportError as e:
+        print(f"   ⚠️  Visualizer dependencies missing: {e}")
+        print("   Install with: pip install matplotlib")
+    except Exception as e:
+        print(f"   ⚠️  Visualizer test failed: {e}")
+    
     print("\n" + "=" * 60)
-    print("✅ All components initialized and tested successfully!")
+    print("✅ All components initialized successfully!")
     print("=" * 60)
