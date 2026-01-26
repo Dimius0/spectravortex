@@ -43,6 +43,67 @@ def run_file(filename: str):
         traceback.print_exc()
         return False
 
+def compile_to_chip(source_file: str, output_gds: str):
+    """Compile SpectraVortex code to photonic chip GDSII"""
+    try:
+        from compiler import compile_source
+        from hardware_backend import ChipDesigner, SimpleGDSIIWriter
+        
+        print(f"🛠️  Compiling {source_file} to photonic chip...")
+        print("=" * 60)
+        
+        # 1. Read source code
+        with open(source_file, 'r') as f:
+            source = f.read()
+        
+        # 2. Parse to AST
+        print("📄 Parsing source code...")
+        ast = compile_source(source)
+        
+        # 3. Design chip from AST
+        print("🎨 Designing photonic chip...")
+        designer = ChipDesigner(technology="silicon_photonic_220nm")
+        designer.design_from_ast(ast)
+        
+        # 4. Generate design report
+        print("\n" + "=" * 60)
+        print(designer.generate_report())
+        
+        # 5. Generate GDSII file
+        print(f"💾 Generating GDSII: {output_gds}")
+        writer = SimpleGDSIIWriter(technology="silicon_photonic_220nm")
+        
+        # Add all components to writer
+        for item in designer.layout:
+            writer.add_element(item['type'], item)
+        
+        # Write file
+        if writer.write(output_gds):
+            print(f"\n✅ SUCCESS! Photonic chip saved to: {output_gds}")
+            
+            # Show summary
+            summary = designer.get_design_summary()
+            print(f"\n📊 CHIP SUMMARY:")
+            print(f"   Technology: {summary['technology']}")
+            print(f"   Components: {summary['components']}")
+            print(f"   Area: {summary['metrics']['total_area']:.1f} μm²")
+            print(f"   Loss: {summary['metrics']['total_loss']:.2f} dB")
+            print(f"   Waveguide: {summary['metrics']['waveguide_length']:.1f} μm")
+            
+            return True
+        else:
+            print("❌ Failed to write GDSII file")
+            return False
+            
+    except FileNotFoundError:
+        print(f"❌ File not found: {source_file}")
+        return False
+    except Exception as e:
+        print(f"❌ Compilation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def run_oam_demo():
     """Run OAM vortex light demo"""
     from compiler import compile_source
@@ -227,6 +288,7 @@ def show_help():
     print("  --run FILE         Run a SpectraVortex file (.svx)")
     print("  --oam-demo         Run OAM vortex light demo")
     print("  --matrix-demo      Run matrix multiplication demo")
+    print("  --compile-chip FILE OUTPUT  Compile to photonic chip (.gds)")
     print("  --interactive      Start interactive REPL session")
     print("  --version          Show version information")
     print("  --help             Show this help message")
@@ -234,6 +296,7 @@ def show_help():
     print("Examples:")
     print("  python main.py --run examples/optical_matrix_multiplier.svx")
     print("  python main.py --oam-demo")
+    print("  python main.py --compile-chip test.svx chip.gds")
     print("  python main.py --interactive")
     print()
     print("Features:")
@@ -241,6 +304,7 @@ def show_help():
     print("  • OAM (vortex light) with physical validation")
     print("  • Type checking for physical correctness")
     print("  • Photon and beam definitions")
+    print("  • Hardware compilation to photonic chips")
 
 def main():
     """Main entry point"""
@@ -271,6 +335,18 @@ def main():
     
     elif command == "--matrix-demo":
         success = run_matrix_demo()
+        sys.exit(0 if success else 1)
+    
+    elif command == "--compile-chip":
+        if len(sys.argv) < 4:
+            print("Error: Please specify input and output files")
+            print("Usage: python main.py --compile-chip <input.svx> <output.gds>")
+            sys.exit(1)
+        
+        source_file = sys.argv[2]
+        output_file = sys.argv[3]
+        
+        success = compile_to_chip(source_file, output_file)
         sys.exit(0 if success else 1)
     
     elif command == "--interactive":
