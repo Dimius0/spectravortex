@@ -1,13 +1,12 @@
-markdown
 # SpectraVortex Hardware Backend
 ## From Photonic Code to Physical Chips
 
-**Status: ⚡ Active Development (Working Prototype)**
+**Status: Active Development (Working Prototype)**
 > Transform SpectraVortex photonic programs into manufacturable Photonic Integrated Circuit (PIC) layouts.
 
 This module completes the SpectraVortex development cycle by converting abstract descriptions of optical vortices and interference into concrete physical layouts, ready for export in the standard GDSII format.
 
-## 🚀 Quick Start in 5 Minutes
+## Quick Start in 5 Minutes
 
 ### Prerequisites
 - **Python 3.8+**
@@ -32,7 +31,7 @@ SpectraVortex Hardware Backend Demo
    Coupling ratio: 0.50
 ... (other components) ...
 ============================================================
-✅ All components initialized and tested successfully!
+OK: All components initialized and tested successfully!
 ============================================================
 Step 2: Run the Full Test Suite
 Ensure all functionality works correctly:
@@ -51,13 +50,13 @@ Layout File: Open my_first_chip.gds.json to inspect the geometry.
 
 Visualization (Optional): Use the example view_chip.py script (see below).
 
-🖥️ Real-World Output Examples
+Real-World Output Examples
 1. Chip Compiler Output
 text
-🛠️  Compiling test_chip_design.svx to photonic chip...
+Compiling test_chip_design.svx to photonic chip...
 ============================================================
-📄 Parsing source code... Done
-🎨 Designing photonic chip...
+Parsing source code... Done
+Designing photonic chip...
 [ChipDesigner] Adding OAM source: source_plus1 (OAM=+1)
 [ChipDesigner] Adding OAM source: source_minus2 (OAM=-2)
 [ChipDesigner] Creating interference region
@@ -73,7 +72,7 @@ DESIGN METRICS:
   Ports: 2
   Design Rule Violations: 0
 TECHNOLOGY: silicon_photonic_220nm
-✅ SUCCESS! Photonic chip saved to: my_first_chip.gds.json
+SUCCESS! Photonic chip saved to: my_first_chip.gds.json
 2. Generated GDSII JSON Fragment
 json
 {
@@ -95,7 +94,7 @@ json
     {"name": "MAIN", "layer": 1, "placement": [0, 0]}
   ]
 }
-📁 Project Structure
+Project Structure
 text
 spectravortex/hardware_backend/
 ├── __init__.py              # Main module & demo
@@ -113,7 +112,7 @@ main.py – Main compilation script
 
 view_chip.py – Visualization script (to be created by user)
 
-🔧 Working with Key Components
+Working with Key Components
 1. Waveguides
 python
 from hardware_backend import Waveguide
@@ -143,7 +142,7 @@ oam = OAMModeConverter(target_oam=2, efficiency=0.85)
 pattern = oam.generate_phase_pattern()  # Spiral phase mask
 print(f"Target OAM charge: +{oam.target_oam}")
 print(f"Expected efficiency: {oam.efficiency:.1%}")
-🎨 Chip Design: From Code to Silicon
+Chip Design: From Code to Silicon
 Complete Design Pipeline
 python
 from compiler import compile_source  # SpectraVortex compiler
@@ -196,7 +195,7 @@ program test_interference() {
     print("Interference visibility:", result.visibility);
     print("Output power:", result.power_dbm, "dBm");
 }
-📊 Design Metrics & Validation
+Design Metrics & Validation
 The backend automatically calculates key metrics:
 
 Metric	Description	Example Value
@@ -214,7 +213,7 @@ print(f"Chip area: {summary['total_area']} μm²")
 print(f"Total loss: {summary['total_loss']} dB")
 if summary['violations']:
     print(f"WARNING: {len(summary['violations'])} design rule violations!")
-🏭 Supported Technology Processes
+Supported Technology Processes
 Silicon Photonic 220nm (SOI)
 Standard Silicon-on-Insulator platform:
 
@@ -238,7 +237,7 @@ tech = SiliconPhotonic220nm()
 errors = tech.validate_waveguide(width=0.3, radius=4.0)
 if errors:
     print(f"Validation errors: {errors}")
-💾 Output Formats
+Output Formats
 1. Simplified GDSII JSON (Implemented)
 Human-readable JSON with full geometry description:
 
@@ -251,7 +250,7 @@ Standard industrial format for foundry submission:
 
 bash
 python main.py --compile-chip design.svx --format gdsii output.gds
-🧪 Testing & Debugging
+Testing & Debugging
 Running Tests
 bash
 # Quick import check
@@ -292,7 +291,7 @@ def view_gds_json(filename):
 
 if __name__ == "__main__":
     view_gds_json("my_first_chip.gds.json")
-📚 API Reference (Summary)
+API Reference (Summary)
 ChipDesigner Class
 python
 class ChipDesigner:
@@ -315,7 +314,7 @@ class SiliconPhotonic220nm:
     def validate_waveguide(self, width: float, radius: float) -> List[str]
     def get_waveguide_properties(self, width: float) -> Dict
     def generate_tech_report(self) -> str
-🔮 Roadmap & Future Features
+Roadmap & Future Features
 Planned for Upcoming Releases:
 Full Binary GDSII Support (Industry standard)
 
@@ -334,7 +333,7 @@ PDK Support for commercial processes
 
 Simulator Integration (Lumerical, COMSOL)
 
-🆘 Troubleshooting Common Issues
+Troubleshooting Common Issues
 Problem	Likely Cause	Solution
 ImportError	Incorrect Python path	Run from project root: cd spectravortex
 FileNotFoundError	Missing design file	Check path: ls -la test_chip_design.svx
@@ -349,10 +348,10 @@ Examine generated .gds.json files for geometry analysis
 
 Use the --full flag for detailed test output
 
-📄 License
+License
 MIT License. See the LICENSE file in the project root.
 
-🎯 Next Steps After Setup
+Next Steps After Setup
 Verify Functionality: python -m hardware_backend
 
 Compile the Example: python main.py --compile-chip test_chip_design.svx my_chip.gds.json
