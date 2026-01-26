@@ -35,7 +35,9 @@ from .technology_kits.silicon_photonic_220nm import TECH_220NM, SiliconPhotonic2
 from .gdsii_generator import GDSIIGenerator
 
 # Chip visualization
-from .visualize_chip import ChipVisualizer  # NEW IMPORT
+from .visualize_chip import ChipVisualizer 
+# Auto routing
+from .auto_router import AutoRouter # NEW IMPORT
 
 # Demo and examples
 if __name__ == "__main__":
