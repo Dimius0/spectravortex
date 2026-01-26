@@ -66,7 +66,9 @@ python main.py --test
 🖼️ Example Visualization Output
 When you compile with --visualize, you get a professional chip layout image:
 
-https://demo_chip.png
+https://via.placeholder.com/800x400/3498db/ffffff?text=SpectraVortex+Chip+Layout
+
+Actual image will be generated when you run the compiler
 
 Features shown:
 
