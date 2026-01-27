@@ -11,6 +11,7 @@ from enum import Enum
 import heapq
 import logging
 from collections import deque
+import math
 
 from .deadlock_protection import (
     RoutingAlgorithm, RouteResult, TimeoutError,
@@ -19,6 +20,16 @@ from .deadlock_protection import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def float_equal(a: float, b: float, tol: float = 1e-9) -> bool:
+    """Compare floats with tolerance"""
+    return abs(a - b) < tol
+
+
+def point_equal(p1: Tuple[float, float], p2: Tuple[float, float], tol: float = 1e-9) -> bool:
+    """Compare points with tolerance"""
+    return float_equal(p1[0], p2[0], tol) and float_equal(p1[1], p2[1], tol)
 
 
 @dataclass
@@ -74,12 +85,15 @@ class BaseRouter:
         # Simplified: obstacle is (x1, y1, x2, y2)
         if hasattr(obstacle, '__len__') and len(obstacle) == 4:
             x1, y1, x2, y2 = obstacle
-            return x1 <= x <= x2 and y1 <= y <= y2
+            # Add small epsilon to avoid boundary issues
+            epsilon = 1e-10
+            return (x1 - epsilon <= x <= x2 + epsilon and 
+                    y1 - epsilon <= y <= y2 + epsilon)
         return False
     
     def heuristic(self, a: Tuple[float, float], b: Tuple[float, float]) -> float:
         """Euclidean distance heuristic"""
-        return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+        return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
     
     def get_neighbors(self, node: Node) -> List[Tuple[float, float]]:
         """Get valid neighboring positions (8-directional)"""
@@ -117,11 +131,20 @@ class AStarRouter(BaseRouter):
     def __init__(self, grid_size: float = 0.1):
         super().__init__(grid_size)
         self.monitor = DeadlockMonitor()
+        # Create new circuit breaker for each instance to avoid state sharing
+        self.circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
     
     @timeout(0.5)  # 500ms timeout for A*
-    @CircuitBreaker(failure_threshold=3, recovery_timeout=30)
     def find_path(self, start: Tuple[float, float], end: Tuple[float, float]) -> List[Tuple[float, float]]:
-        """A* algorithm implementation"""
+        """A* algorithm implementation with circuit breaker"""
+        @self.circuit_breaker
+        def _find_path_internal(start, end):
+            return self._find_path_impl(start, end)
+        
+        return _find_path_internal(start, end)
+    
+    def _find_path_impl(self, start: Tuple[float, float], end: Tuple[float, float]) -> List[Tuple[float, float]]:
+        """Internal A* algorithm implementation"""
         logger.info(f"A* routing from {start} to {end}")
         
         start_node = Node(start[0], start[1])
@@ -147,10 +170,14 @@ class AStarRouter(BaseRouter):
             current_position = current_node.pos  # Update current position
             visited_count += 1
             
-            # Check if we reached the end
-            if self.heuristic(current_node.pos, end_node.pos) < self.grid_size:
+            # Check if we reached the end (with tolerance)
+            if self.heuristic(current_node.pos, end_node.pos) < self.grid_size * 1.5:
                 logger.info(f"A* found path after visiting {visited_count} nodes")
-                return self.reconstruct_path(current_node)
+                path = self.reconstruct_path(current_node)
+                # Ensure end point is exactly at destination
+                if not point_equal(path[-1], end):
+                    path.append(end)
+                return path
             
             closed_set.add(current_node.pos)
             
@@ -195,21 +222,25 @@ class WavefrontRouter(BaseRouter):
         """Wavefront algorithm implementation"""
         logger.info(f"Wavefront routing from {start} to {end}")
         
-        # Discretize space
-        grid_width = int(abs(end[0] - start[0]) / self.grid_size) + 3
-        grid_height = int(abs(end[1] - start[1]) / self.grid_size) + 3
+        # Discretize space with proper rounding
+        grid_width = int(round(abs(end[0] - start[0]) / self.grid_size)) + 3
+        grid_height = int(round(abs(end[1] - start[1]) / self.grid_size)) + 3
+        
+        # Ensure minimum grid size
+        grid_width = max(grid_width, 3)
+        grid_height = max(grid_height, 3)
         
         # Create wavefront grid
         grid = np.full((grid_height, grid_width), -1, dtype=int)
         
-        # Convert to grid coordinates
+        # Convert to grid coordinates with proper rounding
         min_x = min(start[0], end[0]) - self.grid_size
         min_y = min(start[1], end[1]) - self.grid_size
         
         def to_grid(x, y):
             return (
-                int((x - min_x) / self.grid_size),
-                int((y - min_y) / self.grid_size)
+                int(round((x - min_x) / self.grid_size)),
+                int(round((y - min_y) / self.grid_size))
             )
         
         def from_grid(gx, gy):
@@ -221,6 +252,12 @@ class WavefrontRouter(BaseRouter):
         start_gx, start_gy = to_grid(start[0], start[1])
         end_gx, end_gy = to_grid(end[0], end[1])
         
+        # Clamp to grid bounds
+        start_gx = max(0, min(start_gx, grid_width - 1))
+        start_gy = max(0, min(start_gy, grid_height - 1))
+        end_gx = max(0, min(end_gx, grid_width - 1))
+        end_gy = max(0, min(end_gy, grid_height - 1))
+        
         # Mark obstacles
         for obstacle in self.obstacles:
             if hasattr(obstacle, '__len__') and len(obstacle) == 4:
@@ -228,10 +265,15 @@ class WavefrontRouter(BaseRouter):
                 gx1, gy1 = to_grid(x1, y1)
                 gx2, gy2 = to_grid(x2, y2)
                 
+                # Ensure bounds
+                gx1 = max(0, min(gx1, grid_width - 1))
+                gy1 = max(0, min(gy1, grid_height - 1))
+                gx2 = max(0, min(gx2, grid_width - 1))
+                gy2 = max(0, min(gy2, grid_height - 1))
+                
                 for gx in range(gx1, gx2 + 1):
                     for gy in range(gy1, gy2 + 1):
-                        if 0 <= gx < grid_width and 0 <= gy < grid_height:
-                            grid[gy, gx] = -2  # Obstacle
+                        grid[gy, gx] = -2  # Obstacle
         
         # Wavefront propagation
         queue = deque([(end_gx, end_gy, 0)])
@@ -258,26 +300,39 @@ class WavefrontRouter(BaseRouter):
         path = []
         gx, gy = start_gx, start_gy
         
-        while (gx, gy) != (end_gx, end_gy):
+        max_steps = grid_width * grid_height  # Prevent infinite loop
+        steps = 0
+        
+        while not (gx == end_gx and gy == end_gy) and steps < max_steps:
             path.append(from_grid(gx, gy))
             
             # Find next step with lower distance
             current_dist = grid[gy, gx]
             next_pos = None
+            next_dist = current_dist
             
             for dx, dy in directions:
                 ngx, ngy = gx + dx, gy + dy
                 if (0 <= ngx < grid_width and 0 <= ngy < grid_height and
-                    0 < grid[ngy, ngx] < current_dist):
-                    current_dist = grid[ngy, ngx]
+                    0 <= grid[ngy, ngx] < next_dist):
+                    next_dist = grid[ngy, ngx]
                     next_pos = (ngx, ngy)
             
             if next_pos is None:
+                # Can't find better path - go directly to end
                 break
             
             gx, gy = next_pos
+            steps += 1
         
+        # Add end point
         path.append(from_grid(end_gx, end_gy))
+        
+        # Ensure start and end are exact
+        if not point_equal(path[0], start):
+            path.insert(0, start)
+        if not point_equal(path[-1], end):
+            path.append(end)
         
         logger.info(f"Wavefront found path with {len(path)} points")
         return path
@@ -324,8 +379,11 @@ class GeometricRouter(BaseRouter):
                 path.extend([waypoint1, waypoint2, end])
             else:
                 # More complex case - use A* for this segment
+                # Create new A* router without circuit breaker to avoid state issues
                 a_star = AStarRouter(self.grid_size)
                 a_star.set_obstacles(self.obstacles)
+                # Disable circuit breaker for fallback
+                a_star.circuit_breaker = CircuitBreaker(failure_threshold=1000, recovery_timeout=1)
                 return a_star.find_path(start, end)
         
         logger.info(f"Geometric routing found path with {len(path)} points")
@@ -349,9 +407,12 @@ class GeometricRouter(BaseRouter):
         # Simplified version
         x1, y1, x2, y2 = rect
         
-        # Check if either endpoint is inside rectangle
-        if (x1 <= p1[0] <= x2 and y1 <= p1[1] <= y2) or \
-           (x1 <= p2[0] <= x2 and y1 <= p2[1] <= y2):
+        # Check if either endpoint is inside rectangle (with tolerance)
+        epsilon = 1e-10
+        if ((x1 - epsilon <= p1[0] <= x2 + epsilon and 
+             y1 - epsilon <= p1[1] <= y2 + epsilon) or
+            (x1 - epsilon <= p2[0] <= x2 + epsilon and 
+             y1 - epsilon <= p2[1] <= y2 + epsilon)):
             return True
         
         # Check line segment against rectangle edges
@@ -481,7 +542,7 @@ class AdaptiveRouter:
                     self.stats[algo_name]["failures"] += 1
                     logger.warning(f"{algo_name.value} timeout: {e}")
                     
-                except (DeadlockError, NoPathError) as e:
+                except (DeadlockError, NoPathError, RoutingError) as e:
                     elapsed = time.time() - start_time
                     self.stats[algo_name]["failures"] += 1
                     logger.warning(f"{algo_name.value} failed: {e}")
@@ -538,6 +599,13 @@ class AdaptiveRouter:
         """Clear impossible routes cache"""
         self.impossible_routes_cache.clear()
         logger.info("Impossible routes cache cleared")
+    
+    def reset_circuit_breakers(self):
+        """Reset circuit breakers for all algorithms"""
+        for algo in self.algorithms.values():
+            if hasattr(algo, 'circuit_breaker'):
+                algo.circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=30)
+        logger.info("Circuit breakers reset")
 
 
 # Factory function for easy router creation
