@@ -7,11 +7,17 @@ __version__ = "0.3.0"  # Updated for hybrid architecture
 __author__ = "SpectraVortex Team"
 __license__ = "MIT"
 
-# Import legacy core simulator components
+# ============================================================================
+# 1. IMPORT LEGACY CORE SIMULATOR COMPONENTS
+# ============================================================================
 from .interpreter import Interpreter
 from .matrix_ops import MatrixOperations
 
-# Import Hybrid Architecture components with graceful fallback
+# ============================================================================
+# 2. IMPORT HYBRID ARCHITECTURE COMPONENTS WITH GRACEFUL FALLBACK
+# ============================================================================
+
+# FieldSolution from data interface
 try:
     from .core.data_interface import FieldSolution
     HYBRID_DATA_AVAILABLE = True
@@ -22,6 +28,7 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError("FieldSolution requires core.data_interface module")
 
+# Abstract Solver interface
 try:
     from .core.solver import Solver
     HYBRID_SOLVER_AVAILABLE = True
@@ -32,12 +39,13 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError("Solver requires core.solver module")
 
+# LinearWaveSolver concrete implementation
 try:
     from .solvers.linear_wave_solver import LinearWaveSolver, create_linear_wave_solver
     LINEAR_WAVE_SOLVER_AVAILABLE = True
 except ImportError:
     LINEAR_WAVE_SOLVER_AVAILABLE = False
-    # Create placeholder for LinearWaveSolver
+    # Create placeholders
     class LinearWaveSolver:
         def __init__(self, *args, **kwargs):
             raise ImportError("LinearWaveSolver requires solvers.linear_wave_solver module")
@@ -45,7 +53,7 @@ except ImportError:
     def create_linear_wave_solver(**kwargs):
         raise ImportError("create_linear_wave_solver requires LinearWaveSolver")
 
-# Import OpticalSimulator (legacy interface, kept for backward compatibility)
+# OpticalSimulator (legacy interface, kept for backward compatibility)
 try:
     from .optical_simulator import OpticalSimulator, create_simulator, simulate_circuit
     OPTICAL_SIMULATOR_AVAILABLE = True
@@ -62,13 +70,49 @@ except ImportError:
     def simulate_circuit(**kwargs):
         raise ImportError("simulate_circuit requires OpticalSimulator")
 
-# Calculate overall hybrid architecture availability
+# ============================================================================
+# 3. IMPORT SOLVER MANAGER (PHASE 2 CORE COMPONENT)
+# ============================================================================
+try:
+    from .core.solver_manager import (
+        SolverManager, 
+        SolverSelection, 
+        HybridProblemPart,
+        create_solver_manager
+    )
+    SOLVER_MANAGER_AVAILABLE = True
+except ImportError:
+    SOLVER_MANAGER_AVAILABLE = False
+    # Create placeholders for SolverManager components
+    class SolverManager:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SolverManager requires core.solver_manager module")
+    
+    class SolverSelection:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("SolverSelection requires core.solver_manager module")
+    
+    class HybridProblemPart:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("HybridProblemPart requires core.solver_manager module")
+    
+    def create_solver_manager(**kwargs):
+        raise ImportError("create_solver_manager requires SolverManager")
+
+# ============================================================================
+# 4. CALCULATE ARCHITECTURE AVAILABILITY
+# ============================================================================
+# Full hybrid architecture requires all core components
 HYBRID_ARCHITECTURE_AVAILABLE = (
-    HYBRID_DATA_AVAILABLE and 
-    HYBRID_SOLVER_AVAILABLE and 
-    LINEAR_WAVE_SOLVER_AVAILABLE
+    HYBRID_DATA_AVAILABLE and
+    HYBRID_SOLVER_AVAILABLE and
+    LINEAR_WAVE_SOLVER_AVAILABLE and
+    SOLVER_MANAGER_AVAILABLE
 )
 
+# ============================================================================
+# 5. EXPORT LIST - ALL PUBLICLY AVAILABLE SYMBOLS
+# ============================================================================
 __all__ = [
     # Legacy exports (always available)
     "Interpreter",
@@ -85,15 +129,60 @@ __all__ = [
     "LinearWaveSolver",
     "create_linear_wave_solver",
     
+    # SolverManager exports (Phase 2)
+    "SolverManager",
+    "SolverSelection",
+    "HybridProblemPart",
+    "create_solver_manager",
+    
     # Availability flags
     "HYBRID_ARCHITECTURE_AVAILABLE",
     "HYBRID_DATA_AVAILABLE",
     "HYBRID_SOLVER_AVAILABLE",
     "LINEAR_WAVE_SOLVER_AVAILABLE",
     "OPTICAL_SIMULATOR_AVAILABLE",
+    "SOLVER_MANAGER_AVAILABLE",
 ]
 
+# ============================================================================
+# 6. GLOBAL SOLVER MANAGER INSTANCE (SINGLETON PATTERN)
+# ============================================================================
+_global_solver_manager = None
 
+def get_solver_manager() -> SolverManager:
+    """
+    Get or create the global SolverManager instance.
+    
+    Returns:
+        SolverManager: Global instance with default solvers registered
+        
+    Raises:
+        ImportError: If SolverManager is not available
+    """
+    global _global_solver_manager
+    
+    if not SOLVER_MANAGER_AVAILABLE:
+        raise ImportError(
+            "SolverManager is not available. "
+            "Check that core.solver_manager module is installed."
+        )
+    
+    if _global_solver_manager is None:
+        _global_solver_manager = create_solver_manager(enable_auto_selection=True)
+    
+    return _global_solver_manager
+
+def reset_solver_manager() -> None:
+    """
+    Reset the global SolverManager instance.
+    Useful for testing or reconfiguration.
+    """
+    global _global_solver_manager
+    _global_solver_manager = None
+
+# ============================================================================
+# 7. UTILITY FUNCTIONS
+# ============================================================================
 def hello() -> str:
     """
     Get a welcome message with architecture status.
@@ -103,9 +192,11 @@ def hello() -> str:
     """
     base_message = f"SpectraVortex Simulator v{__version__}"
     
-    if HYBRID_ARCHITECTURE_AVAILABLE:
+    if HYBRID_ARCHITECTURE_AVAILABLE and SOLVER_MANAGER_AVAILABLE:
+        return f"{base_message} with Hybrid Solver Architecture ✓ (SolverManager ready)"
+    elif HYBRID_ARCHITECTURE_AVAILABLE:
         return f"{base_message} with Hybrid Solver Architecture ✓"
-    elif HYBRID_DATA_AVAILABLE or HYBRID_SOLVER_AVAILABLE:
+    elif HYBRID_DATA_AVAILABLE or HYBRID_SOLVER_AVAILABLE or LINEAR_WAVE_SOLVER_AVAILABLE:
         # Partial hybrid architecture
         parts = []
         if HYBRID_DATA_AVAILABLE:
@@ -114,11 +205,13 @@ def hello() -> str:
             parts.append("Solver interface")
         if LINEAR_WAVE_SOLVER_AVAILABLE:
             parts.append("LinearWaveSolver")
+        if SOLVER_MANAGER_AVAILABLE:
+            parts.append("SolverManager")
         
-        return f"{base_message} with partial Hybrid Architecture ({', '.join(parts)})"
+        parts_str = ", ".join(parts)
+        return f"{base_message} with partial Hybrid Architecture ({parts_str})"
     else:
         return f"{base_message} (legacy mode)"
-
 
 def get_version() -> str:
     """
@@ -128,7 +221,6 @@ def get_version() -> str:
         Version string
     """
     return __version__
-
 
 def get_available_modules() -> list:
     """
@@ -151,8 +243,10 @@ def get_available_modules() -> list:
     if LINEAR_WAVE_SOLVER_AVAILABLE:
         modules.append("LinearWaveSolver")
     
+    if SOLVER_MANAGER_AVAILABLE:
+        modules.append("SolverManager")
+    
     return modules
-
 
 def get_architecture_status() -> dict:
     """
@@ -169,12 +263,12 @@ def get_architecture_status() -> dict:
             "solver_interface": HYBRID_SOLVER_AVAILABLE,
             "linear_wave_solver": LINEAR_WAVE_SOLVER_AVAILABLE,
             "optical_simulator": OPTICAL_SIMULATOR_AVAILABLE,
+            "solver_manager": SOLVER_MANAGER_AVAILABLE,
         },
         "available_solvers": ["LinearWaveSolver"] if LINEAR_WAVE_SOLVER_AVAILABLE else [],
         "available_modules": get_available_modules(),
         "recommendations": _get_architecture_recommendations(),
     }
-
 
 def _get_architecture_recommendations() -> list:
     """
@@ -194,11 +288,13 @@ def _get_architecture_recommendations() -> list:
     if not LINEAR_WAVE_SOLVER_AVAILABLE:
         recommendations.append("Install solvers.linear_wave_solver for linear wave solving")
     
-    if HYBRID_ARCHITECTURE_AVAILABLE:
-        recommendations.append("Hybrid architecture ready! Consider implementing SolverManager")
+    if not SOLVER_MANAGER_AVAILABLE:
+        recommendations.append("Install core.solver_manager for automatic solver coordination")
+    
+    if HYBRID_ARCHITECTURE_AVAILABLE and SOLVER_MANAGER_AVAILABLE:
+        recommendations.append("Hybrid architecture ready! Consider implementing additional solvers")
     
     return recommendations
-
 
 def check_module(module_name: str) -> dict:
     """
@@ -240,11 +336,14 @@ def check_module(module_name: str) -> dict:
         module_status["available"] = LINEAR_WAVE_SOLVER_AVAILABLE
         module_status["message"] = "Linear wave solver" if LINEAR_WAVE_SOLVER_AVAILABLE else "Requires solvers.linear_wave_solver"
     
+    elif module_name == "SolverManager":
+        module_status["available"] = SOLVER_MANAGER_AVAILABLE
+        module_status["message"] = "Solver coordination manager" if SOLVER_MANAGER_AVAILABLE else "Requires core.solver_manager"
+    
     else:
         module_status["message"] = f"Unknown module: {module_name}"
     
     return module_status
-
 
 def test_imports() -> dict:
     """
@@ -253,6 +352,8 @@ def test_imports() -> dict:
     Returns:
         Dictionary with import test results
     """
+    import importlib
+    
     results = {
         "success": True,
         "modules": {},
@@ -260,11 +361,9 @@ def test_imports() -> dict:
     }
     
     # Test legacy modules using importlib to avoid unused imports
-    import importlib
-    
     # Test Interpreter
     try:
-        importlib.import_module('.interpreter', 'simulator')
+        importlib.import_module('simulator.interpreter', 'simulator')
         results["modules"]["Interpreter"] = {"status": "OK", "version": "unknown"}
     except ImportError as e:
         results["success"] = False
@@ -273,7 +372,7 @@ def test_imports() -> dict:
     
     # Test MatrixOperations
     try:
-        importlib.import_module('.matrix_ops', 'simulator')
+        importlib.import_module('simulator.matrix_ops', 'simulator')
         results["modules"]["MatrixOperations"] = {"status": "OK", "version": "unknown"}
     except ImportError as e:
         results["success"] = False
@@ -293,10 +392,14 @@ def test_imports() -> dict:
     if OPTICAL_SIMULATOR_AVAILABLE:
         results["modules"]["OpticalSimulator"] = {"status": "OK", "type": "legacy_simulator"}
     
+    if SOLVER_MANAGER_AVAILABLE:
+        results["modules"]["SolverManager"] = {"status": "OK", "type": "coordinator"}
+    
     return results
 
-
-# Quick demonstration when module is run directly
+# ============================================================================
+# 8. QUICK DEMONSTRATION WHEN MODULE IS RUN DIRECTLY
+# ============================================================================
 if __name__ == "__main__":
     print("=" * 60)
     print(hello())
@@ -320,5 +423,17 @@ if __name__ == "__main__":
         print(f"\nRecommendations:")
         for i, rec in enumerate(status['recommendations'], 1):
             print(f"  {i:2d}. {rec}")
+    
+    # Test SolverManager if available
+    if SOLVER_MANAGER_AVAILABLE:
+        try:
+            manager = get_solver_manager()
+            available = manager.get_available_solvers()
+            print(f"\nSolverManager Status:")
+            print(f"  Registered solvers: {len(available)}")
+            for solver_id, info in available.items():
+                print(f"    - {info['name']}: {info.get('success_rate', 0):.0%} success rate")
+        except Exception as e:
+            print(f"\nSolverManager test error: {e}")
     
     print("\n" + "=" * 60)
