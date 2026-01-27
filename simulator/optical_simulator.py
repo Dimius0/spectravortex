@@ -9,7 +9,7 @@ import logging
 
 # Import the new hybrid architecture data interface
 try:
-    from .core.data_interface import FieldSolution, SimulationDomain
+    from .core.data_interface import FieldSolution
     HYBRID_ARCH_AVAILABLE = True
 except ImportError:
     # Fallback for when hybrid architecture is not fully implemented yet
