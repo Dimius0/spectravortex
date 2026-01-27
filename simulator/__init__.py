@@ -259,17 +259,21 @@ def test_imports() -> dict:
         "errors": [],
     }
     
-    # Test legacy modules
+    # Test legacy modules using importlib to avoid unused imports
+    import importlib
+    
+    # Test Interpreter
     try:
-        from .interpreter import Interpreter
+        importlib.import_module('.interpreter', 'simulator')
         results["modules"]["Interpreter"] = {"status": "OK", "version": "unknown"}
     except ImportError as e:
         results["success"] = False
         results["modules"]["Interpreter"] = {"status": "FAILED", "error": str(e)}
         results["errors"].append(f"Interpreter: {e}")
     
+    # Test MatrixOperations
     try:
-        from .matrix_ops import MatrixOperations
+        importlib.import_module('.matrix_ops', 'simulator')
         results["modules"]["MatrixOperations"] = {"status": "OK", "version": "unknown"}
     except ImportError as e:
         results["success"] = False
