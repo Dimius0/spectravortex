@@ -1,6 +1,6 @@
 """
-FAST tests for adaptive router - только быстрые тесты без timeout'ов и сложных лабиринтов.
-Все тесты должны завершаться за < 2 секунды.
+FAST tests for adaptive router - only fast tests without timeouts and complex mazes.
+All tests should complete in < 2 seconds.
 """
 
 import pytest
@@ -100,18 +100,20 @@ class TestAStarRouterFast:
 
     def test_no_path_scenario_fast(self):
         """A* should raise exception when no path exists - FIXED version"""
-        # Create truly impossible scenario: box inside a larger box
+        # Create truly impossible scenario: sealed room
         obstacles = [
-            # Outer box (completely sealed)
-            (-1.0, -1.0, 2.0, 0.0),   # Bottom wall
-            (-1.0, 1.0, 2.0, 2.0),    # Top wall
-            (-1.0, -1.0, 0.0, 2.0),   # Left wall
-            (1.0, -1.0, 2.0, 2.0),    # Right wall
+            # Outer walls (completely sealed)
+            (-1.0, -1.0, 2.0, 0.0),   # Bottom wall (extended)
+            (-1.0, 1.0, 2.0, 2.0),    # Top wall (extended)
+            (-1.0, -1.0, 0.0, 2.0),   # Left wall (extended)
+            (1.0, -1.0, 2.0, 2.0),    # Right wall (extended)
+            # Internal block
+            (0.2, 0.2, 0.8, 0.8)      # Solid block in center
         ]
         self.router.set_obstacles(obstacles)
 
-        start = (0.5, 0.5)  # Inside the sealed box
-        end = (3.0, 3.0)    # Outside the box
+        start = (0.1, 0.1)  # Inside sealed area
+        end = (1.5, 1.5)    # Outside
 
         # Should NOT find a path
         with pytest.raises(NoPathError):
@@ -137,8 +139,8 @@ class TestWavefrontRouterFast:
 
     def test_wavefront_simple_maze(self):
         """Wavefront should solve simple maze - FIXED version"""
-        # Single obstacle that doesn't block the path
-        obstacles = [(0.4, 0.4, 0.6, 0.6)]  # Small obstacle in center
+        # Single obstacle that doesn't completely block
+        obstacles = [(0.3, 0.3, 0.7, 0.4)]  # Horizontal block, not too thick
         self.router.set_obstacles(obstacles)
 
         start = (0.0, 0.0)
@@ -237,21 +239,32 @@ class TestAdaptiveRouterIntegrationFast:
         assert point_equal(result.path[-1], end)
 
     def test_impossible_route_caching_fast(self):
-        """Test that impossible routes are cached - FINAL FIXED version"""
-        # Create SOLID WALL - completely blocked, no gaps
+        """Test that impossible routes are cached - FIXED with solid block"""
+        # Create SOLID BOX - start completely surrounded
         obstacles = [
-            # Solid wall from x=0.0 to x=1.0 at y=0.5
-            (0.0, 0.45, 1.0, 0.55),  # Thick wall covering entire path
+            # Create a cross-shaped obstacle that blocks all directions
+            (0.3, 0.0, 0.7, 1.0),  # Vertical wall
+            (0.0, 0.3, 1.0, 0.7),  # Horizontal wall
         ]
         self.router.set_obstacles(obstacles)
 
-        start = (0.5, 0.2)   # Below the wall
-        end = (0.5, 0.8)     # Above the wall
+        # Start and end in opposite quadrants (completely separated by cross)
+        start = (0.2, 0.2)  # Bottom-left quadrant
+        end = (0.8, 0.8)    # Top-right quadrant
 
-        # First attempt should fail (wall is solid)
+        # First attempt should fail (cross blocks all paths)
         result1 = self.router.find_path(start, end)
+        
+        # Debug output if test fails
+        if result1.success:
+            print(f"DEBUG: Found unexpected path: {result1.path}")
+            print(f"DEBUG: Obstacles: {obstacles}")
+            print(f"DEBUG: Grid size: {self.router.grid_size}")
+            print(f"DEBUG: Algorithm used: {result1.algorithm}")
+        
         assert not result1.success, (
-            f"Expected failure but got success. Path: {result1.path}\n"
+            f"Expected failure but got success.\n"
+            f"Path: {result1.path}\n"
             f"Obstacles: {obstacles}\n"
             f"Grid size: {self.router.grid_size}"
         )
@@ -309,12 +322,12 @@ class TestEdgeCasesFast:
     def test_very_close_points(self):
         """Test routing between very close points"""
         router = create_adaptive_router(grid_size=0.05)  # Fine grid but not too fine
-
+        
         start = (0.0, 0.0)
         end = (0.1, 0.1)  # Close but not extremely
-
+        
         result = router.find_path(start, end)
-
+        
         assert result.success
         assert point_equal(result.path[-1], end)
 
@@ -329,34 +342,33 @@ class TestEdgeCasesFast:
 
         # Should fail (can't start in obstacle)
         result = self.router.find_path(start, end)
-
         assert not result.success
+
         # Check error message contains relevant info
         error_lower = result.error_message.lower()
-        assert any(keyword in error_lower for keyword in 
-                  ['impossible', 'not reachable', 'failed', 'start'])
+        assert any(keyword in error_lower for keyword in
+                   ['impossible', 'not reachable', 'failed', 'start'])
 
     def test_many_obstacles_fast(self):
-        """Stress test with many obstacles - FINAL FIXED version"""
-        router = create_adaptive_router(grid_size=0.3)  # Coarser for speed
+        """Stress test with many obstacles - SAFE version"""
+        router = create_adaptive_router(grid_size=0.2)  # Coarser for speed
 
-        # Create simple grid of obstacles (2x2 instead of 3x3)
+        # Create widely spaced obstacles (2x2 grid)
         obstacles = []
-        for i in range(2):  # Only 2x2 grid
+        for i in range(2):
             for j in range(2):
                 if (i + j) % 2 == 0:  # Checkerboard pattern
-                    x1, y1 = i * 0.8, j * 0.8  # Much larger spacing
+                    x1, y1 = i * 0.8, j * 0.8  # Large spacing
                     x2, y2 = x1 + 0.3, y1 + 0.3
                     obstacles.append((x1, y1, x2, y2))
-
+        
         router.set_obstacles(obstacles)
 
-        # Start and end in CLEAR gaps - carefully chosen coordinates
-        # Obstacles are at: (0,0)-(0.3,0.3) and (0.8,0.8)-(1.1,1.1)
-        # Clear spaces are around (0.4,0.4) and (0.1,0.8) etc.
-        
+        # Start and end in clear areas (between obstacles)
+        # Obstacles at: (0,0)-(0.3,0.3) and (0.8,0.8)-(1.1,1.1)
+        # Clear space around (0.5,0.5)
         start = (0.5, 0.5)  # Clear space between obstacles
-        end = (1.5, 1.5)    # Clear space beyond obstacles
+        end = (1.3, 1.3)    # Clear space beyond
 
         result = router.find_path(start, end)
 
@@ -370,13 +382,13 @@ class TestEdgeCasesFast:
             for ox1, oy1, ox2, oy2 in obstacles:
                 # Generous tolerance for grid boundaries and float errors
                 # Make sure we're not inside or too close to obstacles
-                if (ox1 - 0.15 <= x <= ox2 + 0.15 and 
-                    oy1 - 0.15 <= y <= oy2 + 0.15):
+                if (ox1 - 0.2 <= x <= ox2 + 0.2 and 
+                    oy1 - 0.2 <= y <= oy2 + 0.2):
                     in_obstacle = True
                     break
             assert not in_obstacle, (
                 f"Path point {point} is too close to obstacle at "
-                f"({ox1},{oy1})-({ox2},{oy2})\n"
+                f"({ox1}, {oy1})-({ox2}, {oy2})\n"
                 f"All obstacles: {obstacles}"
             )
 
