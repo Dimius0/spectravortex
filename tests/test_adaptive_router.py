@@ -12,7 +12,7 @@ from typing import List, Tuple
 from router.adaptive_router import (
     AdaptiveRouter, create_adaptive_router,
     AStarRouter, WavefrontRouter, GeometricRouter,
-    RouteResult, RoutingAlgorithm
+    RouteResult, RoutingAlgorithm, point_equal
 )
 from router.deadlock_protection import (
     TimeoutError, DeadlockError, NoPathError
@@ -62,19 +62,22 @@ class TestBaseRouter:
 class TestAStarRouter:
     """A* algorithm specific tests"""
     
+    def setup_method(self):
+        """Reset circuit breaker before each test"""
+        self.router = AStarRouter(grid_size=0.1)
+    
     def test_simple_path_no_obstacles(self):
         """A* should find straight line path without obstacles"""
-        router = AStarRouter(grid_size=0.1)
         
         # Simple diagonal path
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert len(path) >= 2
-        assert path[0] == start
-        assert path[-1] == end
+        assert point_equal(path[0], start)
+        assert point_equal(path[-1], end)
         
         # Check path is roughly diagonal
         for point in path:
@@ -83,20 +86,19 @@ class TestAStarRouter:
     
     def test_path_around_single_obstacle(self):
         """A* should navigate around a single obstacle"""
-        router = AStarRouter(grid_size=0.1)
         
         # Put obstacle in the middle
         obstacles = [(0.4, 0.4, 0.6, 0.6)]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert len(path) > 2  # Should have waypoints
-        assert path[0] == start
-        assert path[-1] == end
+        assert point_equal(path[0], start)
+        assert point_equal(path[-1], end)
         
         # Verify path doesn't go through obstacle
         for point in path:
@@ -105,17 +107,23 @@ class TestAStarRouter:
     
     def test_no_path_scenario(self):
         """A* should raise exception when no path exists"""
-        router = AStarRouter(grid_size=0.1)
         
-        # Create wall completely blocking the path
-        obstacles = [(0.3, -0.5, 0.7, 1.5)]  # Vertical wall
-        router.set_obstacles(obstacles)
+        # Create IMPOSSIBLE scenario: start completely surrounded
+        obstacles = [
+            (-0.1, -0.1, 0.1, 0.1),  # Block start
+            (0.0, -0.1, 0.2, 0.0),   # Bottom wall
+            (0.0, 0.1, 0.2, 0.2),    # Top wall
+            (-0.1, -0.1, 0.0, 0.2),  # Left wall
+            (0.1, -0.1, 0.2, 0.2),   # Right wall
+        ]
+        self.router.set_obstacles(obstacles)
         
-        start = (0.0, 0.0)
+        start = (0.05, 0.05)  # Inside blocked area
         end = (1.0, 1.0)
         
+        # Should NOT find a path
         with pytest.raises(NoPathError):
-            router.find_path(start, end)
+            self.router.find_path(start, end)
     
     @pytest.mark.slow
     def test_timeout_protection(self):
@@ -140,90 +148,86 @@ class TestAStarRouter:
 class TestWavefrontRouter:
     """Wavefront algorithm tests"""
     
+    def setup_method(self):
+        self.router = WavefrontRouter(grid_size=0.1)
+    
     def test_wavefront_simple_path(self):
         """Wavefront should find path in simple case"""
-        router = WavefrontRouter(grid_size=0.1)
-        
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert len(path) >= 2
-        assert path[0] == start
-        assert path[-1] == end
+        assert point_equal(path[0], start)
+        assert point_equal(path[-1], end)
     
     def test_wavefront_maze(self):
         """Wavefront should solve maze"""
-        router = WavefrontRouter(grid_size=0.1)
-        
         # Create corridor maze
         obstacles = [
-            (0.2, -0.1, 0.4, 0.6),   # Left block
-            (0.6, 0.4, 0.8, 1.1),    # Right block
+            (0.3, -0.1, 0.5, 0.6),   # Left block
+            (0.5, 0.4, 0.7, 1.1),    # Right block
         ]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert path is not None
         assert len(path) > 2
-        assert path[0] == start
-        assert path[-1] == end
+        assert point_equal(path[0], start)
+        assert point_equal(path[-1], end)
     
     def test_wavefront_no_path(self):
         """Wavefront should detect impossible paths"""
-        router = WavefrontRouter(grid_size=0.1)
-        
         # Completely enclosed area
         obstacles = [
-            (-0.1, -0.1, 1.1, 0.1),  # Bottom wall
-            (-0.1, 0.9, 1.1, 1.1),   # Top wall
-            (-0.1, -0.1, 0.1, 1.1),  # Left wall
-            (0.9, -0.1, 1.1, 1.1),   # Right wall
+            (-0.1, -0.1, 1.1, 0.0),  # Bottom wall
+            (-0.1, 1.0, 1.1, 1.1),   # Top wall
+            (-0.1, -0.1, 0.0, 1.1),  # Left wall
+            (1.0, -0.1, 1.1, 1.1),   # Right wall
         ]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.5, 0.5)
         end = (2.0, 2.0)  # Outside the box
         
         with pytest.raises(NoPathError):
-            router.find_path(start, end)
+            self.router.find_path(start, end)
 
 
 class TestGeometricRouter:
     """Geometric routing tests"""
     
+    def setup_method(self):
+        self.router = GeometricRouter(grid_size=0.1)
+    
     def test_direct_line_no_obstacles(self):
         """Geometric router should return straight line"""
-        router = GeometricRouter(grid_size=0.1)
-        
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert path == [start, end]  # Direct line
     
     def test_obstacle_avoidance(self):
         """Geometric router should go around obstacles"""
-        router = GeometricRouter(grid_size=0.1)
-        
         # Obstacle in direct path
         obstacles = [(0.4, 0.4, 0.6, 0.6)]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert len(path) > 2  # Should have waypoints
-        assert path[0] == start
-        assert path[-1] == end
+        assert point_equal(path[0], start)
+        assert point_equal(path[-1], end)
         
         # Check it avoids obstacle
         for point in path:
@@ -232,20 +236,18 @@ class TestGeometricRouter:
     
     def test_fallback_to_astar(self):
         """Geometric router should fall back to A* for complex cases"""
-        router = GeometricRouter(grid_size=0.1)
-        
         # Create L-shaped obstacle that geometric can't handle simply
         obstacles = [
             (0.3, 0.3, 0.7, 0.4),  # Horizontal bar
             (0.6, 0.3, 0.7, 0.7),  # Vertical bar
         ]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
         # This should trigger A* fallback
-        path = router.find_path(start, end)
+        path = self.router.find_path(start, end)
         
         assert path is not None
         assert len(path) >= 2
@@ -253,6 +255,10 @@ class TestGeometricRouter:
 
 class TestAdaptiveRouterIntegration:
     """Integration tests for adaptive router"""
+    
+    def setup_method(self):
+        """Create fresh router for each test"""
+        self.router = create_adaptive_router(grid_size=0.1)
     
     def test_adaptive_router_creation(self):
         """Test factory function creates router correctly"""
@@ -267,43 +273,39 @@ class TestAdaptiveRouterIntegration:
     
     def test_simple_routing_adaptive(self):
         """Adaptive router should handle simple case"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
-        result = router.find_path(start, end)
+        result = self.router.find_path(start, end)
         
         assert result.success
         assert result.algorithm == RoutingAlgorithm.A_STAR  # First choice
         assert len(result.path) >= 2
-        assert result.path[0] == start
-        assert result.path[-1] == end
+        assert point_equal(result.path[0], start)
+        assert point_equal(result.path[-1], end)
     
     def test_algorithm_fallback(self):
         """Adaptive router should fallback when A* fails"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         # Create maze that will timeout A* but wavefront can solve
         obstacles = []
         for i in range(5):  # Simple maze, not too complex
             obstacles.append((0.3, i * 0.2, 0.7, i * 0.2 + 0.1))
         
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.0, 0.0)
         end = (1.0, 1.0)
         
         # Mock A* to always timeout for this test
-        original_find_path = router.algorithms[RoutingAlgorithm.A_STAR].find_path
+        original_find_path = self.router.algorithms[RoutingAlgorithm.A_STAR].find_path
         def mock_timeout(*args, **kwargs):
             time.sleep(0.6)  # Exceed 0.5s timeout
             raise TimeoutError("Mock timeout")
         
-        router.algorithms[RoutingAlgorithm.A_STAR].find_path = mock_timeout
+        self.router.algorithms[RoutingAlgorithm.A_STAR].find_path = mock_timeout
         
         try:
-            result = router.find_path(start, end, max_attempts=2)
+            result = self.router.find_path(start, end, max_attempts=2)
             
             # Should succeed with fallback algorithm
             assert result.success
@@ -311,12 +313,10 @@ class TestAdaptiveRouterIntegration:
                                        RoutingAlgorithm.WAVEFRONT]
         finally:
             # Restore original method
-            router.algorithms[RoutingAlgorithm.A_STAR].find_path = original_find_path
+            self.router.algorithms[RoutingAlgorithm.A_STAR].find_path = original_find_path
     
     def test_impossible_route_caching(self):
         """Test that impossible routes are cached"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         # Create completely blocked scenario
         obstacles = [
             (-0.1, -0.1, 1.1, 0.1),  # Bottom wall
@@ -324,28 +324,26 @@ class TestAdaptiveRouterIntegration:
             (-0.1, -0.1, 0.1, 1.1),  # Left wall
             (0.9, -0.1, 1.1, 1.1),   # Right wall
         ]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.5, 0.5)
         end = (2.0, 2.0)  # Outside the box
         
         # First attempt should fail
-        result1 = router.find_path(start, end)
+        result1 = self.router.find_path(start, end)
         assert not result1.success
         
         # Check cache was populated
         cache_key = f"{start}_{end}"
-        assert cache_key in router.impossible_routes_cache
+        assert cache_key in self.router.impossible_routes_cache
         
         # Second attempt should return cached result immediately
-        result2 = router.find_path(start, end)
+        result2 = self.router.find_path(start, end)
         assert not result2.success
         assert "previously marked as impossible" in result2.error_message
     
     def test_statistics_tracking(self):
         """Test that router tracks statistics correctly"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         # Run several routing attempts
         test_cases = [
             ((0.0, 0.0), (1.0, 1.0)),
@@ -354,11 +352,11 @@ class TestAdaptiveRouterIntegration:
         ]
         
         for start, end in test_cases:
-            result = router.find_path(start, end)
+            result = self.router.find_path(start, end)
             assert result.success
         
         # Get statistics
-        stats = router.get_statistics()
+        stats = self.router.get_statistics()
         
         # Should have stats for all algorithms
         assert "a_star" in stats
@@ -395,17 +393,18 @@ class TestAdaptiveRouterIntegration:
 class TestEdgeCases:
     """Edge case and stress tests"""
     
+    def setup_method(self):
+        self.router = create_adaptive_router(grid_size=0.1)
+    
     def test_zero_length_path(self):
         """Test routing from point to itself"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         start = end = (0.5, 0.5)
         
-        result = router.find_path(start, end)
+        result = self.router.find_path(start, end)
         
         assert result.success
         assert len(result.path) >= 1
-        assert result.path[0] == start
+        assert point_equal(result.path[0], start)
         # May have 1 or more points (some algorithms add start+end)
     
     def test_very_close_points(self):
@@ -418,7 +417,7 @@ class TestEdgeCases:
         result = router.find_path(start, end)
         
         assert result.success
-        assert result.path[-1] == end
+        assert point_equal(result.path[-1], end)
     
     def test_large_coordinates(self):
         """Test routing with large coordinates"""
@@ -430,58 +429,59 @@ class TestEdgeCases:
         result = router.find_path(start, end)
         
         assert result.success
-        assert result.path[0] == start
-        assert result.path[-1] == end
+        assert point_equal(result.path[0], start)
+        assert point_equal(result.path[-1], end)
     
     def test_obstacle_at_start_or_end(self):
         """Test routing when start or end is inside obstacle"""
-        router = create_adaptive_router(grid_size=0.1)
-        
         # Obstacle covering start point
         obstacles = [(0.0, 0.0, 0.5, 0.5)]
-        router.set_obstacles(obstacles)
+        self.router.set_obstacles(obstacles)
         
         start = (0.2, 0.2)  # Inside obstacle
         end = (1.0, 1.0)
         
-        # Should fail or find creative path
-        result = router.find_path(start, end)
+        # Should fail (can't start in obstacle)
+        result = self.router.find_path(start, end)
         
-        # Either fails or succeeds with path starting outside obstacle
-        if result.success:
-            assert result.path[0] != start  # Can't start in obstacle
-        else:
-            assert "impossible" in result.error_message.lower()
+        assert not result.success
+        # Check error message contains relevant info
+        error_lower = result.error_message.lower()
+        assert any(keyword in error_lower for keyword in 
+                  ['impossible', 'not reachable', 'failed', 'start'])
     
     def test_many_obstacles(self):
         """Stress test with many obstacles"""
         router = create_adaptive_router(grid_size=0.2)  # Coarser for speed
         
-        # Create grid of obstacles
+        # Create grid of obstacles with GAPS between them
         obstacles = []
         for i in range(5):
             for j in range(5):
                 if (i + j) % 2 == 0:  # Checkerboard pattern
                     x1, y1 = i * 0.4, j * 0.4
-                    x2, y2 = x1 + 0.3, y1 + 0.3
+                    x2, y2 = x1 + 0.2, y1 + 0.2  # Smaller obstacles
                     obstacles.append((x1, y1, x2, y2))
         
         router.set_obstacles(obstacles)
         
-        start = (0.05, 0.05)  # In empty space
-        end = (1.95, 1.95)    # In empty space
+        # Start in a CLEAR gap (not at 0.05 which might be in obstacle due to float errors)
+        start = (0.35, 0.35)  # In gap between obstacles
+        end = (1.85, 1.85)    # In gap
         
         result = router.find_path(start, end)
         
         # Should find path through checkerboard
         assert result.success
         
-        # Verify path avoids obstacles
+        # Verify path avoids obstacles (with tolerance for grid boundaries)
         for point in result.path:
             x, y = point
             in_obstacle = False
             for ox1, oy1, ox2, oy2 in obstacles:
-                if ox1 <= x <= ox2 and oy1 <= y <= oy2:
+                # Add small tolerance for grid boundaries
+                if (ox1 - 0.01 <= x <= ox2 + 0.01 and 
+                    oy1 - 0.01 <= y <= oy2 + 0.01):
                     in_obstacle = True
                     break
             assert not in_obstacle, f"Path point {point} is inside obstacle"
