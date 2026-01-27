@@ -75,7 +75,8 @@ class LinearWaveSolver(Solver):
         parameters = problem.get('parameters', {})
         components = problem.get('components', [])
         initial_conditions = problem.get('initial_conditions', {})
-        boundary_conditions = problem.get('boundary_conditions', {})
+        # boundary_conditions intentionally not used in this basic implementation
+        # but kept in signature for future expansion
         
         # Create grid from domain specification
         self._create_grid_from_domain(domain)
