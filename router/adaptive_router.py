@@ -135,14 +135,16 @@ class AStarRouter(BaseRouter):
         node_dict[start_node.pos] = start_node
         
         visited_count = 0
+        current_position = start  # Initialize current position
         self.monitor.reset()
         
         while open_set:
             # Check for deadlock
-            if not self.monitor.check(visited_count, current_node.pos if 'current_node' in locals() else start, end):
+            if not self.monitor.check(visited_count, current_position, end):
                 raise DeadlockError("A* algorithm stuck in deadlock")
             
             current_node = heapq.heappop(open_set)
+            current_position = current_node.pos  # Update current position
             visited_count += 1
             
             # Check if we reached the end
@@ -294,9 +296,6 @@ class GeometricRouter(BaseRouter):
         
         # Find obstacle-free path around obstacles
         path = [start]
-        
-        # Simple strategy: go around the bounding box of obstacles
-        current = start
         
         # Get bounding box of all obstacles
         obs_points = []
