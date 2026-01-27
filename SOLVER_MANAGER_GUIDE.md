@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 SolverManager Demo - Simple examples.
