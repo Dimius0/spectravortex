@@ -6,6 +6,7 @@ Tests cover all algorithms and edge cases.
 import pytest
 import numpy as np
 import time
+import sys
 from typing import List, Tuple
 
 from router.adaptive_router import (
@@ -50,12 +51,12 @@ class TestBaseRouter:
         
         # Test points inside obstacles
         a_star = router.algorithms[RoutingAlgorithm.A_STAR]
-        assert a_star.is_obstacle(1.5, 1.5) == True
-        assert a_star.is_obstacle(3.5, 3.5) == True
+        assert a_star.is_obstacle(1.5, 1.5)
+        assert a_star.is_obstacle(3.5, 3.5)
         
         # Test points outside obstacles
-        assert a_star.is_obstacle(0.5, 0.5) == False
-        assert a_star.is_obstacle(2.5, 2.5) == False
+        assert not a_star.is_obstacle(0.5, 0.5)
+        assert not a_star.is_obstacle(2.5, 2.5)
 
 
 class TestAStarRouter:
@@ -273,7 +274,7 @@ class TestAdaptiveRouterIntegration:
         
         result = router.find_path(start, end)
         
-        assert result.success == True
+        assert result.success
         assert result.algorithm == RoutingAlgorithm.A_STAR  # First choice
         assert len(result.path) >= 2
         assert result.path[0] == start
@@ -296,7 +297,6 @@ class TestAdaptiveRouterIntegration:
         # Mock A* to always timeout for this test
         original_find_path = router.algorithms[RoutingAlgorithm.A_STAR].find_path
         def mock_timeout(*args, **kwargs):
-            import time
             time.sleep(0.6)  # Exceed 0.5s timeout
             raise TimeoutError("Mock timeout")
         
@@ -306,7 +306,7 @@ class TestAdaptiveRouterIntegration:
             result = router.find_path(start, end, max_attempts=2)
             
             # Should succeed with fallback algorithm
-            assert result.success == True
+            assert result.success
             assert result.algorithm in [RoutingAlgorithm.GEOMETRIC, 
                                        RoutingAlgorithm.WAVEFRONT]
         finally:
@@ -331,7 +331,7 @@ class TestAdaptiveRouterIntegration:
         
         # First attempt should fail
         result1 = router.find_path(start, end)
-        assert result1.success == False
+        assert not result1.success
         
         # Check cache was populated
         cache_key = f"{start}_{end}"
@@ -339,7 +339,7 @@ class TestAdaptiveRouterIntegration:
         
         # Second attempt should return cached result immediately
         result2 = router.find_path(start, end)
-        assert result2.success == False
+        assert not result2.success
         assert "previously marked as impossible" in result2.error_message
     
     def test_statistics_tracking(self):
@@ -355,7 +355,7 @@ class TestAdaptiveRouterIntegration:
         
         for start, end in test_cases:
             result = router.find_path(start, end)
-            assert result.success == True
+            assert result.success
         
         # Get statistics
         stats = router.get_statistics()
@@ -385,7 +385,7 @@ class TestAdaptiveRouterIntegration:
         result = router.find_path(start, end)
         elapsed = time.time() - start_time
         
-        assert result.success == True
+        assert result.success
         assert elapsed < 2.0  # Should complete in under 2 seconds
         
         print(f"\nPerformance: routed {start} to {end} in {elapsed:.3f}s")
@@ -403,7 +403,7 @@ class TestEdgeCases:
         
         result = router.find_path(start, end)
         
-        assert result.success == True
+        assert result.success
         assert len(result.path) >= 1
         assert result.path[0] == start
         # May have 1 or more points (some algorithms add start+end)
@@ -417,7 +417,7 @@ class TestEdgeCases:
         
         result = router.find_path(start, end)
         
-        assert result.success == True
+        assert result.success
         assert result.path[-1] == end
     
     def test_large_coordinates(self):
@@ -429,7 +429,7 @@ class TestEdgeCases:
         
         result = router.find_path(start, end)
         
-        assert result.success == True
+        assert result.success
         assert result.path[0] == start
         assert result.path[-1] == end
     
@@ -474,7 +474,7 @@ class TestEdgeCases:
         result = router.find_path(start, end)
         
         # Should find path through checkerboard
-        assert result.success == True
+        assert result.success
         
         # Verify path avoids obstacles
         for point in result.path:
@@ -489,8 +489,6 @@ class TestEdgeCases:
 
 def run_all_tests():
     """Run all tests and print summary"""
-    import sys
-    
     print("=" * 60)
     print("Running Adaptive Router Tests")
     print("=" * 60)
