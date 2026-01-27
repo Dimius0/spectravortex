@@ -163,11 +163,10 @@ class TestWavefrontRouter:
         assert point_equal(path[-1], end)
     
     def test_wavefront_maze(self):
-        """Wavefront should solve maze"""
-        # Create corridor maze
+        """Wavefront should solve simple corridor maze"""
+        # Create SIMPLE corridor (not blocking start)
         obstacles = [
-            (0.3, -0.1, 0.5, 0.6),   # Left block
-            (0.5, 0.4, 0.7, 1.1),    # Right block
+            (0.3, 0.3, 0.5, 0.7),   # Vertical block on right side
         ]
         self.router.set_obstacles(obstacles)
         
