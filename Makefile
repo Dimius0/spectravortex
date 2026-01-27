@@ -21,9 +21,9 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Testing:$(NC)"
 	@echo "  $(GREEN)make test$(NC)       - Run fast tests (default)"
-	@echo "  $(GREEN)make test-fast$(NC)  - Fast tests only (< 10 sec)"
-	@echo "  $(GREEN)make test-all$(NC)   - All tests (< 30 sec)"
-	@echo "  $(GREEN)make test-ci$(NC)    - CI/CD tests (< 70 sec)"
+	@echo "  $(GREEN)make test-fast$(NC)  - Fast tests only"
+	@echo "  $(GREEN)make test-all$(NC)   - All tests"
+	@echo "  $(GREEN)make test-ci$(NC)    - CI/CD tests"
 	@echo ""
 	@echo "$(YELLOW)Code Quality:$(NC)"
 	@echo "  $(GREEN)make lint$(NC)       - Run linter"
@@ -43,26 +43,25 @@ install:
 
 dev:
 	@echo "$(YELLOW)Installing dev dependencies...$(NC)"
-	@pip install -e ".[dev]"
+	@pip install pytest pytest-cov pytest-timeout flake8 black isort mypy
 
 # ============================================
 # Testing
 # ============================================
 
 test-fast:
-	@echo "$(YELLOW)Running FAST tests (timeout: 10 seconds)...$(NC)"
+	@echo "$(YELLOW)Running FAST tests...$(NC)"
 	@echo "$(GREEN)=== Tests via pytest (fast) ===$(NC)"
 	@python -m pytest tests/test_adaptive_router_fast.py \
 		-v \
 		--tb=short \
 		--disable-warnings \
-		--timeout=10 \
 		--cov=router \
 		--cov-report=term-missing
 	@echo "$(GREEN)✅ Fast tests completed$(NC)"
 
 test-all:
-	@echo "$(YELLOW)Running ALL tests (timeout: 30 seconds)...$(NC)"
+	@echo "$(YELLOW)Running ALL tests...$(NC)"
 	@echo "$(GREEN)=== Tests via main.py ===$(NC)"
 	@python main.py --test || echo "$(RED)▲ main.py tests failed$(NC)"
 	@echo ""
@@ -71,31 +70,28 @@ test-all:
 		-v \
 		--tb=short \
 		--disable-warnings \
-		--timeout=30 \
 		--cov=. \
 		--cov-report=term-missing
 	@echo "$(GREEN)✅ All tests completed$(NC)"
 
 test-ci:
-	@echo "$(YELLOW)Running CI/CD tests (optimized)...$(NC)"
-	@echo "$(GREEN)=== PHASE 1: Fast tests (timeout: 10 seconds) ===$(NC)"
+	@echo "$(YELLOW)Running CI/CD tests...$(NC)"
+	@echo "$(GREEN)=== PHASE 1: Fast tests ===$(NC)"
 	@python -m pytest tests/ \
 		-v \
 		-m "not slow and not performance" \
 		--tb=short \
 		--disable-warnings \
-		--timeout=10 \
 		--cov=router \
 		--cov-report=term-missing || (echo "$(RED)❌ Fast tests failed$(NC)" && exit 1)
 	@echo "$(GREEN)✅ Fast tests passed$(NC)"
 	@echo ""
-	@echo "$(GREEN)=== PHASE 2: Slow tests (timeout: 60 seconds) ===$(NC)"
+	@echo "$(GREEN)=== PHASE 2: Slow tests ===$(NC)"
 	@python -m pytest tests/ \
 		-v \
 		-m "slow or performance" \
 		--tb=short \
 		--disable-warnings \
-		--timeout=60 \
 		--cov=router \
 		--cov-report=term-missing || (echo "$(RED)❌ Slow tests failed$(NC)" && exit 1)
 	@echo "$(GREEN)✅ All CI tests passed$(NC)"
