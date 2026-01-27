@@ -150,32 +150,32 @@ build:
 
 run-router-demo:
 	@echo "$(YELLOW)Running router demo...$(NC)"
-	@python -c "
-from router.adaptive_router import create_adaptive_router
-
-router = create_adaptive_router(grid_size=0.1)
-
-# Simple test
-start = (0.0, 0.0)
-end = (1.0, 1.0)
-
-print('Adaptive router demo:')
-print(f'Routing from {start} to {end}')
-
-result = router.find_path(start, end)
-
-if result.success:
-    print(f'✅ Success! Algorithm: {result.algorithm.value}')
-    print(f'   Time: {result.time_spent:.3f} sec')
-    print(f'   Path length: {len(result.path)} points')
-    # Show first and last points
-    if len(result.path) > 4:
-        print(f'   First points: {result.path[:3]}...')
-        print(f'   Last points: ...{result.path[-3:]}')
-    else:
-        print(f'   Full path: {result.path}')
-else:
-    print(f'❌ Error: {result.error_message}')
+	@python -c "\
+from router.adaptive_router import create_adaptive_router\n\
+\n\
+router = create_adaptive_router(grid_size=0.1)\n\
+\n\
+# Simple test\n\
+start = (0.0, 0.0)\n\
+end = (1.0, 1.0)\n\
+\n\
+print('Adaptive router demo:')\n\
+print(f'Routing from {start} to {end}')\n\
+\n\
+result = router.find_path(start, end)\n\
+\n\
+if result.success:\n\
+    print(f'✅ Success! Algorithm: {result.algorithm.value}')\n\
+    print(f'   Time: {result.time_spent:.3f} sec')\n\
+    print(f'   Path length: {len(result.path)} points')\n\
+    # Show first and last points\n\
+    if len(result.path) > 4:\n\
+        print(f'   First points: {result.path[:3]}...')\n\
+        print(f'   Last points: ...{result.path[-3:]}')\n\
+    else:\n\
+        print(f'   Full path: {result.path}')\n\
+else:\n\
+    print(f'❌ Error: {result.error_message}')\n\
 "
 
 coverage:
