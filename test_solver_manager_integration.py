@@ -26,8 +26,6 @@ try:
         get_architecture_status,
         get_solver_manager,
         SOLVER_MANAGER_AVAILABLE,
-        SolverManager,
-        SolverSelection,
         HYBRID_ARCHITECTURE_AVAILABLE
     )
     
@@ -325,8 +323,8 @@ try:
         from simulator import create_solver_manager
         custom_manager = create_solver_manager(enable_auto_selection=False)
         print(f"   Custom manager created (auto-selection disabled)")
-    except:
-        print(f"   ⚠️  Could not create custom manager")
+    except Exception as create_error:
+        print(f"   ⚠️  Could not create custom manager: {create_error}")
     
     print("\n   📊 Test Summary:")
     print(f"   - Architecture: {'Hybrid' if HYBRID_ARCHITECTURE_AVAILABLE else 'Legacy'}")
