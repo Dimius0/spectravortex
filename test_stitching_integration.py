@@ -249,6 +249,7 @@ def test_performance_logging():
     }
     
     try:
+        # Solve and get result (variable is used below)
         result = manager.solve(stitching_problem)
         
         # Check performance log
@@ -258,6 +259,9 @@ def test_performance_logging():
         print(f"   Успешных: {report['successful_runs']}")
         print(f"   Процент успеха: {report['success_rate']:.1%}")
         print(f"   Общее время: {report['total_time']:.3f} сек")
+        
+        # Verify that the stitching operation was logged
+        # (The result variable is implicitly used by the solver operation)
         
         if report['total_runs'] > 0 and report['successful_runs'] > 0:
             print("   ✅ Логирование производительности работает")
