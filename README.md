@@ -31,7 +31,7 @@ SpectraVortex is now more than a compiler—it's a platform for **resilient phot
 
  **Note**: This is not an autonomous AI, but an **advanced analysis system** that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
 
-```python
+
 # Example: Using the Resilience Analyzer
 from simulator.resilience.resilience_manager import ResilienceManager
 
