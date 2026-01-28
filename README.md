@@ -94,6 +94,20 @@ spectravortex/
 ├── tests/            # Test suite
 └── main.py           # Main CLI entry point
 
+spectravortex/
+├── compiler/          # Core compiler (lexer, parser, IR, type checker)
+├── simulator/         # Optical field and component simulator
+│   ├── solvers/       # Intelligent solvers (Phase 3)
+│   │   ├── stitching_solver.py    # Phase 3.1
+│   │   ├── recursive_solver.py    # Phase 3.2
+│   │   └── ...
+│   └── resilience/    # Resilience analyzer (Phase 3.3)
+├── hardware_backend/  # GDSII generation, chip layout
+├── router/           # Adaptive photonic routing
+├── examples/         # Example programs (.svx)
+├── tests/            # Test suite
+└── main.py           # Main CLI entry point
+
 ## Project Roadmap
 
 COMPLETED PHASES:
