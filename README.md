@@ -113,20 +113,20 @@ text
 
 ## Project Roadmap
 
-### COMPLETED PHASES
+**COMPLETED PHASES:**
 - Phase 1: Core compiler with photonic type system
 - Phase 2: Hardware backend (GDSII generation, auto-routing)
 - Phase 3: Solver system for design analysis and optimization
 
-### CURRENT WORK
+**CURRENT WORK:**
 - Stabilizing APIs and improving documentation
 - Expanding the standard library of optical elements
 - Optimizing simulator performance
 
 ## How to Contribute
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+We welcome contributions! Please see CONTRIBUTING.md to get started.
 
 ## License
 
-SpectraVortex is open-source software released under the MIT License. See the [LICENSE](LICENSE) file for details.
+SpectraVortex is open-source software released under the MIT License. See the LICENSE file for details.
