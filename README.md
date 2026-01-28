@@ -88,7 +88,6 @@ program hello_photon() {
 Want to see more? Check out the examples/ directory.
 
 🏗️ Project Architecture
-text
 spectravortex/
 ├── compiler/          # Core compiler (lexer, parser, IR, type checker)
 ├── simulator/         # Optical field and component simulator
