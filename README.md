@@ -29,9 +29,9 @@ SpectraVortex is now more than a compiler—it's a platform for **resilient phot
 * 🔄 **Topology Comparison**: For OAM systems, generates and compares 4 alternative implementation variants.
 * 🧠 **Design Recommendations**: Suggests strategies for increasing reliability and potential reconfiguration paths.
 
- **Note**: This is not an autonomous AI, but an **advanced analysis system** that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
+> **Note**: This is not an autonomous AI, but an **advanced analysis system** that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
 
-
+```python
 # Example: Using the Resilience Analyzer
 from simulator.resilience.resilience_manager import ResilienceManager
 
@@ -44,80 +44,11 @@ print(f"Expected resilience improvement: {report.resilience_improvement:.1%}")
 Get SpectraVortex running in under a minute.
 
 Clone and enter the repository:
-
-bash
 git clone https://github.com/Dimius0/spectravortex.git
 cd spectravortex
 Install dependencies:
-
-bash
 pip install numpy
 (For a reproducible development environment, see CONTRIBUTING.md).
 
 Run a simple example:
-
-bash
 python main.py --compile examples/hello_photon.svx
-Test Phase 3 features:
-
-bash
-# Test resilience analysis
-python test_resilience_self_healing.py
-
-# Test fractal decomposition
-python test_recursive_fractal.py
-
-# Test solution stitching
-python test_stitching_integration.py
-📖 A Taste of the Language
-Here's a simple program that creates a photon and prints a message:
-
-javascript
-// examples/hello_photon.svx
-photon source = {
-    frequency: 193.414e12, // 1550 nm, telecom wavelength
-    amplitude: 0.8,
-    phase: 0.0,
-    oam: 0,
-    polarization: "linear"
-}
-
-program hello_photon() {
-    print("Hello from the photonic realm!")
-}
-Want to see more? Check out the examples/ directory.
-
-🏗️ Project Architecture
-spectravortex/
-├── compiler/          # Core compiler (lexer, parser, IR, type checker)
-├── simulator/         # Optical field and component simulator
-│   ├── solvers/       # Intelligent solvers (Phase 3)
-│   │   ├── stitching_solver.py    # Phase 3.1
-│   │   ├── recursive_solver.py    # Phase 3.2
-│   │   └── ...
-│   └── resilience/    # Resilience analyzer (Phase 3.3)
-├── hardware_backend/  # GDSII generation, chip layout
-├── router/           # Adaptive photonic routing
-├── examples/         # Example programs (.svx)
-├── tests/            # Test suite
-└── main.py           # Main CLI entry point
-🧭 Project Roadmap
-✅ COMPLETED PHASES
-Phase 1: Core compiler with photonic type system.
-
-Phase 2: Hardware backend (GDSII generation, auto-routing).
-
-Phase 3: Solver system for design analysis and optimization.
-
-🔄 CURRENT WORK
-Stabilizing APIs and improving documentation.
-
-Expanding the standard library of optical elements.
-
-Optimizing simulator performance.
-
-🤝 How to Contribute
-We welcome contributions! Please see CONTRIBUTING.md to get started.
-
-📄 License
-SpectraVortex is open-source software released under the MIT License. See the LICENSE file for details.
