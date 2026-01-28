@@ -109,6 +109,7 @@ spectravortex/
 ├── tests/ # Test suite
 └── main.py # Main CLI entry point
 
+text
 
 ## Project Roadmap
 
