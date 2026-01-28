@@ -249,7 +249,7 @@ def test_performance_logging():
     }
     
     try:
-        # Solve and get result (variable is used below)
+        # Solve and get result
         result = manager.solve(stitching_problem)
         
         # Check performance log
@@ -261,7 +261,12 @@ def test_performance_logging():
         print(f"   Общее время: {report['total_time']:.3f} сек")
         
         # Verify that the stitching operation was logged
-        # (The result variable is implicitly used by the solver operation)
+        # Also verify that we got a valid result (using the variable)
+        assert hasattr(result, 'amplitude'), "Результат не содержит amplitude"
+        assert hasattr(result, 'metadata'), "Результат не содержит metadata"
+        
+        print(f"   Сшитое поле размером: {result.amplitude.shape}")
+        print(f"   Решатель: {result.metadata.get('solver_used', 'unknown')}")
         
         if report['total_runs'] > 0 and report['successful_runs'] > 0:
             print("   ✅ Логирование производительности работает")
