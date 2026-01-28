@@ -58,3 +58,4 @@ Run a simple example:
 
 bash
 python main.py --compile examples/hello_photon.svx
+text
