@@ -1,19 +1,3 @@
-# SpectraVortex: A Language and Platform for Photonic Computing
-
-SpectraVortex is a declarative programming language and full compiler stack for designing and simulating photonic systems. Instead of describing low-level optical component geometry, you describe what you want to compute with light, and SpectraVortex figures out how to implement it.
-
-It's a high-level language for photonics enhanced with intelligent analysis tools for creating more resilient designs.
-
-## Key Features
-
-**Declarative, Wave-Optics Syntax** — Write programs using intuitive concepts: photons, beams, interference (+), and optical elements
-
-**Physical Correctness by Design** — The built-in type system enforces physical invariants (e.g., Orbital Angular Momentum, coherence)
-
-**Multi-Target Compilation** — The same high-level program can be:
-- Simulated using the built-in Python/NumPy simulator for verification
-- Compiled to hardware layouts (e.g., GDSII for photonic chip fabrication)
-
 **Intelligent Solver System (Phase 3)** — Advanced algorithms for analyzing and optimizing photonic circuit designs
 
 ## Phase 3: Intelligent Design System (IMPLEMENTED)
