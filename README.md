@@ -40,16 +40,21 @@ report = resilience_mgr.analyze_resilience(oam_problem)
 
 print(f"Recommended topology: {report.best_alternative_id}")
 print(f"Expected resilience improvement: {report.resilience_improvement:.1%}")
-```
 🚀 Quick Start
 Get SpectraVortex running in under a minute.
 
 Clone and enter the repository:
+
+bash
 git clone https://github.com/Dimius0/spectravortex.git
 cd spectravortex
 Install dependencies:
+
+bash
 pip install numpy
 (For a reproducible development environment, see CONTRIBUTING.md).
 
 Run a simple example:
+
+bash
 python main.py --compile examples/hello_photon.svx
