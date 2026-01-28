@@ -119,7 +119,10 @@ class StitchingSolver(Solver):
             Unified FieldSolution
         """
         start_time = time.time()
-        logger.info(f"{self.name} starting stitching of {len(problem.get('subdomain_solutions', []))} solutions")
+        logger.info(
+            f"{self.name} starting stitching of "
+            f"{len(problem.get('subdomain_solutions', []))} solutions"
+        )
         
         # Extract parameters
         solutions = problem.get("subdomain_solutions", [])
@@ -145,7 +148,9 @@ class StitchingSolver(Solver):
             stitched_field = self._stitch_weighted_overlap(subdomains, boundaries)
         
         # Analyze the stitched result
-        topology_features = self._analyze_stitched_topology(stitched_field, boundaries)
+        topology_features = self._analyze_stitched_topology(
+            stitched_field, boundaries
+        )
         
         # Create the final solution
         elapsed = time.time() - start_time
@@ -190,7 +195,9 @@ class StitchingSolver(Solver):
             if hasattr(solution, 'metadata') and 'solver_used' in solution.metadata:
                 solver_used = solution.metadata['solver_used']
             elif 'solver_manager' in getattr(solution, 'metadata', {}):
-                solver_used = solution.metadata['solver_manager'].get('selected_solver', 'unknown')
+                solver_used = solution.metadata['solver_manager'].get(
+                    'selected_solver', 'unknown'
+                )
             
             subdomain = SubdomainSolution(
                 solution=solution,
@@ -396,8 +403,8 @@ class StitchingSolver(Solver):
         """
         features = []
         
-        amplitude = stitched_field['amplitude']
-        phase = stitched_field['phase']
+        # Note: stitched_field['amplitude'] and stitched_field['phase'] 
+        # would be used in a full implementation for analyzing field continuity
         
         # Simple feature detection (can be enhanced)
         # Look for phase singularities at boundary regions
@@ -405,7 +412,7 @@ class StitchingSolver(Solver):
             # Check for phase jumps at boundaries
             if boundary.overlap_indices_a and boundary.overlap_indices_b:
                 # This is a placeholder - real implementation would analyze
-                # phase continuity across boundaries
+                # phase continuity across boundaries using the actual field data
                 feature = TopologicalFeature(
                     feature_type='boundary_interface',
                     position=(0.0, 0.0),  # Would be actual position
