@@ -27,7 +27,7 @@ class ResilienceStrategy(Enum):
     """Strategies for achieving resilience."""
     REDUNDANCY = "redundancy"  # Extra components
     RECONFIGURATION = "reconfiguration"  # Alternative paths
-    ADAPTIVE_TUNING = "adaptive_tuning"  parameter tuning
+    ADAPTIVE_TUNING = "adaptive_tuning"  # Adaptive parameter tuning
     TOPOLOGICAL_PROTECTION = "topological_protection"  # Topologically robust designs
     FRACTAL_RECOVERY = "fractal_recovery"  # Use fractal patterns for recovery
 
