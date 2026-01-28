@@ -33,6 +33,7 @@ Analyzes and improves the robustness of photonic designs:
 **Note**: This is not an autonomous AI, but an advanced analysis system that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
 
 **Example code**:
+
 ```python
 from simulator.resilience.resilience_manager import ResilienceManager
 
