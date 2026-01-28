@@ -39,7 +39,8 @@ resilience_mgr = ResilienceManager()
 report = resilience_mgr.analyze_resilience(oam_problem)
 
 print(f"Recommended topology: {report.best_alternative_id}")
-print(f"Expected resilience improvement: {report.resilience_improvement:.1%}")...
+print(f"Expected resilience improvement: {report.resilience_improvement:.1%}")
+...
 🚀 Quick Start
 Get SpectraVortex running in under a minute.
 
