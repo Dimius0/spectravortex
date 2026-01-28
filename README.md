@@ -29,7 +29,7 @@ SpectraVortex is now more than a compiler—it's a platform for **resilient phot
 * 🔄 **Topology Comparison**: For OAM systems, generates and compares 4 alternative implementation variants.
 * 🧠 **Design Recommendations**: Suggests strategies for increasing reliability and potential reconfiguration paths.
 
-> **Note**: This is not an autonomous AI, but an **advanced analysis system** that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
+ **Note**: This is not an autonomous AI, but an **advanced analysis system** that provides engineers with data-driven insights to create more failure-tolerant photonic systems.
 
 ```python
 # Example: Using the Resilience Analyzer
