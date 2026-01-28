@@ -121,6 +121,7 @@ class SolverManager:
 
     def register_default_solvers(self) -> None:
         """Register default solvers if available."""
+        # Register LinearWaveSolver
         try:
             from ..solvers.linear_wave_solver import LinearWaveSolver
 
@@ -131,6 +132,17 @@ class SolverManager:
             logger.warning("LinearWaveSolver not available for registration")
         except Exception as e:
             logger.error(f"Error registering LinearWaveSolver: {e}")
+        
+        # NEW: Register StitchingSolver (используем тот же путь импорта)
+        try:
+            from ..solvers.stitching_solver import StitchingSolver
+            stitching_solver = StitchingSolver()
+            self.register_solver(stitching_solver, priority=5)  # Medium priority
+            logger.info("Registered default StitchingSolver")
+        except ImportError:
+            logger.warning("StitchingSolver not available for registration")
+        except Exception as e:
+            logger.error(f"Error registering StitchingSolver: {e}")
 
     def get_available_solvers(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -311,6 +323,15 @@ class SolverManager:
         ):
             score *= 1.2  # 20% bonus for solvers that support topology analysis
 
+        # NEW: Bonus for stitching problems
+        if self._should_use_stitching(problem):
+            if solver.__class__.__name__ == "StitchingSolver":
+                score *= 1.5  # 50% bonus for stitching problems
+                reason += " (stitching specialist)"
+            elif hasattr(solver, "supports_stitching") and solver.supports_stitching:
+                score *= 1.2  # 20% bonus for solvers that support stitching
+                reason += " (supports stitching)"
+
         # Cap score between 0 and 2
         score = max(0.0, min(2.0, score))
 
@@ -320,6 +341,15 @@ class SolverManager:
             "reason": f"{reason}. Priority: {priority}, Success: {success_rate:.1%}",
             "estimated_cost": cost_estimate,
         }
+
+    def _should_use_stitching(self, problem: Dict[str, Any]) -> bool:
+        """Check if a problem requires stitching."""
+        return (
+            problem.get("requires_stitching", False)
+            or "subdomain_solutions" in problem
+            or problem.get("decomposition_strategy") is not None
+            or self._requires_stitching(problem)
+        )
 
     def _estimate_problem_complexity(self, problem: Dict[str, Any]) -> str:
         """Estimate problem complexity."""
