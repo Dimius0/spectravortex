@@ -84,6 +84,7 @@ Automatic scaling and labels
 
 Complete Compilation Pipeline
 From Code to Chip Visualization:
+
 bash
 # 1. Write your SpectraVortex program
 nano my_design.svx
@@ -176,6 +177,7 @@ spectravortex/
 └── test_chip_design.svx        # Example chip design
 Installation & Dependencies
 Basic Installation:
+
 bash
 # Clone repository
 git clone <repository-url>
@@ -184,10 +186,12 @@ cd spectravortex
 # Install core dependencies
 pip install -e .
 For Visualization Features:
+
 bash
 # Install matplotlib for visualization
 pip install matplotlib
 Testing:
+
 bash
 # Run all tests
 python main.py --test
@@ -214,12 +218,14 @@ if summary['violations']:
     print(f"WARNING: {len(summary['violations'])} design rule violations!")
 Troubleshooting
 Common Issues:
+
 Problem	Solution
 "ModuleNotFoundError: No module named 'matplotlib'"	Install: pip install matplotlib
 Visualization shows blank image	Check GDSII file contains valid geometry
 "ImportError" when running main.py	Run from spectravortex/ directory
 Tests fail in CI/CD	GitHub Actions installs matplotlib automatically
 Getting Help:
+
 Run the demo: python main.py --demo
 
 Check tests: python main.py --test
@@ -230,6 +236,7 @@ Use --visualize-only to debug existing files
 
 Roadmap & Future Features
 ✅ Completed This Week:
+
 Chip Visualization Module (visualize_chip.py)
 
 Integrated visualization into ChipDesigner
@@ -239,6 +246,7 @@ Command line interface with --visualize flag
 CI/CD compatibility (headless matplotlib)
 
 Planned for Next Week:
+
 Automatic Waveguide Routing
 
 Interactive Web Visualizer (HTML/JavaScript)
@@ -248,6 +256,7 @@ More component types (grating couplers, splitters)
 3D Visualization option
 
 Long-Term Goals:
+
 Full Binary GDSII Support (Industry standard)
 
 Thermal Analysis for heaters and crosstalk
