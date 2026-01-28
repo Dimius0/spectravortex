@@ -62,6 +62,7 @@ class SolverManager:
     - Hybrid problem decomposition
     - Performance monitoring and logging
     - Topological analysis of solutions (NEW)
+    - Recursive problem solving (NEW: Phase 3.2)
     """
 
     def __init__(self, enable_auto_selection: bool = True):
@@ -133,7 +134,7 @@ class SolverManager:
         except Exception as e:
             logger.error(f"Error registering LinearWaveSolver: {e}")
         
-        # NEW: Register StitchingSolver (используем тот же путь импорта)
+        # NEW: Register StitchingSolver
         try:
             from ..solvers.stitching_solver import StitchingSolver
             stitching_solver = StitchingSolver()
@@ -143,6 +144,17 @@ class SolverManager:
             logger.warning("StitchingSolver not available for registration")
         except Exception as e:
             logger.error(f"Error registering StitchingSolver: {e}")
+
+        # NEW: Register RecursiveSolver (Phase 3.2)
+        try:
+            from ..solvers.recursive_solver import RecursiveSolver
+            recursive_solver = RecursiveSolver()
+            self.register_solver(recursive_solver, priority=8)  # High priority for complex problems
+            logger.info("Registered default RecursiveSolver (Phase 3.2)")
+        except ImportError as e:
+            logger.warning(f"RecursiveSolver not available for registration: {e}")
+        except Exception as e:
+            logger.error(f"Error registering RecursiveSolver: {e}")
 
     def get_available_solvers(self) -> Dict[str, Dict[str, Any]]:
         """
@@ -169,21 +181,22 @@ class SolverManager:
             if hasattr(solver, "get_requirements"):
                 try:
                     requirements = solver.get_requirements()
-                    solver_info.update(
-                        {
-                            "capabilities": requirements.get("physical_models", []),
-                            "max_dimensions": requirements.get("max_dimensions", 1),
-                        }
-                    )
+                    solver_info.update({
+                        "capabilities": requirements.get("physical_models", []),
+                        "max_dimensions": requirements.get("max_dimensions", 1),
+                        "supports_recursion": requirements.get("fractal_capable", False),  # NEW
+                    })
                 except Exception as e:
                     logger.warning(
                         f"Error getting requirements for {solver_id}: {e}"
                     )
             else:
                 # Default values
-                solver_info.update(
-                    {"capabilities": ["unknown"], "max_dimensions": 1}
-                )
+                solver_info.update({
+                    "capabilities": ["unknown"],
+                    "max_dimensions": 1,
+                    "supports_recursion": False,  # NEW
+                })
 
             result[solver_id] = solver_info
 
@@ -332,6 +345,15 @@ class SolverManager:
                 score *= 1.2  # 20% bonus for solvers that support stitching
                 reason += " (supports stitching)"
 
+        # NEW: Bonus for recursive/fractal problems (Phase 3.2)
+        if self._should_use_recursion(problem):
+            if solver.__class__.__name__ == "RecursiveSolver":
+                score *= 1.6  # 60% bonus for recursive problems
+                reason += " (recursive specialist)"
+            elif hasattr(solver, "fractal_capable") and solver.fractal_capable:
+                score *= 1.3  # 30% bonus for solvers that support fractals
+                reason += " (fractal capable)"
+
         # Cap score between 0 and 2
         score = max(0.0, min(2.0, score))
 
@@ -350,6 +372,49 @@ class SolverManager:
             or problem.get("decomposition_strategy") is not None
             or self._requires_stitching(problem)
         )
+
+    def _should_use_recursion(self, problem: Dict[str, Any]) -> bool:
+        """
+        NEW: Check if a problem should use recursive solving (Phase 3.2).
+        
+        Criteria for recursion:
+        1. High topological complexity
+        2. Large domain size
+        3. Multiple physics models
+        4. Explicit recursion flag
+        5. Fractal design patterns
+        """
+        # Check explicit flag
+        if problem.get("use_recursion", False):
+            return True
+        
+        # Check topological complexity
+        topo_complexity = self._estimate_topological_complexity(problem)
+        if topo_complexity == "high":
+            return True
+        
+        # Check domain size
+        domain = problem.get("domain", {})
+        if domain.get("type") == "2d":
+            width = domain.get("width", 0)
+            height = domain.get("height", 0)
+            if width > 20e-6 or height > 20e-6:  # Large domains benefit from recursion
+                return True
+        
+        # Check for fractal patterns
+        if "fractal" in problem.get("components", []):
+            return True
+        
+        # Check for OAM multiplexing (complex interference patterns)
+        if problem.get("parameters", {}).get("orbital_angular_momentum"):
+            return True
+        
+        # Check physics model count
+        physics = problem.get("physics", [])
+        if len(physics) > 2:
+            return True
+        
+        return False
 
     def _estimate_problem_complexity(self, problem: Dict[str, Any]) -> str:
         """Estimate problem complexity."""
@@ -411,8 +476,11 @@ class SolverManager:
             for c in components
         )
 
+        # Check for fractal patterns (NEW: Phase 3.2)
+        has_fractal = "fractal" in str(components).lower() or "self_similar" in str(components).lower()
+
         # Determine complexity level
-        if has_oam or (has_interference and has_resonators):
+        if has_oam or (has_interference and has_resonators) or has_fractal:
             return "high"
         elif has_interference or has_resonators:
             return "medium"
@@ -470,28 +538,24 @@ class SolverManager:
                 self.solver_stats[solver_id]["success_count"] += 1
                 self.solver_stats[solver_id]["total_time"] += elapsed
 
-            # ===== НАЧАЛО ШАГА 1: ТОПОЛОГИЧЕСКИЙ АНАЛИЗ =====
+            # ===== ШАГ 1: ТОПОЛОГИЧЕСКИЙ АНАЛИЗ =====
             # Проводим анализ топологических особенностей решения
             result = self._add_topology_metadata(result, problem, solver_id)
             # ===== КОНЕЦ ШАГА 1 =====
 
             # Log performance
-            self._log_performance(
-                {
-                    "problem_name": problem.get("name", "unnamed"),
-                    "solver": solver.__class__.__name__,
-                    "solver_id": solver_id,
-                    "selection_confidence": selection.confidence,
-                    "selection_reason": selection.reason,
-                    "actual_time": elapsed,
-                    "estimated_time": selection.estimated_cost.get(
-                        "time_seconds", 0
-                    ),
-                    "success": True,
-                    "topology_analyzed": "topology"
-                    in getattr(result, "metadata", {}),
-                }
-            )
+            self._log_performance({
+                "problem_name": problem.get("name", "unnamed"),
+                "solver": solver.__class__.__name__,
+                "solver_id": solver_id,
+                "selection_confidence": selection.confidence,
+                "selection_reason": selection.reason,
+                "actual_time": elapsed,
+                "estimated_time": selection.estimated_cost.get("time_seconds", 0),
+                "success": True,
+                "topology_analyzed": "topology" in getattr(result, "metadata", {}),
+                "used_recursion": solver.__class__.__name__ == "RecursiveSolver",  # NEW
+            })
 
             # Add manager metadata to result
             if not hasattr(result, "metadata"):
@@ -518,21 +582,17 @@ class SolverManager:
             elapsed = time.time() - start_time
 
             # Log failure
-            self._log_performance(
-                {
-                    "problem_name": problem.get("name", "unnamed"),
-                    "solver": solver.__class__.__name__,
-                    "solver_id": solver_id,
-                    "selection_confidence": selection.confidence,
-                    "selection_reason": selection.reason,
-                    "actual_time": elapsed,
-                    "estimated_time": selection.estimated_cost.get(
-                        "time_seconds", 0
-                    ),
-                    "success": False,
-                    "error": str(e),
-                }
-            )
+            self._log_performance({
+                "problem_name": problem.get("name", "unnamed"),
+                "solver": solver.__class__.__name__,
+                "solver_id": solver_id,
+                "selection_confidence": selection.confidence,
+                "selection_reason": selection.reason,
+                "actual_time": elapsed,
+                "estimated_time": selection.estimated_cost.get("time_seconds", 0),
+                "success": False,
+                "error": str(e),
+            })
 
             logger.error(f"Solver {solver.__class__.__name__} failed: {e}")
             raise RuntimeError(
@@ -558,6 +618,7 @@ class SolverManager:
             "features": [],
             "complexity": self._estimate_topological_complexity(problem),
             "requires_stitching": self._requires_stitching(problem),
+            "requires_recursion": self._should_use_recursion(problem),  # NEW
             "singularity_count": 0,
             "stability_index": 1.0,
             "analysis_performed": False,  # Full analysis not implemented yet
@@ -829,7 +890,6 @@ class SolverManager:
 
         self.performance_log.clear()
         logger.info("Statistics reset")
-
 
 # Factory function
 def create_solver_manager(enable_auto_selection: bool = True) -> SolverManager:
