@@ -1,0 +1,19 @@
+[project]
+name = "fractal-adaptive-prototype"
+version = "0.1.0"
+description = "Прототип модуля фрактально-адаптивной динамики"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-v"
+
+[tool.flake8]
+max-line-length = 120
+exclude = [".git", "__pycache__", ".venv", "venv"]
