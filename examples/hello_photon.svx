@@ -1,0 +1,18 @@
+// Hello Photon - First SpectraVortex Program
+photon red_laser = {
+    frequency: 474.0e12,    // 633 nm (red light)
+    amplitude: 1.0,
+    phase: 0.0,
+    polarization: "linear"
+}
+
+program hello_world() {
+    print("🌀 Welcome to SpectraVortex!")
+    print("Programming with photons...")
+    
+    // Create a simple beam
+    beam laser_beam = beam(red_laser)
+    
+    print("Beam created successfully!")
+    return laser_beam
+}

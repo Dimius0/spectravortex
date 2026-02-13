@@ -1,0 +1,130 @@
+// examples/optical_matrix_multiplier.svx
+// Оптический ускоритель матричных умножений
+
+// Конфигурация источника света
+photon source = {
+    frequency: 193.414e12,  // 1550 нм
+    amplitude: 1.0,
+    phase: 0.0,
+    oam: 0,
+    polarization: "linear"
+}
+
+// Функция кодирования матрицы в оптические сигналы
+function encode_matrix(matrix_data) {
+    print("Encoding matrix of size: ", matrix_data.rows, "x", matrix_data.cols);
+    
+    // В реальной реализации здесь было бы преобразование
+    // электрических сигналов в оптические моды
+    optical_matrix om;
+    om.data = matrix_data;
+    om.encoding_type = "MZI_mesh";  // Используем интерферометры Маха-Цендера
+    
+    return om;
+}
+
+// Функция оптического матричного умножения
+function optical_matmul(matrix_a, matrix_b) {
+    // Проверка совместимости размеров
+    if (matrix_a.cols != matrix_b.rows) {
+        error("Matrix dimensions incompatible for multiplication!");
+    }
+    
+    print("Performing optical matrix multiplication...");
+    print("Input A: ", matrix_a.rows, "x", matrix_a.cols);
+    print("Input B: ", matrix_b.rows, "x", matrix_b.cols);
+    
+    // Симуляция оптического процессора на основе интерферометров
+    // Каждый элемент матрицы A кодируется в амплитуду/фазу световой моды
+    // Матрица B программирует настройки фазовращателей
+    
+    optical_matrix result;
+    result.rows = matrix_a.rows;
+    result.cols = matrix_b.cols;
+    
+    // В симуляции: простое умножение для демонстрации
+    // В реальной оптической реализации: свет проходит через интерферометр
+    for (i = 0; i < matrix_a.rows; i = i + 1) {
+        for (j = 0; j < matrix_b.cols; j = j + 1) {
+            result.value[i][j] = 0;
+            for (k = 0; k < matrix_a.cols; k = k + 1) {
+                // Имитация интерференции в оптическом процессоре
+                interference = matrix_a.value[i][k] * matrix_b.value[k][j];
+                result.value[i][j] = result.value[i][j] + interference;
+            }
+        }
+    }
+    
+    return result;
+}
+
+// Функция измерения (детектирования) оптического результата
+function measure_optical_matrix(optical_result) {
+    print("Measuring optical output intensities...");
+    
+    // В оптической системе это соответствует фотодетекторам,
+    // измеряющим интенсивность света в каждом выходном канале
+    electrical_result;
+    electrical_result.rows = optical_result.rows;
+    electrical_result.cols = optical_result.cols;
+    
+    for (i = 0; i < optical_result.rows; i = i + 1) {
+        for (j = 0; j < optical_result.cols; j = j + 1) {
+            // Интенсивность пропорциональна квадрату амплитуды
+            electrical_result.value[i][j] = optical_result.value[i][j] * optical_result.value[i][j];
+        }
+    }
+    
+    return electrical_result;
+}
+
+// Главная программа
+program optical_matrix_multiplier_demo() {
+    print("=== Optical Matrix Multiplier Demo ===");
+    print("Simulating a photonic tensor core...");
+    
+    // Тестовые матрицы 2x2
+    matrix_a = {
+        rows: 2,
+        cols: 2,
+        value: [[1.0, 2.0], [3.0, 4.0]]
+    };
+    
+    matrix_b = {
+        rows: 2,
+        cols: 2,
+        value: [[0.5, 1.0], [1.5, 2.0]]
+    };
+    
+    // Шаг 1: Кодирование матриц в оптические сигналы
+    print("\n1. Encoding matrices into optical modes...");
+    optical_a = encode_matrix(matrix_a);
+    optical_b = encode_matrix(matrix_b);
+    
+    // Шаг 2: Оптическое умножение
+    print("\n2. Processing through photonic interferometer mesh...");
+    optical_result = optical_matmul(optical_a, optical_b);
+    
+    // Шаг 3: Детектирование результата
+    print("\n3. Detecting output optical signals...");
+    electrical_result = measure_optical_matrix(optical_result);
+    
+    // Шаг 4: Вывод результатов
+    print("\n4. Results:");
+    print("Matrix A * Matrix B = ");
+    
+    for (i = 0; i < electrical_result.rows; i = i + 1) {
+        row_str = "";
+        for (j = 0; j < electrical_result.cols; j = j + 1) {
+            row_str = row_str + electrical_result.value[i][j] + " ";
+        }
+        print(row_str);
+    }
+    
+    // Ожидаемый результат:
+    // [1*0.5 + 2*1.5, 1*1.0 + 2*2.0] = [3.5, 5.0]
+    // [3*0.5 + 4*1.5, 3*1.0 + 4*2.0] = [7.5, 11.0]
+    
+    print("\nExpected: [[3.5, 5.0], [7.5, 11.0]]");
+    print("Demo completed successfully!");
+}

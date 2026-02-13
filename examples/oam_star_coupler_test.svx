@@ -1,0 +1,158 @@
+// examples/oam_star_coupler_test.svx
+// Тест для статьи: "Photonic integrated chip enabling orbital angular momentum multiplexing..."
+// Цель: Воспроизвести базовый элемент (star coupler) для генерации OAM моды l=+1.
+// Проверка выразительности языка и физической адекватности симуляции.
+
+// === 1. КОНСТАНТЫ И ПАРАМЕТРЫ ИЗ СТАТЬИ ===
+// Рабочая длина волны (1550 нм)
+const wavelength = 1550e-9;
+
+// Параметры кремниевой фотоники (предположительные, из общей практики)
+const silicon_refractive_index = 3.47;
+const oxide_refractive_index = 1.44;
+const waveguide_height = 220e-9; // 220 нм
+const waveguide_width = 500e-9;  // 500 нм
+
+// Параметры звездообразного ответвителя (star coupler)
+// Статья: массив из 26 выходных портов для генерации OAM.
+const star_coupler_ports = 26;
+const star_coupler_radius = 10e-6; // Радиус сектора (оценка)
+const output_pitch_angle = 360 / star_coupler_ports; // Угол между портами
+
+// Целевая OAM мода (топологический заряд)
+const target_orbital_angular_momentum = 1; // l = +1
+
+// === 2. ОПРЕДЕЛЕНИЕ КОМПОНЕНТОВ ===
+// Фундаментальный Gaussian источник для ввода в звездообразный ответвитель
+photon gaussian_source = {
+    frequency: 3e8 / wavelength, // Частота из длины волны
+    amplitude: 1.0,
+    phase: 0.0,
+    oam: 0, // Входной Gaussian пучок имеет OAM = 0
+    polarization: "TE", // Трансверсальная электрическая мода для кремниевых волноводов
+    beam_waist: 2e-6    // Размер пятна
+};
+
+// Компонент: Звездообразный ответвитель (Star Coupler)
+// Этот компонент должен преобразовать Gaussian вход в кольцевое распределение
+// с линейно набегающей фазой для создания OAM.
+component star_coupler = StarCoupler({
+    label: "oam_generator_lp1",
+    design: {
+        type: "sector",
+        input_waveguide: {
+            width: waveguide_width,
+            height: waveguide_height,
+            material: { core: "Si", cladding: "SiO2" }
+        },
+        output_ports: star_coupler_ports,
+        sector_radius: star_coupler_radius,
+        // КРИТИЧЕСКИЙ ПАРАМЕТР: Распределение фазы по портам.
+        // Для генерации OAM(l=+1) фаза на k-м порту должна быть phi_k = l * theta_k,
+        // где theta_k - угловая позиция порта.
+        phase_profile: "linear_azimuthal",
+        topological_charge: target_orbital_angular_momentum
+    },
+    simulation_hint: {
+        // Указание SolverManager на метод моделирования
+        preferred_solver: "FDTD_3D", // Для точного учёта дифракции
+        mesh_accuracy: "high"
+    }
+});
+
+// Компонент: Выходная апертура (для визуализации поля)
+component output_aperture = FreeSpacePropagation({
+    distance: 5e-6, // Небольшое расстояние для распространения после star coupler
+    medium: "SiO2"   // Распространение в оксиде
+});
+
+// === 3. ОПИСАНИЕ СХЕМЫ (CIRCUIT) ===
+circuit Test_OAM_Generation {
+    // Вход
+    input -> gaussian_source;
+
+    // Прохождение через star coupler
+    gaussian_source -> star_coupler.input;
+
+    // Распространение на небольшую дистанцию для формирования пучка
+    star_coupler.output -> output_aperture.input;
+
+    // Выход схемы
+    output = output_aperture.output;
+}
+
+// === 4. СИМУЛЯЦИЯ И ВЕРИФИКАЦИЯ ===
+// Запуск симуляции с помощью SolverManager
+simulation_result = simulate(Test_OAM_Generation, {
+    // SolverManager должен выбрать лучший решатель на основе simulation_hint
+    // и возможностей системы.
+    primary_metrics: [
+        "near_field_intensity",
+        "phase_distribution",
+        "orbital_angular_momentum_purity"
+    ],
+    secondary_metrics: [
+        "power_transmission", // Общая эффективность
+        "crosstalk" // Для случая нескольких мод, пока не актуально
+    ],
+    visualizations: [
+        "2D_intensity_plot",
+        "phase_color_map",
+        "3D_field_propagation"
+    ]
+});
+
+// === 5. АВТОМАТИЧЕСКАЯ ПРОВЕРКА РЕЗУЛЬТАТОВ ===
+// Проверка ключевых характеристик сгенерированного поля
+verification_report = verify(simulation_result, {
+    criteria: [
+        {
+            metric: "orbital_angular_momentum_purity",
+            condition: ">",
+            value: 0.85, // Требуемая чистота моды (85%)
+            description: "Сгенерированное поле должно иметь доминирующую OAM(l=+1) моду."
+        },
+        {
+            metric: "phase_singularity",
+            condition: "present_at_center",
+            description: "В центре пучка должна быть фазовая сингулярность (вихрь)."
+        },
+        {
+            metric: "intensity_profile",
+            condition: "matches",
+            pattern: "donut", // Ожидается "бубликовая" интенсивность
+            tolerance: 0.15
+        }
+    ]
+});
+
+// === 6. ВЫВОД РЕЗУЛЬТАТОВ И ДИАГНОСТИКА ===
+// Логирование результатов
+print("=== РЕЗУЛЬТАТЫ ТЕСТА STAR COUPLER ===");
+print("Целевая OAM мода: l =", target_orbital_angular_momentum);
+print("Число портов star coupler:", star_coupler_ports);
+print("---");
+
+// Если верификация прошла успешно
+if (verification_report.all_passed) {
+    print("✅ ТЕСТ ПРОЙДЕН.");
+    print("Сгенерированная OAM мода соответствует целевым характеристикам.");
+    print("Рекомендуется перейти к тесту мультиплексирования нескольких мод.");
+} else {
+    print("❌ ТЕСТ НЕ ПРОЙДЕН. Критические замечания:");
+    for (issue in verification_report.failed_criteria) {
+        print(" -", issue.description);
+        print("   Измеренное значение:", issue.measured_value);
+    }
+    print("\n⚡ ДИАГНОСТИКА И РЕКОМЕНДАЦИИ:");
+    print("1. Проверьте параметры 'phase_profile' в StarCoupler.");
+    print("2. Увеличьте 'mesh_accuracy' или выберите другой решатель.");
+    print("3. Убедитесь, что радиус сектора достаточен для размещения портов.");
+}
+
+// Экспорт результатов для последующего анализа
+export(simulation_result, format: "json", file: "star_coupler_test_results.json");
+export(verification_report, format: "markdown", file: "star_coupler_verification.md");
+
+// Генерация отчёта для интеграции с SolverManager
+update_solver_statistics(simulation_result, component: star_coupler);

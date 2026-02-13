@@ -1,0 +1,12 @@
+﻿# Core dependencies
+numpy>=1.21.0
+scipy>=1.7.0
+matplotlib>=3.5.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Project specific
