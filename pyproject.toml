@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spectravortex"
+version = "0.1.0"
+description = "Programming language for photonic computing"
+readme = "README.md"
+authors = [{name = "Dimius0"}]
+license = "MIT"
+
+dependencies = [
+    "numpy",
+]
+
+# РАБОЧАЯ КОНФИГУРАЦИЯ: Используем автоматическое обнаружение пакетов (find)
+[tool.setuptools.packages.find]
+# Пакеты будут найдены автоматически. Это работает для 'compiler/' и 'simulator/'
