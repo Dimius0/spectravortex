@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Можно запускать вручную
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install .[dev]
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: make test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: success()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+      - name: Check for failed tests
+        if: failure()
+        run: |
+          echo "::error::Тесты упали! Проверьте логи выше."
+          echo "Локально можно запустить: make test-fast"
+
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install linting tools
+        run: |
+          pip install black ruff
+
+      - name: Check and Fix Formatting
+        run: |
+          echo "Проверяю форматирование..."
+          if black --check .; then
+            echo "✅ Все файлы отформатированы правильно."
+          else
+            echo "🔄 Найдены ошибки форматирования. Исправляю локально..."
+            black .
+            echo "✅ Код отформатирован."
+            echo "ℹ️ Чтобы сохранить изменения, выполните команды локально:"
+            echo "   git add ."
+            echo "   git commit -m 'style: auto-format with black'"
+            echo "   git push"
+          fi
+
+      - name: Run linter
+        run: |
+          echo "Запускаю линтер..."
+          ruff check . --fix
+          if ruff check .; then
+            echo "✅ Линтер не нашёл проблем."
+          else
+            echo "⚠️ Внимание: остались проблемы с кодом."
+          fi
