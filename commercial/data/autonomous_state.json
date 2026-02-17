@@ -1,0 +1,11 @@
+{
+  "current_N": 100,
+  "last_stable_N": 100,
+  "collapse_point": null,
+  "jump_attempt": 5,
+  "stabilization_counter": 0,
+  "collapse_streak": 0,
+  "border_06": 100,
+  "border_confirmed": false,
+  "last_updated": "2026-02-12T23:41:36.280437"
+}
