@@ -1,0 +1,378 @@
+{
+  "islands": {
+    "31000": [
+      20985,
+      24796
+    ],
+    "32000": [
+      22868
+    ],
+    "33000": [
+      29509
+    ],
+    "34000": [
+      25949
+    ],
+    "35000": [
+      24378
+    ],
+    "36000": [
+      25337
+    ],
+    "37000": [
+      23066
+    ],
+    "38000": [
+      27865,
+      26146
+    ],
+    "39000": [
+      28742,
+      20988,
+      29052
+    ],
+    "40000": [
+      28941
+    ],
+    "41000": [
+      25933
+    ],
+    "42000": [
+      23992
+    ],
+    "43000": [
+      25679
+    ],
+    "44000": [
+      22670,
+      28470
+    ],
+    "45000": [
+      23211,
+      21311,
+      28137
+    ],
+    "46000": [
+      27957
+    ],
+    "47000": [
+      26215
+    ]
+  },
+  "passages": {},
+  "collapses": {},
+  "front_line": 47000,
+  "hyper_ready": true,
+  "target_500_data": [
+    {
+      "target": 200,
+      "energy": 22513,
+      "success": false
+    },
+    {
+      "target": 250,
+      "energy": 26385,
+      "success": false
+    },
+    {
+      "target": 300,
+      "energy": 27542,
+      "success": false
+    },
+    {
+      "target": 350,
+      "energy": 30058,
+      "success": false
+    },
+    {
+      "target": 400,
+      "energy": 32032,
+      "success": false
+    },
+    {
+      "target": 450,
+      "energy": 36050,
+      "success": false
+    },
+    {
+      "target": 500,
+      "energy": 38025,
+      "success": false
+    }
+  ],
+  "active_modules": [],
+  "deep_recon": {
+    "10000": {
+      "energy": 40000,
+      "success": true
+    }
+  },
+  "heavy_recon": {
+    "2500": [
+      {
+        "energy": 33714,
+        "success": true,
+        "power": 1,
+        "timestamp": 1771057155.656018
+      }
+    ],
+    "8000": [
+      {
+        "energy": 69541,
+        "success": false,
+        "power": 2,
+        "timestamp": 1771057155.662015
+      }
+    ],
+    "12000": [
+      {
+        "energy": 101290,
+        "success": false,
+        "power": 2,
+        "timestamp": 1771057155.6640158
+      }
+    ],
+    "20000": [
+      {
+        "energy": 165163,
+        "success": true,
+        "power": 3,
+        "timestamp": 1771057155.6900172
+      }
+    ],
+    "30000": [
+      {
+        "energy": 245194,
+        "success": true,
+        "power": 3,
+        "timestamp": 1771057155.6940172
+      },
+      {
+        "energy": 28963,
+        "success": true,
+        "power": 3,
+        "timestamp": 1771057840.2480152
+      },
+      {
+        "energy": 27768,
+        "success": true,
+        "power": 3,
+        "timestamp": 1771063240.3058476
+      }
+    ],
+    "3500": [
+      {
+        "energy": 231042,
+        "success": false,
+        "power": 1,
+        "timestamp": 1771057840.1790147
+      }
+    ],
+    "15000": [
+      {
+        "energy": 143148,
+        "success": false,
+        "power": 2,
+        "timestamp": 1771057840.2240162
+      }
+    ],
+    "18000": [
+      {
+        "energy": 118618,
+        "success": false,
+        "power": 2,
+        "timestamp": 1771057840.2300153
+      }
+    ],
+    "25000": [
+      {
+        "energy": 63225,
+        "success": false,
+        "power": 3,
+        "timestamp": 1771057840.2450154
+      }
+    ],
+    "4500": [
+      {
+        "energy": 227448,
+        "success": false,
+        "power": 1,
+        "timestamp": 1771059640.194731
+      }
+    ],
+    "5500": [
+      {
+        "energy": 215176,
+        "success": false,
+        "power": 1,
+        "timestamp": 1771061440.2053187
+      }
+    ],
+    "6500": [
+      {
+        "energy": 207201,
+        "success": false,
+        "power": 1,
+        "timestamp": 1771063240.2088728
+      }
+    ],
+    "50000": [
+      {
+        "energy": 188629,
+        "success": false,
+        "power": 3,
+        "timestamp": 1771063240.3038483
+      }
+    ]
+  },
+  "strategic_recon": {
+    "2000": [
+      {
+        "success": false,
+        "energy": 160846,
+        "power": 1
+      }
+    ],
+    "7000": [
+      {
+        "success": false,
+        "energy": 136537,
+        "power": 1
+      },
+      {
+        "success": false,
+        "energy": 137413,
+        "power": 2
+      },
+      {
+        "success": false,
+        "energy": 137469,
+        "power": 2
+      }
+    ],
+    "4000": [
+      {
+        "success": false,
+        "energy": 152246,
+        "power": 2
+      }
+    ],
+    "9000": [
+      {
+        "success": true,
+        "energy": 130109,
+        "power": 3
+      },
+      {
+        "success": true,
+        "energy": 130796,
+        "power": 2
+      }
+    ],
+    "14000": [
+      {
+        "success": true,
+        "energy": 106066,
+        "power": 3
+      }
+    ],
+    "3000": [
+      {
+        "success": false,
+        "energy": 156370,
+        "power": 1
+      }
+    ],
+    "5000": [
+      {
+        "success": false,
+        "energy": 146732,
+        "power": 1
+      },
+      {
+        "success": false,
+        "energy": 150353,
+        "power": 2
+      }
+    ],
+    "12000": [
+      {
+        "success": false,
+        "energy": 115660,
+        "power": 2
+      },
+      {
+        "success": true,
+        "energy": 117428,
+        "power": 3
+      }
+    ],
+    "6000": [
+      {
+        "success": true,
+        "energy": 143161,
+        "power": 1
+      }
+    ],
+    "17000": [
+      {
+        "success": true,
+        "energy": 89446,
+        "power": 3
+      },
+      {
+        "success": true,
+        "energy": 92840,
+        "power": 3
+      }
+    ],
+    "8000": [
+      {
+        "success": false,
+        "energy": 132285,
+        "power": 2
+      }
+    ],
+    "22000": [
+      {
+        "success": true,
+        "energy": 67666,
+        "power": 3
+      }
+    ],
+    "10000": [
+      {
+        "success": false,
+        "energy": 123917,
+        "power": 2
+      },
+      {
+        "success": false,
+        "energy": 124714,
+        "power": 3
+      },
+      {
+        "success": true,
+        "energy": 126280,
+        "power": 3
+      }
+    ],
+    "15000": [
+      {
+        "success": false,
+        "energy": 99953,
+        "power": 2
+      },
+      {
+        "success": false,
+        "energy": 99427,
+        "power": 3
+      },
+      {
+        "success": true,
+        "energy": 100771,
+        "power": 3
+      }
+    ]
+  }
+}
