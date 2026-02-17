@@ -1,6 +1,0 @@
-include README.md
-include CONTRIBUTING.md
-include LICENSE
-include requirements.txt
-recursive-include examples *.svx
-recursive-include tests *.py
