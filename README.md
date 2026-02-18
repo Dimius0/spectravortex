@@ -283,8 +283,6 @@ Performance scaling (efficiency > 90%)
 
 Ризома помнит.
 
-💼 Commercial License
-SpectraVortex core is MIT licensed and free to use.
 
 For production deployments, advanced features are available under commercial license.
 These modules are currently in development and available for early access, pilot projects, or custom integration under NDA.
@@ -305,9 +303,6 @@ Why commercial?
 Proven on seed 7777: 100 vortices in 16³ grid, 0.06 min dist
 
 Reproducible: same input → same output, guaranteed
-
-For inquiries, early access, or custom development:
-📧 superperson1@ya.ru
 
 致谢 (Acknowledgements)
 SpectraVortex runs on infrastructure powered by Chinese manufacturing,
