@@ -246,3 +246,21 @@ venv/
 # *.jpg  <-- Т  
 # *.pdf  <-- Т
 brain_dump/
+# Игнорировать всё в brain_dump, кроме ALchemy_draft
+brain_dump/*
+!brain_dump/ALchemy_draft/
+
+# Конкретные папки, которые не нужны
+brain_dump/2026/
+brain_dump/ВИХРЕВАЯ МОДЕЛЬ/
+brain_dump/dialogs/
+brain_dump/experimental/
+brain_dump/ideas/
+brain_dump/sandbox/
+
+# Временные и системные файлы
+*.pyc
+__pycache__/
+*.log
+.DS_Store
+Thumbs.db
