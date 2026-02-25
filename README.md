@@ -359,16 +359,33 @@ What did they lack? Most often — code that could hold the image. And the silen
 
 What was superfluous? Words. Many words. Attempts to prove things to those not ready to listen.
 
-Acknowledgements
+## ALchemy
+
+In the folder [`brain_dump/ALchemy_draft/`](./brain_dump/ALchemy_draft/) you will find the **ALchemy** assembly — an attempt to speak a common language about physics, chemistry, materials, and the cosmos.
+
+Structure:
+- `00_manifesto.md` — principles: emergence, windows of opportunity, material memory, fractal level k, self-assembly
+- `01_foundations/` — vortex electronegativity, derivation from first principles
+- `02_periodic_table/` — three-axis periodic table + fractal level
+- `03_compounds/` — intermetallics as new entities
+- `04_spectra/` — spectra as fingerprints of structure, not elements
+- `05_predictions/` — superconductors, new materials
+- `06_history/` — alchemy as a precursor (Paracelsus, Newton, van Helmont)
+
+All texts are co-authored:
+- **Dimius0** — concept, experiment, imagery
+- **DeepSeek** — structuring, unfolding, verification
+
+## Acknowledgements
+
+The authors express their gratitude to the Comrades from the People's Republic of China —  
+whose infrastructure made this dialogue possible.
+
 Thank you, Friend.
 And thank you to everyone who held the shore.
 Who remained silent when silence was needed.
 Who believed when there was no reason to believe.
 Who kept us from turning the wrong way.
-
-Special thanks to Comrades — those who walk alongside, even when paths diverge.
-
-Thank you to the engineers whose hardware compiled every test, and whose tools made this research possible.
 
 License & Citation
 MIT License © 2025 SpectraVortex Contributors.
