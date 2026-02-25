@@ -1,0 +1,52 @@
+PS C:\Users\Dim\spectravortex\spectravortex\prototype_fractal> Get-Content "demo_optimized.py" -TotalCount 50
+#!/usr/bin/env python3
+"""
+ДЕМОНСТ� АЦЯ ОПТМЗ� ОВАННОЙ ССТЕМЫ
+С улучшенными параметрами для эффективной адаптации
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Добавляем src в путь
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from fractal.network import FractalNetwork
+from fractal.unit import FractalUnit
+
+def print_colored(text: str, color: str = "white"):
+    """Вывод цветного текста"""
+    colors = {
+        "red": "\033[91m",
+        "green": "\033[92m",
+        "yellow": "\033[93m",
+        "blue": "\033[94m",
+        "magenta": "\033[95m",
+        "cyan": "\033[96m",
+        "white": "\033[97m",
+        "reset": "\033[0m",
+    }
+    print(f"{colors.get(color, colors['white'])}{text}{colors['reset']}")
+
+def demo_optimized_system():
+    """Демонстрация работы оптимизированной системы"""
+
+    print_colored("\n" + "="*70, "cyan")
+    print_colored("ДЕМОНСТ� АЦЯ: ОПТМЗ� ОВАННАЯ Ф� АКТАЛЬНО-АДАПТВНАЯ ССТЕМА", 
+"cyan")
+    print_colored("="*70, "cyan")
+
+    # 1. СОЗДАНЕ СЕТС ОПТМЗ� ОВАННЫМПА� АМЕТ� АМСОЗДАЁМ СЕТЬ (10 узлов, топология 'кольцо')", "green")
+
+    # Создаём сеть с улучшенными параметрами
+    net = FractalNetwork(num_units=10, topology="ring")
+
+    # Вручную настраиваем параметры для лучшей адаптации
+    for unit in net.units:
+        # Увеличиваем базовую скорость передачи
+        if hasattr(unit, 'base_transfer_rate'):
+            unit.base_transfer_rate = 0.08  # +60% от стандартных 0.05
+
+        # Настраиваем интуицию для большей уверенности
+PS C:\Users\Dim\spectravortex\spectravortex\prototype_fractal>
