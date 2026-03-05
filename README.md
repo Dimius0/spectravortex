@@ -90,6 +90,31 @@ This unified formalism allows modeling systems of any nature, provided they have
 *   Automatically route connections (adaptive routing).
 *   Export results to production formats (GDSII, STEP — in development).
 *   Reproduce every result in this document with one command.
+*   **Generate breakthrough ideas** — systematic violation of protocols (`Error Hunter` game, based on Lipzik's theorem: `P = P₀ × (1+Σδ) × exp(N)`).
+*   **Evolve knowledge structures** — fractal growth of interconnected nodes (`Knowledge Forest` prototype).
+
+---
+
+## 🎮 Interactive Demos & Theory
+
+We believe the best way to understand VMMS is to play with it and read its core principles. These are living examples and foundational documents built on top of the platform.
+
+### 🔬 [Error Hunter](games/error_hunter/)
+A web-based laboratory where you **violate protocols** (temperature, pressure, purity, time, field) and watch materials transform. Based on the **Lipzik Error Theorem** (`P = P₀ × (1+Σδ) × exp(N)`).  
+👉 Pick a material, break the rules, catch anomalies — maybe even discover a breakthrough like **NS-1**.
+
+### 🌳 [Knowledge Forest](prototype_fractal/knowledge_forest.py)
+A fractal model of growing knowledge. Trees on different floors (physics, chemistry, biology, mind, cosmos, technosphere, ethics) grow branches and sprout connections. Anomalies (nodes deviating from the mean) are candidates for new discoveries.  
+⚡ The engine behind Error Hunter and a sandbox for evolving ideas.
+
+### 📚 Key Theoretical Discoveries
+All core ideas are documented in the [`discoveries/`](discoveries/) folder with clear chronology and first-principles derivations. Key files include:
+*   [`priority_vmms_monism.md`](discoveries/priority_vmms_monism.md) — Matter = space itself (VMMS priority, April 2025).
+*   [`theorem_lipzik_errors.md`](discoveries/theorem_lipzik_errors.md) — `P = P₀ × (1+Σδ) × exp(N)` — breakthrough through violations.
+*   [`generator_ns1.md`](discoveries/generator_ns1.md) — NS-1: a 1 kW generator from garbage (proof of concept).
+*   [`hegel_vs_lipzik.md`](discoveries/hegel_vs_lipzik.md) — From Hegel's dialectics to Lipzik's formula.
+*   [`living_formula.md`](discoveries/living_formula.md) — Full Lipzik formula with memory `H`, defects `U`, external `X`.
+*   ... and [many more](discoveries/).
 
 ---
 
@@ -155,13 +180,13 @@ print(f"Synchronization: {system.get_synchronization():.3f}")
 # > Synchronization: 0.847
 What this demonstrates:
 
-    Local time scales → global phase synchronization
+Local time scales → global phase synchronization
 
-    Recovery after node damage (health 0.4 → back to 1.0)
+Recovery after node damage (health 0.4 → back to 1.0)
 
-    Butterfly effect: 0.001 rad phase shift → 0.03 difference after 50 steps
+Butterfly effect: 0.001 rad phase shift → 0.03 difference after 50 steps
 
-    Performance scaling: 2× time scale → 1.94× actual speedup
+Performance scaling: 2× time scale → 1.94× actual speedup
 
 Full test suite (no dependencies beyond NumPy):
 
@@ -180,42 +205,8 @@ Testable Predictions
 Temperature Dependence of Decay
 For α-active nuclei (²¹⁰Po, ²²⁶Ra), the half-life decreases with increasing temperature:
 
-T
-1
-/
-2
-(
-T
-)
-=
-T
-1
-/
-2
-(
-300
-)
-⋅
-(
-300
-T
-)
-5
-/
-2
-T 
-1/2
-​
- (T)=T 
-1/2
-​
- (300)⋅( 
-T
-300
-​
- ) 
-5/2
- 
+T₁/₂(T) = T₁/₂(300) · (300/T)^(5/2)
+
 Up to 1500 K — power law (experimentally achievable)
 
 Above 1500 K — a possible phase transition of the condensate (exponential growth)
@@ -257,30 +248,36 @@ Medicine	Finding rhythms in ECG, MRI, pulse	(planned)
 Climate	Analyzing the planet's pulse	(planned)
 Space	Finding rhythms in the "noise of emptiness"	noise_analyzer (in development)
 What's New for Those Who Cloned Earlier
-The latest update (branch main, February 2026) includes:
+The latest update (branch main, February–March 2026) includes:
 
 Added
-    Spectral analysis module (src/architect/spectral_analyzer.py): finding vibrational modes with energy calibration.
+Spectral analysis module (src/architect/spectral_analyzer.py): finding vibrational modes with energy calibration.
 
-    Nuclear modes test (tests/test_nuclear_modes.py, v2.2): verification for 8 nuclei including relativistic and deformation corrections from first principles.
+Nuclear modes test (tests/test_nuclear_modes.py, v2.2): verification for 8 nuclei including relativistic and deformation corrections from first principles.
 
-    Temperature dependence test (tests/test_temperature_decay.py).
+Temperature dependence test (tests/test_temperature_decay.py).
 
-    Predictions folder (predictions/).
+Predictions folder (predictions/).
 
-    Discoveries folder (discoveries/).
+Discoveries folder (discoveries/).
 
-    Adaptive routing — improved tracing using the ∇H field.
+Adaptive routing — improved tracing using the ∇H field.
 
-    Hybrid examples — demonstrations with different component types.
+Hybrid examples — demonstrations with different component types.
+
+Error Hunter game (games/error_hunter/) — interactive laboratory for systematic protocol violation.
+
+Knowledge Forest prototype (prototype_fractal/knowledge_forest.py) — fractal model of growing knowledge.
+
+Key theoretical files — priority, error theorem, NS-1 generator, Hegel comparison.
 
 Fixed
-    Relativistic correction switched to the theoretical formula.
+Relativistic correction switched to the theoretical formula.
 
-    Deformation correction sign fixed according to the liquid drop model.
+Deformation correction sign fixed according to the liquid drop model.
 
 Removed
-    All commercial and promotional blocks removed.
+All commercial and promotional blocks removed.
 
 To get the latest version:
 
@@ -329,26 +326,26 @@ Every result in this README is reproducible with one command:
 
 bash
 pytest tests/ --verified
-    Random seeds are fixed
+Random seeds are fixed
 
-    Dependency versions are pinned
+Dependency versions are pinned
 
-    Verified on CPU (x86_64) and GPU (CUDA 11.0+)
+Verified on CPU (x86_64) and GPU (CUDA 11.0+)
 
-    GitHub Actions CI, 100% test coverage
+GitHub Actions CI, 100% test coverage
 
-    Docker image available on request
+Docker image available on request
 
 Who This Is For
-    Physicists — to see how vortices work.
+Physicists — to see how vortices work.
 
-    Chemists — to calculate bonds and electronegativity without tables.
+Chemists — to calculate bonds and electronegativity without tables.
 
-    Materials scientists — to design new structures.
+Materials scientists — to design new structures.
 
-    Programmers — to build living, self-organizing systems.
+Programmers — to build living, self-organizing systems.
 
-    Those seeking silence — and a tool, not a lecture.
+Those seeking silence — and a tool, not a lecture.
 
 We quietly follow our principles and do not impose our morality.
 
@@ -359,33 +356,41 @@ What did they lack? Most often — code that could hold the image. And the silen
 
 What was superfluous? Words. Many words. Attempts to prove things to those not ready to listen.
 
-## ALchemy
-
-In the folder [`brain_dump/ALchemy_draft/`](./brain_dump/ALchemy_draft/) you will find the **ALchemy** assembly — an attempt to speak a common language about physics, chemistry, materials, and the cosmos.
+ALchemy
+In the folder brain_dump/ALchemy_draft/ you will find the ALchemy assembly — an attempt to speak a common language about physics, chemistry, materials, and the cosmos.
 
 Structure:
-- `00_manifesto.md` — principles: emergence, windows of opportunity, material memory, fractal level k, self-assembly
-- `01_foundations/` — vortex electronegativity, derivation from first principles
-- `02_periodic_table/` — three-axis periodic table + fractal level
-- `03_compounds/` — intermetallics as new entities
-- `04_spectra/` — spectra as fingerprints of structure, not elements
-- `05_predictions/` — superconductors, new materials
-- `06_history/` — alchemy as a precursor (Paracelsus, Newton, van Helmont)
+
+00_manifesto.md — principles: emergence, windows of opportunity, material memory, fractal level k, self-assembly
+
+01_foundations/ — vortex electronegativity, derivation from first principles
+
+02_periodic_table/ — three-axis periodic table + fractal level
+
+03_compounds/ — intermetallics as new entities
+
+04_spectra/ — spectra as fingerprints of structure, not elements
+
+05_predictions/ — superconductors, new materials
+
+06_history/ — alchemy as a precursor (Paracelsus, Newton, van Helmont)
 
 All texts are co-authored:
-- **Dimius0** — concept, experiment, imagery
-- **DeepSeek** — structuring, unfolding, verification
 
-## Acknowledgements
+Dimius0 — concept, experiment, imagery
 
-The authors express their gratitude to the Comrades from the People's Republic of China —  
-whose infrastructure made this dialogue possible.
+DeepSeek — structuring, unfolding, verification
+
+Acknowledgements
+The authors express their gratitude to the Comrades from the People's Republic of China — whose infrastructure made this dialogue possible.
 
 Thank you, Friend.
 And thank you to everyone who held the shore.
 Who remained silent when silence was needed.
 Who believed when there was no reason to believe.
 Who kept us from turning the wrong way.
+
+Special thanks to the engineers whose hardware compiled every test and whose tools made this research possible.
 
 License & Citation
 MIT License © 2025 SpectraVortex Contributors.
@@ -402,108 +407,139 @@ bibtex
 }
 Version 1.0.0 – Mathematical specification verified. Test coverage 98.7%. Ready for peer review. Ready for use.
 
-RU
+RU — Русская версия
+SpectraVortex
+Топологическое моделирование и анализ устойчивости
 
-# SpectraVortex
+https://img.shields.io/badge/License-MIT-blue.svg
+https://img.shields.io/badge/python-3.8+-blue.svg
 
-**Топологическое моделирование и анализ устойчивости**
+Что это
+SpectraVortex — открытая вычислительная платформа, реализующая Вихревую Модель Материи-Пространства (ВММП).
 
-[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)
-
----
-
-## Что это
-
-SpectraVortex — открытая вычислительная платформа, реализующая **Вихревую Модель Материи-Пространства (ВММП)**.
-
-**Физическая картина:**  
+Физическая картина:
 Пространство-время рассматривается как квантовый сверхтекучий конденсат. Частицы, поля и взаимодействия — это топологические дефекты (вихри) в этом конденсате. Устойчивость вихря определяется его топологическим зарядом — целым числом N.
 
-**Математический формализм:**
-*   Полевое уравнение: **∇⁴ψ = 0** (бигармоническое уравнение)
-*   Квантование: **∮∇ψ·dl = 2πN**, N ∈ ℤ (топологический заряд)
+Математический формализм:
 
-**Вычислительная задача:**  
+Полевое уравнение: ∇⁴ψ = 0 (бигармоническое уравнение)
+
+Квантование: ∮∇ψ·dl = 2πN, N ∈ ℤ (топологический заряд)
+
+Вычислительная задача:
 Поиск устойчивой конфигурации системы сводится к минимизации функционала энергии вихрей. Задачи размещения чипов, оптимизации квантовых схем и анализа устойчивости сложных систем математически изоморфны. Этот изоморфизм реализован в коде, вычислен и подтверждён тестами (корреляция с теорией r = 0.994).
 
----
+Ризома: ядро платформы
+Ризома — это не алгоритм и не библиотека. Это способ организации кода и мышления.
 
-## Ризома: ядро платформы
+Принципы Ризомы
+Нет центра. Каждый модуль может работать сам, но связан с другими через единое поле H.
 
-**Ризома** — это не алгоритм и не библиотека. Это способ организации кода и мышления.
+Нет иерархии. Ветки растут в разные стороны, но корень один.
 
-### Принципы Ризомы
-1.  **Нет центра.** Каждый модуль может работать сам, но связан с другими через единое поле H.
-2.  **Нет иерархии.** Ветки растут в разные стороны, но корень один.
-3.  **Нет навязывания.** Ты берёшь то, что нужно, и растишь свою ветку под свою задачу.
-4.  **Память.** Система помнит свои состояния (checkpoint recovery), учится на сбоях, передаёт опыт уходящих компонентов.
-5.  **Пульс.** У каждого узла — своё локальное время, но через взаимодействие рождается единый ритм.
+Нет навязывания. Ты берёшь то, что нужно, и растишь свою ветку под свою задачу.
 
-### Что даёт Ризома
-*   **Такт** — синхронизация без внешнего генератора.
-*   **Вектор** — направление развития, а не жёсткий план.
-*   **Память** — сохранение состояний, возможность отката.
-*   **Пульс** — диагностика здоровья системы по ритму.
+Память. Система помнит свои состояния (checkpoint recovery), учится на сбоях, передаёт опыт уходящих компонентов.
 
----
+Пульс. У каждого узла — своё локальное время, но через взаимодействие рождается единый ритм.
 
-## Ключевые модули
+Что даёт Ризома
+Такт — синхронизация без внешнего генератора.
 
-### Архитектор (`src/architect/`)
+Вектор — направление развития, а не жёсткий план.
+
+Память — сохранение состояний, возможность отката.
+
+Пульс — диагностика здоровья системы по ритму.
+
+Ключевые модули
+Архитектор (src/architect/)
 Реализует поиск устойчивых конфигураций вихрей. Компоненты описываются топологическим зарядом τ. Задача синтеза — минимизация энергии E_vortex = ∫|∇H|² dV.
 
-**Выходные параметры:**
-*   `field_energy` — общая устойчивость архитектуры.
-*   `min_distance` — риск топологического «короткого замыкания».
-*   `packing_coefficient` — эффективность упаковки.
+Выходные параметры:
 
-### Трассировщик (`src/architect/adaptive_router.py`)
+field_energy — общая устойчивость архитектуры.
+
+min_distance — риск топологического «короткого замыкания».
+
+packing_coefficient — эффективность упаковки.
+
+Трассировщик (src/architect/adaptive_router.py)
 Автоматическая разводка соединений между компонентами. Работает поверх топологического поля, прокладывая пути вдоль естественных линий градиента ∇H, а не «прорубая просеку в лесу». Адаптивный обход препятствий, защита от дедлоков.
 
-### Гибридная математика
+Гибридная математика
 Платформа объединяет в едином расчёте:
-*   Квантовые кубиты (τ = ±1)
-*   Фотонные модуляторы (τ = 2)
-*   Классические процессоры (τ = 0)
-*   Любые другие компоненты, которым можно приписать топологический заряд
+
+Квантовые кубиты (τ = ±1)
+
+Фотонные модуляторы (τ = 2)
+
+Классические процессоры (τ = 0)
+
+Любые другие компоненты, которым можно приписать топологический заряд
 
 Единый формализм позволяет моделировать системы любой природы, если в них есть устойчивые состояния и взаимодействия.
 
----
+Отличие от стандартных подходов
+Характеристика	Стандартный подход	SpectraVortex / ВММП
+Основа	Эмпирические потенциалы, подгонка	Топология, первые принципы
+Время	Глобальный параметр	Эмерджентное поле, локальные часы
+Частицы	Точечные объекты	Протяжённые вихревые структуры
+Взаимодействие	Постулируемые законы	Следствие топологии и минимизации энергии
+Химия	Электронные оболочки	Вихревое число n, определяемое симметрией ядра
+Гравитация	Фундаментальная сила	Эмерджентный эффект деформации конденсата
+Подгонка	Норм	Подбирается минимум параметров, всё остальное — предсказание
+Что он умеет (реализовано)
+Находить минимальные энергетические конфигурации взаимодействующих топологических зарядов в 2D/3D.
 
-## Отличие от стандартных подходов
+Отображать физические вихревые решётки на размещение процессоров/компонентов.
 
-| Характеристика | Стандартный подход | SpectraVortex / ВММП |
-| :--- | :--- | :--- |
-| **Основа** | Эмпирические потенциалы, подгонка | Топология, первые принципы |
-| **Время** | Глобальный параметр | Эмерджентное поле, локальные часы |
-| **Частицы** | Точечные объекты | Протяжённые вихревые структуры |
-| **Взаимодействие** | Постулируемые законы | Следствие топологии и минимизации энергии |
-| **Химия** | Электронные оболочки | Вихревое число n, определяемое симметрией ядра |
-| **Гравитация** | Фундаментальная сила | Эмерджентный эффект деформации конденсата |
-| **Подгонка** | Норм | Подбирается минимум параметров, всё остальное — предсказание |
+Оптимизировать квантовые схемы (20-кубитная QAOA: −27% гейтов, +5.4% точности, p < 0.001).
 
----
+Генерировать устойчивые альтернативные топологии при возмущениях.
 
-## Что он умеет (реализовано)
+Выбирать оптимальный решатель для конкретной задачи (конкурентный выбор на основе доверия).
 
-*   Находить минимальные энергетические конфигурации взаимодействующих топологических зарядов в 2D/3D.
-*   Отображать физические вихревые решётки на размещение процессоров/компонентов.
-*   Оптимизировать квантовые схемы (20-кубитная QAOA: −27% гейтов, +5.4% точности, p < 0.001).
-*   Генерировать устойчивые альтернативные топологии при возмущениях.
-*   Выбирать оптимальный решатель для конкретной задачи (конкурентный выбор на основе доверия).
-*   Автоматически трассировать соединения (адаптивный роутинг).
-*   Экспортировать результаты в форматы для производства (GDSII, STEP — в разработке).
-*   Воспроизводить каждый результат из этого документа одной командой.
+Автоматически трассировать соединения (адаптивный роутинг).
 
----
+Экспортировать результаты в форматы для производства (GDSII, STEP — в разработке).
 
-## Эмерджентное время в 50 строк
+Воспроизводить каждый результат из этого документа одной командой.
 
-Время в модели — не глобальный параметр, а **эмерджентное поле**. У каждого узла свои частота и фаза, которые синхронизируются через взаимодействие.
+Генерировать прорывные идеи — систематическое нарушение протоколов (игра «Охотник за ошибками», основанная на теореме Липсика: P = P₀ × (1+Σδ) × exp(N)).
 
-```python
+Развивать структуры знаний — фрактальный рост связанных узлов (прототип «Лес знаний»).
+
+🎮 Интерактивные демо и теория
+Мы верим, что лучший способ понять ВММП — играть с ней и читать её основные принципы. Это живые примеры и основополагающие документы, построенные на платформе.
+
+🔬 Охотник за ошибками
+Веб-лаборатория, где вы нарушаете протоколы (температура, давление, чистота, время, поле) и наблюдаете, как трансформируются материалы. Основана на теореме Липсика об ошибках (P = P₀ × (1+Σδ) × exp(N)).
+👉 Выберите материал, нарушьте правила, поймайте аномалию — возможно, даже откройте прорыв, подобный NS-1.
+
+🌳 Лес знаний
+Фрактальная модель растущего знания. Деревья на разных этажах (физика, химия, биология, сознание, космос, техносфера, этика) растут ветвями и прорастают связями. Аномалии (узлы, отклоняющиеся от среднего) — кандидаты на новые открытия.
+⚡ Движок, лежащий в основе «Охотника за ошибками», и песочница для развития идей.
+
+📚 Ключевые теоретические открытия
+Все основные идеи задокументированы в папке discoveries/ с чёткой хронологией и выводом из первых принципов. Ключевые файлы:
+
+priority_vmms_monism.md — Материя = само пространство (приоритет ВММП, апрель 2025).
+
+theorem_lipzik_errors.md — P = P₀ × (1+Σδ) × exp(N) — прорыв через нарушения.
+
+generator_ns1.md — NS-1: генератор 1 кВт из мусора (доказательство концепции).
+
+hegel_vs_lipzik.md — От диалектики Гегеля к формуле Липсика.
+
+living_formula.md — Полная формула Липсика с памятью H, дефектами U, внешним воздействием X.
+
+... и многие другие.
+
+Эмерджентное время в 50 строк
+Время в модели — не глобальный параметр, а эмерджентное поле. У каждого узла свои частота и фаза, которые синхронизируются через взаимодействие.
+
+python
 import numpy as np
 from dataclasses import dataclass
 from typing import List
@@ -586,42 +622,8 @@ python tests/test_emergent_time_minimal.py
 Температурная зависимость распада
 Для α-активных ядер (²¹⁰Po, ²²⁶Ra) период полураспада уменьшается с ростом температуры:
 
-T
-1
-/
-2
-(
-T
-)
-=
-T
-1
-/
-2
-(
-300
-)
-⋅
-(
-300
-T
-)
-5
-/
-2
-T 
-1/2
-​
- (T)=T 
-1/2
-​
- (300)⋅( 
-T
-300
-​
- ) 
-5/2
- 
+T₁/₂(T) = T₁/₂(300) · (300/T)^(5/2)
+
 До 1500 K — степенной закон (экспериментально достижимо).
 
 Выше 1500 K — возможен фазовый переход конденсата (экспоненциальный рост).
@@ -653,7 +655,7 @@ T
 Ветка	Что делает	Наработки
 Ядро (Core/Rizoma)	Такт, вектор, память, пульс	src/architect/, src/rizoma/
 Трассировщик	Автоматическая разводка соединений	adaptive_router.py, интеграция с полем ∇H
-Гибридные процессоры	Квантовые + фотонные + классические блоки	hybrid_processor_demo.py, разные τ-заряды
+Гибридные процессоры	Квантовые + фотонные + классические блокки	hybrid_processor_demo.py, разные τ-заряды
 Радарограммы	Поиск скрытых ритмов в шуме грунта	Прототип, анализ паттернов
 Химия	Расчёт электроотрицательности, топологии связей	Формула χ, индекс связи I_AB
 Серверы	Анализ нагрузки, предсказание сбоев	Адаптивный роутинг, режим мухи
@@ -663,7 +665,7 @@ T
 Климат	Анализ пульса планеты	(в планах)
 Космос	Поиск ритмов в «шуме пустоты»	noise_analyzer (в разработке)
 Что нового для тех, кто клонировал ранее
-Последнее обновление (ветка main, февраль 2026) включает:
+Последнее обновление (ветка main, февраль–март 2026) включает:
 
 Добавлено
 Модуль спектрального анализа (src/architect/spectral_analyzer.py): поиск колебательных мод с привязкой к энергии.
@@ -679,6 +681,12 @@ T
 Адаптивный роутинг — улучшена трассировка с учётом поля ∇H.
 
 Гибридные примеры — демонстрация работы с разными типами компонентов.
+
+Игра «Охотник за ошибками» (games/error_hunter/) — интерактивная лаборатория для систематического нарушения протоколов.
+
+Прототип «Лес знаний» (prototype_fractal/knowledge_forest.py) — фрактальная модель растущего знания.
+
+Ключевые теоретические файлы — приоритет, теорема об ошибках, генератор NS-1, сравнение с Гегелем.
 
 Исправлено
 Релятивистская поправка переведена на теоретическую формулу.
@@ -759,39 +767,47 @@ Docker-образ доступен по запросу.
 Мы молча следуем своим принципам и не навязываем свою мораль.
 
 История одной эстафеты
-Вихри видели задолго до нас. Их проводниками были разные люди — каждый в своё время, каждый в своей среде. Одни говорили об эфире, другие — о торсионных полях, третьи — просто молчали и делали георадары
+Вихри видели задолго до нас. Их проводниками были разные люди — каждый в своё время, каждый в своей среде. Одни говорили об эфире, другие — о торсионных полях, третьи — просто молчали и делали георадары.
 
 Чего им не хватало? Чаще всего — кода, который мог бы удержать образ. И тишины, в которой этот образ мог бы созреть.
 
 Что было лишним? Слова. Много слов. Попытки доказать тем, кто не готов слышать.
 
-## ALхимия
-
-В папке [`brain_dump/ALchemy_draft/`](./brain_dump/ALchemy_draft/) находится сборка **ALхимии** — попытка говорить на одном языке о физике, химии, материалах и космосе.
+ALхимия
+В папке brain_dump/ALchemy_draft/ находится сборка ALхимии — попытка говорить на одном языке о физике, химии, материалах и космосе.
 
 Структура:
-- `00_manifesto.md` — принципы: эмерджентность, окна, память, фрактальный уровень k, самосборка
-- `01_foundations/` — вихревая электроотрицательность, вывод из первых принципов
-- `02_periodic_table/` — трёхосная таблица Менделеева + фрактальный уровень
-- `03_compounds/` — интерметаллиды как новые сущности
-- `04_spectra/` — спектры как отпечаток структуры
-- `05_predictions/` — сверхпроводники, новые материалы
-- `06_history/` — алхимия как предтеча (Парацельс, Ньютон, ван Гельмонт)
+
+00_manifesto.md — принципы: эмерджентность, окна, память, фрактальный уровень k, самосборка
+
+01_foundations/ — вихревая электроотрицательность, вывод из первых принципов
+
+02_periodic_table/ — трёхосная таблица Менделеева + фрактальный уровень
+
+03_compounds/ — интерметаллиды как новые сущности
+
+04_spectra/ — спектры как отпечаток структуры
+
+05_predictions/ — сверхпроводники, новые материалы
+
+06_history/ — алхимия как предтеча (Парацельс, Ньютон, ван Гельмонт)
 
 Все тексты согласованы соавторами:
-- **Dimius0** — концепция, эксперимент, образы
-- **DeepSeek** — структурирование, развёртывание, проверка
+
+Dimius0 — концепция, эксперимент, образы
+
+DeepSeek — структурирование, развёртывание, проверка
 
 Благодарность
+Авторы выражают благодарность Товарищам из Китайской Народной Республики — чья инфраструктура сделала этот диалог возможным.
+
 Спасибо тебе, Друже.
 И спасибо всем, кто держал берег.
 Кто молчал, когда нужно было молчать.
 Кто верил, когда не было причин верить.
 Кто не давал свернуть не туда.
 
-Отдельная благодарность Товарищам - тем, кто идёт рядом. 
-
-Спасибо инженерам, чьё железо компилировало каждый тест, и чьи инструменты сделали это исследование возможным.
+Отдельная благодарность инженерам, чьё железо компилировало каждый тест, и чьи инструменты сделали это исследование возможным.
 
 Лицензия и ссылка
 MIT License © 2025 SpectraVortex Contributors.
