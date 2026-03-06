@@ -1,2 +1,0 @@
-﻿# -*- coding: utf-8 -*-
-print("🧪 роверка модуля");import sys,os;if not os.path.exists("emergent_time"):print("❌ emergent_time/ не найден");exit(1);print("✅ emergent_time/ найден");sys.path.insert(0,"emergent_time");try:from emergent_time.integration.spectravortex_solver import EmergentTimeSolver;print("✅ EmergentTimeSolver импортирован");solver=EmergentTimeSolver();print(f"✅ Solver: {solver.name}");print("🎉 Ь ТТ!");except Exception as e:print(f"❌ шибка: {e}")
