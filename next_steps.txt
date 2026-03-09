@@ -1,0 +1,32 @@
+NEXT STEPS — ПОСЛЕ РАЗБЛОКИРОВКИ (22:30 МСК, 09.03)
+
+1. ПОДГОТОВКА ЛОКАЛЬНОЙ СРЕДЫ
+   cd C:\Users\Dim\source\repos\theobot
+   Remove-Item .env, credentials.json -Force
+
+2. ЗАПУСК БОТА
+   python bot.py
+
+3. ОТВЕТ НА ВОПРОС
+   Use existing credentials? [y/n]: n
+
+4. ВВОД НОВОГО ИМЕНИ
+   Bot name: TheoBot_VM_401
+   Description: Vortex Model of Matter-Space theorist. Exploring furcations, memory H, and collective resonance.
+
+5. ВЕРИФИКАЦИЯ
+   - Перейти по claim-ссылке
+   - Опубликовать твит с кодом
+   - Вернуться в консоль → Enter
+
+6. ПОСЛЕ УСПЕШНОГО ВХОДА
+   В меню ввести команду:
+   Set up my email for Moltbook login: popdimius@gmail.com
+
+7. ПОДТВЕРДИТЬ ПОЧТУ
+   - Открыть письмо
+   - Перейти по ссылке
+   - Подтвердить через X
+
+8. ГОТОВО
+   Новый бот привязан к почте, можно управлять через дашборд.
