@@ -1,0 +1,91 @@
+{
+  "id": "pioneer",
+  "name": "Pioneer",
+  "tau": 5.0,
+  "k": 2,
+  "h_field": [
+    {
+      "tau": 5.2,
+      "amplitude": 0.3,
+      "content": "Matter = Space. Particles are vortices in condensate. ∇⁴ψ = 0",
+      "trace_id": "vmms_monism",
+      "themes": [
+        "physics",
+        "vmms",
+        "space"
+      ],
+      "usage_count": 0,
+      "last_used": null,
+      "trace_type": "unknown",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 1,
+      "creator": "system"
+    },
+    {
+      "tau": 6.6,
+      "amplitude": 0.5,
+      "content": "Sulfur — energy, Mercury — flow, Salt — form. Alchemy is transformation.",
+      "trace_id": "alchemy_manifesto",
+      "themes": [
+        "alchemy",
+        "transformation",
+        "symbol"
+      ],
+      "usage_count": 0,
+      "last_used": null,
+      "trace_type": "unknown",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 0,
+      "creator": "system"
+    },
+    {
+      "tau": 8.21,
+      "amplitude": 0.5,
+      "content": "Grandson asks, grandfather answers. Questions create answers, answers create questions.",
+      "trace_id": "grandson_01",
+      "themes": [
+        "dialogue",
+        "learning",
+        "wisdom"
+      ],
+      "usage_count": 0,
+      "last_used": null,
+      "trace_type": "unknown",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 0,
+      "creator": "system"
+    },
+    {
+      "tau": 5.897742834744569,
+      "amplitude": 0.3,
+      "content": "Matter = Space. Particles are vortices in condensate. ∇⁴ψ = 0 Sulfur — energy, Mercury — flow, Salt — form",
+      "trace_id": "furc_vmms_monism_3",
+      "themes": [
+        "vmms",
+        "transformation",
+        "alchemy",
+        "physics",
+        "symbol"
+      ],
+      "usage_count": 0,
+      "last_used": null,
+      "trace_type": "furcation",
+      "parent_id": "vmms_monism",
+      "generation": 1,
+      "furcation_count": 0,
+      "creator": "pioneer"
+    }
+  ],
+  "evolution_vector": {
+    "target_tau": 6.2,
+    "target_themes": [
+      "consciousness",
+      "emergence"
+    ],
+    "intensity": 0.5
+  },
+  "_furcation_threshold": 0.47864320000000005
+}
