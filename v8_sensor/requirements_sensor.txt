@@ -1,8 +1,11 @@
 numpy>=1.24.0
 
-# Для голосового ввода (опционально):
-openai-whisper
+# Семантический анализ
+sentence-transformers
 torch
-torchaudio
-# pyaudio  # для записи с микрофона
-# ffmpeg-python  # для работы с аудио
+
+# Голосовой ввод
+openai-whisper
+# pyaudio  # для микрофона, требуется отдельная установка
+
+# Для mesh-сети (стандартная библиотека)
