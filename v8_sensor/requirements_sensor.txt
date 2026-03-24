@@ -1,0 +1,8 @@
+numpy>=1.24.0
+
+# Для голосового ввода (опционально):
+openai-whisper
+torch
+torchaudio
+# pyaudio  # для записи с микрофона
+# ffmpeg-python  # для работы с аудио
