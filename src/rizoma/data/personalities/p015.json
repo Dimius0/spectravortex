@@ -1,0 +1,53 @@
+{
+  "id": "p015",
+  "name": "Резонансный",
+  "tau": 7.2,
+  "k": 3,
+  "n": 11.0,
+  "defects": [],
+  "rhythm": 1.0515647787130777,
+  "entities": {
+    "default": {
+      "entity_id": "default",
+      "name": "Резонансный_основной",
+      "tau": 5.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.0,
+      "active": false,
+      "last_active": "2026-03-18T21:46:31.794606"
+    },
+    "entity_1": {
+      "entity_id": "entity_1",
+      "name": "Сантехник",
+      "tau": 4.3,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9272990947059357,
+      "active": false,
+      "last_active": "2026-03-18T21:46:31.816610"
+    },
+    "entity_2": {
+      "entity_id": "entity_2",
+      "name": "Философ",
+      "tau": 7.2,
+      "k": 3,
+      "defects": [],
+      "rhythm": 1.0515647787130777,
+      "active": true,
+      "last_active": "2026-03-18T21:46:31.816610"
+    }
+  },
+  "active_entity": "entity_2",
+  "inner_dialogue": [],
+  "memory": {
+    "owner_id": "p015",
+    "core_traces": [],
+    "branches": {},
+    "public_branch": {
+      "branch_id": "public",
+      "traces": []
+    }
+  },
+  "relations": {}
+}

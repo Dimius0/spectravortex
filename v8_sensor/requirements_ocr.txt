@@ -1,0 +1,28 @@
+# Основные зависимости
+numpy>=1.24.0
+
+# Семантический анализ
+sentence-transformers
+torch
+
+# Голосовой ввод
+openai-whisper
+# pyaudio  # для микрофона, требуется отдельная установка
+
+# Для OCR (распознавание текста из масштабированных PDF)
+pytesseract
+pdf2image
+
+# Для работы с PDF
+pdfplumber
+PyPDF2
+
+# Для HTML
+beautifulsoup4
+
+# Для DOC (упрощённо)
+olefile
+
+# Для аудио
+openai-whisper
+# ffmpeg должен быть установлен отдельно

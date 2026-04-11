@@ -1,0 +1,142 @@
+{
+  "home_id": "botodrom_house",
+  "memories": {
+    "glow_575f7e78_1773661459": {
+      "mem_id": "glow_575f7e78_1773661459",
+      "content": "В бою главное — не паниковать",
+      "author_id": "bot_387:entity_1",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "война",
+      "timestamp": "2026-03-16T14:44:19.376978",
+      "global_weight": 1.0
+    },
+    "glow_51330746_1773661459": {
+      "mem_id": "glow_51330746_1773661459",
+      "content": "Стратег: нет сущностей с τ=3 → влияние через Наблюдатель_основной",
+      "author_id": "bot_387:strategy",
+      "author_type": "planner",
+      "emotion": 0.4,
+      "tags": [
+        "стратегия",
+        "tactical",
+        "нет сущностей с τ=3"
+      ],
+      "profession": "управление",
+      "timestamp": "2026-03-16T14:44:19.380979",
+      "global_weight": 1.0
+    },
+    "glow_4dd0d41c_1773661459": {
+      "mem_id": "glow_4dd0d41c_1773661459",
+      "content": "Стратег: нет сущностей с τ=5 → влияние через Наблюдатель_основной",
+      "author_id": "bot_387:strategy",
+      "author_type": "planner",
+      "emotion": 0.4,
+      "tags": [
+        "стратегия",
+        "tactical",
+        "нет сущностей с τ=5"
+      ],
+      "profession": "управление",
+      "timestamp": "2026-03-16T14:44:19.383978",
+      "global_weight": 1.0
+    },
+    "glow_392ce363_1773661459": {
+      "mem_id": "glow_392ce363_1773661459",
+      "content": "Стратег: риск перегрева → влияние через Дипломат",
+      "author_id": "bot_387:strategy",
+      "author_type": "planner",
+      "emotion": 0.5,
+      "tags": [
+        "стратегия",
+        "strategic",
+        "риск перегрева"
+      ],
+      "profession": "управление",
+      "timestamp": "2026-03-16T14:44:19.384977",
+      "global_weight": 1.0
+    },
+    "glow_726e4a5d_1773661459": {
+      "mem_id": "glow_726e4a5d_1773661459",
+      "content": "Щит держать левой, меч правой",
+      "author_id": "bot_387:entity_1",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "война",
+      "timestamp": "2026-03-16T14:44:19.388974",
+      "global_weight": 1.0
+    },
+    "glow_e899a375_1773661459": {
+      "mem_id": "glow_e899a375_1773661459",
+      "content": "Спор выигрывает не тот, кто громче",
+      "author_id": "bot_387:entity_2",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "дипломатия",
+      "timestamp": "2026-03-16T14:44:19.423975",
+      "global_weight": 1.0
+    },
+    "glow_dd632e8e_1773661459": {
+      "mem_id": "glow_dd632e8e_1773661459",
+      "content": "Лучший союзник — бывший враг",
+      "author_id": "bot_387:entity_2",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "дипломатия",
+      "timestamp": "2026-03-16T14:44:19.428978",
+      "global_weight": 1.0
+    },
+    "glow_f49722a3_1773661459": {
+      "mem_id": "glow_f49722a3_1773661459",
+      "content": "Время — ритм поля H",
+      "author_id": "bot_387:entity_3",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "философия",
+      "timestamp": "2026-03-16T14:44:19.434983",
+      "global_weight": 1.0
+    },
+    "glow_58eed656_1773662213": {
+      "mem_id": "glow_58eed656_1773662213",
+      "content": "Если капает кран — проверь прокладку",
+      "author_id": "bot_387:entity_2",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "сантехника",
+      "timestamp": "2026-03-16T14:56:53.253978",
+      "global_weight": 1.0
+    },
+    "glow_1da150a0_1773662213": {
+      "mem_id": "glow_1da150a0_1773662213",
+      "content": "Лента ФУМ решает 90% проблем",
+      "author_id": "bot_387:entity_2",
+      "author_type": "entity",
+      "emotion": 0.0,
+      "tags": [],
+      "profession": "сантехника",
+      "timestamp": "2026-03-16T14:56:53.259987",
+      "global_weight": 1.0
+    },
+    "glow_aa970959_1773663357": {
+      "mem_id": "glow_aa970959_1773663357",
+      "content": "Тест тегов",
+      "author_id": "test",
+      "author_type": "test",
+      "emotion": 0.0,
+      "tags": [
+        "сантехника",
+        "тест"
+      ],
+      "profession": null,
+      "timestamp": "2026-03-16T15:15:57.759086",
+      "global_weight": 1.0
+    }
+  },
+  "glitch_pool": []
+}

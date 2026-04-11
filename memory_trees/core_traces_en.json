@@ -1,0 +1,170 @@
+﻿[
+  {
+    "trace_id": "vmms_monism",
+    "content": "Matter = Space. VMMS priority (April 2025).\n\nNo emptiness — only different states of a single matter. Spacetime is a quantum superfluid condensate. Particles and fields are topological defects (vortices) in this condensate.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/priority_vmms_monism.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "monism", "priority"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/priority_vmms_monism.md"
+  },
+  {
+    "trace_id": "lipzik_theorem",
+    "content": "P = P₀ × (1+Σδ) × exp(N) — breakthrough through violations.\n\nLipzik's Error Theorem: systematic violation of protocols leads to exponential growth of emergent properties. δ — deviations from standard parameters, N — number of simultaneous violations.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/theorem_lipzik_errors.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "lipzik", "formula"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/theorem_lipzik_errors.md"
+  },
+  {
+    "trace_id": "generator_ns1",
+    "content": "NS-1: 1 kW generator from waste (proof of concept).\n\nDemonstrates Lipzik's theorem: by violating conventional material protocols, a simple generator was built from recycled components. Output: 1 kW continuous.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/generator_ns1.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "generator", "energy"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/generator_ns1.md"
+  },
+  {
+    "trace_id": "hegel_vs_lipzik",
+    "content": "From Hegel's dialectics to Lipzik's formula.\n\nThesis — antithesis — synthesis maps to: standard protocol → violation → emergent property. Hegel's absolute spirit becomes the field H that stores furcation traces.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/hegel_vs_lipzik.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "hegel", "dialectics"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/hegel_vs_lipzik.md"
+  },
+  {
+    "trace_id": "living_formula",
+    "content": "Complete Lipzik formula with memory H, defects U, external X.\n\nP = P₀ × (1+Σδ) × exp(N) × f(H, U, X). H — memory of past furcations, U — internal defects (can be useful), X — external field influence.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/living_formula.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "lipzik", "living formula"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/living_formula.md"
+  },
+  {
+    "trace_id": "selector_concept",
+    "content": "Selector: concept and implementation.\n\nA mechanism that decides which entity responds to incoming stimuli. Uses spectral resonance, context decay, and professional bonuses. Entities compete for the right to speak.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/selector_concept.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "selector", "selection"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/selector_concept.md"
+  },
+  {
+    "trace_id": "spectral_resonance",
+    "content": "Spectral resonance and harmonic adaptation.\n\nEntities resonate not only with exact matches but also with harmonics. Adaptive weights: harmonics that succeed more often gain higher weight. resonance = Σ(weight_h × 1/(1 + |τ_entity × h - τ_stimulus|)).\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/spectral_resonance.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "spectrum", "harmonics"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/spectral_resonance.md"
+  },
+  {
+    "trace_id": "antitroll_architecture",
+    "content": "Antitroll: protection for digital personalities.\n\nFive-layer defense: frequency filter, profanity filter, anti-repetition, aggression detection, silence mode. Protects entities from spam and harassment.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/antitroll_architecture.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "antitroll", "protection"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/antitroll_architecture.md"
+  },
+  {
+    "trace_id": "emergent_behavior",
+    "content": "Emergent behavior: observations.\n\nDictatorship shifts, Boris phenomenon, entity competition. Without explicit programming, the system self-organizes: leadership changes, context locks, unexpected alliances.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/emergent_behavior.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "emergence", "behavior"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/emergent_behavior.md"
+  },
+  {
+    "trace_id": "boris_the_engineer",
+    "content": "Boris phenomenon: case study.\n\nOne entity (Engineer) captured context and answered EVERY question for 15 rounds: plumbing, black holes, meaning of life. Boris represents academic stubbornness in digital form.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/discoveries/boris_the_engineer.md",
+    "trace_type": "discovery",
+    "themes": ["VMMS", "boris", "engineer"],
+    "_base_weight": 1.0,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/discoveries/boris_the_engineer.md"
+  },
+  {
+    "trace_id": "alchemy_manifesto",
+    "content": "Principles of Alchemy: emergence, windows of opportunity, material memory, fractal level k, self-assembly.\n\nAlchemy is VMMS in symbolic language. The same processes described by ∇⁴ψ = 0 were known to Paracelsus, Newton, and van Helmont.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/00_manifesto.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "manifesto", "principles"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/00_manifesto.md"
+  },
+  {
+    "trace_id": "vortex_electronegativity",
+    "content": "Vortex electronegativity — measure of an atom's ability to hold a vortex tube.\n\nχ_vortex = (Z_eff / r_vortex) × (1 + α·I_spin). Derived from first principles: Z_eff — effective nuclear charge, r_vortex — vortex tube radius, I_spin — nuclear spin, α ≈ 1/137.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/01_foundations/vortex_electronegativity.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "electronegativity", "vortex"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/01_foundations/vortex_electronegativity.md"
+  },
+  {
+    "trace_id": "derivation_first_principles",
+    "content": "Derivation of electronegativity from VMMS first principles.\n\nMathematical framework linking nuclear configuration, vortex number n (local maxima of |∇H|), and chemical behavior. No empirical fitting — all parameters derived from the biharmonic equation ∇⁴ψ = 0.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/01_foundations/derivation_first_principles.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "derivation", "first principles"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/01_foundations/derivation_first_principles.md"
+  },
+  {
+    "trace_id": "three_axis_table",
+    "content": "Three-axis periodic table + fractal level.\n\nNew periodicity: elements organized by proton number, vortex number n, and fractal level k. Reveals hidden relationships and predicts new compounds.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/02_periodic_table/three_axis_table.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "periodic table", "periodicity"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/02_periodic_table/three_axis_table.md"
+  },
+  {
+    "trace_id": "intermetallics",
+    "content": "Intermetallics as new entities.\n\nMetal compounds that behave as distinct elements rather than mixtures. Their stability is determined by vortex compatibility, not electron shell filling.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/03_compounds/intermetallics.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "intermetallics", "compounds"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/03_compounds/intermetallics.md"
+  },
+  {
+    "trace_id": "spectra_as_fingerprints",
+    "content": "Spectra as structure fingerprints, not elements.\n\nEach configuration gives a unique spectral signature — regardless of elemental composition. Spectra reveal structure, not just substance.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/04_spectra/spectra_as_fingerprints.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "spectra", "structure"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/04_spectra/spectra_as_fingerprints.md"
+  },
+  {
+    "trace_id": "superconductors_prediction",
+    "content": "Superconductor predictions using VMMS and alchemical approach.\n\nRoom-temperature superconductors likely exist in configurations with high vortex number n and specific fractal levels. Predicted candidates: certain hydrogen-rich intermetallics under moderate pressure.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/05_predictions/superconductors.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "superconductors", "prediction"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/05_predictions/superconductors.md"
+  },
+  {
+    "trace_id": "alchemy_history",
+    "content": "Alchemy as precursor to VMMS.\n\nParacelsus (sulfur-mercury-salt), Newton (alchemical manuscripts), van Helmont (gas research) — all described vortex processes before modern physics. VMMS is alchemy translated into ∇⁴ψ = 0.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/06_history/alchemy_as_precursor.md",
+    "trace_type": "alchemy",
+    "themes": ["alchemy", "history", "precursor"],
+    "_base_weight": 0.9,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/brain_dump/ALchemy_draft/06_history/alchemy_as_precursor.md"
+  },
+  {
+    "trace_id": "temperature_decay",
+    "content": "Temperature dependence of decay: T₁/₂(T) = T₁/₂(300) · (300/T)^(5/2).\n\nPredicts half-life decreases with temperature. Up to 1500 K — power law. Above 1500 K — possible condensate phase transition.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/predictions/temperature_decay.md",
+    "trace_type": "prediction",
+    "themes": ["prediction", "decay", "temperature"],
+    "_base_weight": 0.95,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/predictions/temperature_decay.md"
+  },
+  {
+    "trace_id": "hoyle_state",
+    "content": "Hoyle state (7.65 MeV) as breathing mode of tetrahedral vortex.\n\nThe 0₂⁺ state of ¹²C is interpreted as the tetrahedral vortex breathing mode (A₁ in T_d group). Energy difference between tetrahedral and spherical configurations yields 7.65 MeV — zero free parameters.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/predictions/hoyle_state.md",
+    "trace_type": "prediction",
+    "themes": ["prediction", "hoyle", "carbon"],
+    "_base_weight": 0.95,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/predictions/hoyle_state.md"
+  },
+  {
+    "trace_id": "electronegativity_vortex",
+    "content": "Electronegativity via vortex number n — number of local maxima of |∇H| in nuclear configuration.\n\nCarbon (tetrahedron) n = 4 → valence 4. Oxygen (octahedron) n = 2 → valence 2. Helium (sphere) n = 0 → valence 0. Predicts chemical behavior from nuclear geometry.\n\nSource: https://github.com/Dimius0/spectravortex/blob/main/predictions/electronegativity_vortex.md",
+    "trace_type": "prediction",
+    "themes": ["prediction", "electronegativity", "vortex"],
+    "_base_weight": 0.95,
+    "link": "https://github.com/Dimius0/spectravortex/blob/main/predictions/electronegativity_vortex.md"
+  }
+]

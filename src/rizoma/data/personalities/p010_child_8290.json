@@ -1,0 +1,53 @@
+{
+  "id": "p010_child_8290",
+  "name": "??????????????_младший",
+  "tau": 5.02807143194047,
+  "k": 1,
+  "n": 5.02807143194047,
+  "defects": [],
+  "rhythm": 0.9739469874017344,
+  "entities": {
+    "default": {
+      "entity_id": "default",
+      "name": "??????????????_младший_основной",
+      "tau": 5.02807143194047,
+      "k": 1,
+      "defects": [],
+      "rhythm": 0.9739469874017344,
+      "active": true,
+      "last_active": null
+    },
+    "entity_1": {
+      "entity_id": "entity_1",
+      "name": "Юный философ",
+      "tau": 6.8,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9311104923303035,
+      "active": false,
+      "last_active": null
+    },
+    "entity_2": {
+      "entity_id": "entity_2",
+      "name": "Маленький воин",
+      "tau": 7.5,
+      "k": 1,
+      "defects": [],
+      "rhythm": 0.9359474235494727,
+      "active": false,
+      "last_active": null
+    }
+  },
+  "active_entity": "default",
+  "inner_dialogue": [],
+  "memory": {
+    "owner_id": "p010_child_8290",
+    "core_traces": [],
+    "branches": {},
+    "public_branch": {
+      "branch_id": "public",
+      "traces": []
+    }
+  },
+  "relations": {}
+}

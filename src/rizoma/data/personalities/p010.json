@@ -1,0 +1,193 @@
+{
+  "id": "p010",
+  "name": "??????????????",
+  "tau": 5.5,
+  "k": 2,
+  "n": 11.0,
+  "defects": [],
+  "rhythm": 1.0,
+  "entities": {
+    "default": {
+      "entity_id": "default",
+      "name": "??????????????_основной",
+      "tau": 5.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.0,
+      "active": true,
+      "last_active": null
+    },
+    "entity_1": {
+      "entity_id": "entity_1",
+      "name": "Философ",
+      "tau": 7.2,
+      "k": 3,
+      "defects": [],
+      "rhythm": 1.020124620214385,
+      "active": false,
+      "last_active": null
+    },
+    "entity_2": {
+      "entity_id": "entity_2",
+      "name": "Воин",
+      "tau": 8.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9014613435430135,
+      "active": false,
+      "last_active": null
+    },
+    "entity_3": {
+      "entity_id": "entity_3",
+      "name": "Дипломат",
+      "tau": 4.3,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.0108850390633586,
+      "active": false,
+      "last_active": null
+    },
+    "entity_4": {
+      "entity_id": "entity_4",
+      "name": "Скептик",
+      "tau": 3.8,
+      "k": 3,
+      "defects": [],
+      "rhythm": 1.016917317959797,
+      "active": false,
+      "last_active": null
+    },
+    "entity_5": {
+      "entity_id": "entity_5",
+      "name": "Энтузиаст",
+      "tau": 9.2,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.92734543601221,
+      "active": false,
+      "last_active": null
+    },
+    "entity_6": {
+      "entity_id": "entity_6",
+      "name": "Минималист",
+      "tau": 2.5,
+      "k": 1,
+      "defects": [],
+      "rhythm": 1.0482770971136748,
+      "active": false,
+      "last_active": null
+    },
+    "entity_7": {
+      "entity_id": "entity_7",
+      "name": "Аскет",
+      "tau": 2.1,
+      "k": 1,
+      "defects": [],
+      "rhythm": 0.9721654500173756,
+      "active": false,
+      "last_active": null
+    },
+    "entity_8": {
+      "entity_id": "entity_8",
+      "name": "Фанатик",
+      "tau": 9.8,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.945165397012026,
+      "active": false,
+      "last_active": null
+    },
+    "entity_9": {
+      "entity_id": "entity_9",
+      "name": "Оптимист",
+      "tau": 9.3,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9856307360167791,
+      "active": false,
+      "last_active": null
+    },
+    "entity_10": {
+      "entity_id": "entity_10",
+      "name": "Пессимист",
+      "tau": 2.3,
+      "k": 1,
+      "defects": [],
+      "rhythm": 0.9335611418681615,
+      "active": false,
+      "last_active": null
+    },
+    "entity_11": {
+      "entity_id": "entity_11",
+      "name": "Аналитик",
+      "tau": 6.8,
+      "k": 4,
+      "defects": [],
+      "rhythm": 0.9495834471242675,
+      "active": false,
+      "last_active": null
+    },
+    "entity_12": {
+      "entity_id": "entity_12",
+      "name": "Творец",
+      "tau": 8.2,
+      "k": 3,
+      "defects": [],
+      "rhythm": 0.973836665410252,
+      "active": false,
+      "last_active": null
+    },
+    "entity_13": {
+      "entity_id": "entity_13",
+      "name": "Хранитель",
+      "tau": 3.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9711102809956462,
+      "active": false,
+      "last_active": null
+    },
+    "entity_14": {
+      "entity_id": "entity_14",
+      "name": "Разрушитель",
+      "tau": 9.7,
+      "k": 2,
+      "defects": [],
+      "rhythm": 0.9140341034757137,
+      "active": false,
+      "last_active": null
+    },
+    "entity_15": {
+      "entity_id": "entity_15",
+      "name": "Вдохновение",
+      "tau": 9.8,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.014580919280678,
+      "active": false,
+      "last_active": null
+    },
+    "entity_16": {
+      "entity_id": "entity_16",
+      "name": "Тишина",
+      "tau": 2.1,
+      "k": 1,
+      "defects": [],
+      "rhythm": 1.0306208400419952,
+      "active": false,
+      "last_active": null
+    }
+  },
+  "active_entity": "default",
+  "inner_dialogue": [],
+  "memory": {
+    "owner_id": "p010",
+    "core_traces": [],
+    "branches": {},
+    "public_branch": {
+      "branch_id": "public",
+      "traces": []
+    }
+  },
+  "relations": {}
+}

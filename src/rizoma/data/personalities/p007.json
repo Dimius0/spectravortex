@@ -1,0 +1,178 @@
+{
+  "id": "p007",
+  "name": "?????????",
+  "tau": 4.3,
+  "k": 3,
+  "n": 11.0,
+  "defects": [],
+  "rhythm": 0.9277634814542155,
+  "entities": {
+    "default": {
+      "entity_id": "default",
+      "name": "?????????_основной",
+      "tau": 5.5,
+      "k": 2,
+      "defects": [
+        {
+          "name": "???????????",
+          "vector": 0.7,
+          "strength": 0.8,
+          "contexts": []
+        }
+      ],
+      "rhythm": 1.0,
+      "active": false,
+      "last_active": "2026-03-15T18:43:17.316359",
+      "memory_keys": []
+    },
+    "entity_1": {
+      "entity_id": "entity_1",
+      "name": "Философ",
+      "tau": 7.2,
+      "k": 3,
+      "defects": [],
+      "rhythm": 0.930643146232747,
+      "active": false,
+      "last_active": "2026-03-15T18:47:17.460362",
+      "memory_keys": []
+    },
+    "entity_2": {
+      "entity_id": "entity_2",
+      "name": "Воин",
+      "tau": 8.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.0604612111128522,
+      "active": false,
+      "last_active": "2026-03-15T18:47:17.530364",
+      "memory_keys": []
+    },
+    "entity_3": {
+      "entity_id": "entity_3",
+      "name": "Дипломат",
+      "tau": 4.3,
+      "k": 3,
+      "defects": [],
+      "rhythm": 0.9277634814542155,
+      "active": true,
+      "last_active": "2026-03-15T18:47:17.530364",
+      "memory_keys": []
+    }
+  },
+  "active_entity": "entity_3",
+  "inner_dialogue": [
+    {
+      "timestamp": "2026-03-15T18:41:10.931713",
+      "from": "default",
+      "message": "Что думаете о ситуации?",
+      "to": "all"
+    },
+    {
+      "timestamp": "2026-03-15T18:41:10.931713",
+      "from": "entity_3",
+      "message": "Дипломат: ... (услышал)",
+      "to": "default"
+    },
+    {
+      "timestamp": "2026-03-15T18:43:20.396661",
+      "from": "entity_3",
+      "message": "А теперь что скажете?",
+      "to": "all"
+    },
+    {
+      "timestamp": "2026-03-15T18:44:33.343321",
+      "from": "entity_3",
+      "message": "Есть тут кто живой?",
+      "to": "all"
+    },
+    {
+      "timestamp": "2026-03-15T18:44:33.343321",
+      "from": "default",
+      "message": "?????????_основной: ... (услышал)",
+      "to": "entity_3"
+    },
+    {
+      "timestamp": "2026-03-15T18:44:36.416758",
+      "from": "entity_3",
+      "message": "Философ, ты чего молчишь?",
+      "to": "all"
+    },
+    {
+      "timestamp": "2026-03-15T18:44:36.416758",
+      "from": "default",
+      "message": "?????????_основной: ... (услышал)",
+      "to": "entity_3"
+    }
+  ],
+  "memory": {
+    "owner_id": "p007",
+    "core_traces": [
+      {
+        "trace_id": "trace_cb25d241",
+        "content": "Размышлял о смысле бытия",
+        "trace_type": "мысль",
+        "glyph": "",
+        "emotion": 0.8,
+        "_base_weight": 0.5,
+        "depth": 0,
+        "timestamp": null,
+        "themes": [],
+        "people": [],
+        "access": "private",
+        "shadow": false,
+        "access_count": 0,
+        "last_accessed": null,
+        "connections": [],
+        "entities": [
+          "entity_1"
+        ]
+      },
+      {
+        "trace_id": "trace_d69755c9",
+        "content": "Тренировал реакцию",
+        "trace_type": "действие",
+        "glyph": "",
+        "emotion": 0.9,
+        "_base_weight": 0.5,
+        "depth": 0,
+        "timestamp": null,
+        "themes": [],
+        "people": [],
+        "access": "private",
+        "shadow": false,
+        "access_count": 0,
+        "last_accessed": null,
+        "connections": [],
+        "entities": [
+          "entity_2"
+        ]
+      },
+      {
+        "trace_id": "trace_63631945",
+        "content": "Вёл переговоры с пользователем",
+        "trace_type": "диалог",
+        "glyph": "",
+        "emotion": 0.7,
+        "_base_weight": 0.5,
+        "depth": 0,
+        "timestamp": null,
+        "themes": [],
+        "people": [],
+        "access": "private",
+        "shadow": false,
+        "access_count": 0,
+        "last_accessed": null,
+        "connections": [],
+        "entities": [
+          "entity_3"
+        ]
+      }
+    ],
+    "branches": {},
+    "public_branch": {
+      "branch_id": "public",
+      "traces": []
+    }
+  },
+  "relations": {}
+}

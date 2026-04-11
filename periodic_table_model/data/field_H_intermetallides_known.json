@@ -1,0 +1,361 @@
+{
+  "metadata": {
+    "description": "Известные интерметаллиды в формате связей поля H",
+    "format": "spectravortex.AdaptiveRouter compatible",
+    "total_compounds": 15,
+    "source": "Pauling File + AFLOW + эксперимент"
+  },
+  "bonds": [
+    {
+      "bond_id": "FeAl_B2",
+      "formula": "FeAl",
+      "elements": ["Fe", "Al"],
+      "stoichiometry": [1, 1],
+      "crystal_structure": "B2",
+      "symmetry_compatibility": 0.92,
+      "frequency_ratio": 1.052,
+      "frequency_resonance": 0.95,
+      "formation_enthalpy_kJ_mol": -50.0,
+      "melting_point_K": 1523,
+      "lattice_constant_A": 2.895,
+      "synthesis_conditions": {
+        "T_opt_K": 1473,
+        "P_opt_GPa": 0.1,
+        "time_h": 2.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.52,
+        "equilibrium_distance_fm": 2.5,
+        "gradient_threshold": 0.12
+      }
+    },
+    {
+      "bond_id": "Ni3Al_L12",
+      "formula": "Ni3Al",
+      "elements": ["Ni", "Al"],
+      "stoichiometry": [3, 1],
+      "crystal_structure": "L12",
+      "symmetry_compatibility": 0.88,
+      "frequency_ratio": 1.030,
+      "frequency_resonance": 0.91,
+      "formation_enthalpy_kJ_mol": -40.0,
+      "melting_point_K": 1668,
+      "lattice_constant_A": 3.570,
+      "synthesis_conditions": {
+        "T_opt_K": 1573,
+        "P_opt_GPa": 0.1,
+        "time_h": 4.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.42,
+        "equilibrium_distance_fm": 2.6,
+        "gradient_threshold": 0.10
+      }
+    },
+    {
+      "bond_id": "TiAl_L10",
+      "formula": "TiAl",
+      "elements": ["Ti", "Al"],
+      "stoichiometry": [1, 1],
+      "crystal_structure": "L10",
+      "symmetry_compatibility": 0.95,
+      "frequency_ratio": 1.022,
+      "frequency_resonance": 0.93,
+      "formation_enthalpy_kJ_mol": -75.0,
+      "melting_point_K": 1733,
+      "lattice_constant_A": 4.000,
+      "synthesis_conditions": {
+        "T_opt_K": 1673,
+        "P_opt_GPa": 0.1,
+        "time_h": 3.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.78,
+        "equilibrium_distance_fm": 2.8,
+        "gradient_threshold": 0.15
+      }
+    },
+    {
+      "bond_id": "CuZn_B2",
+      "formula": "CuZn",
+      "elements": ["Cu", "Zn"],
+      "stoichiometry": [1, 1],
+      "crystal_structure": "B2",
+      "symmetry_compatibility": 0.78,
+      "frequency_ratio": 1.015,
+      "frequency_resonance": 0.85,
+      "formation_enthalpy_kJ_mol": -25.0,
+      "melting_point_K": 1175,
+      "lattice_constant_A": 2.950,
+      "synthesis_conditions": {
+        "T_opt_K": 1073,
+        "P_opt_GPa": 0.1,
+        "time_h": 2.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.26,
+        "equilibrium_distance_fm": 2.4,
+        "gradient_threshold": 0.08
+      }
+    },
+    {
+      "bond_id": "MgZn2_C14",
+      "formula": "MgZn2",
+      "elements": ["Mg", "Zn"],
+      "stoichiometry": [1, 2],
+      "crystal_structure": "C14",
+      "symmetry_compatibility": 0.72,
+      "frequency_ratio": 0.882,
+      "frequency_resonance": 0.88,
+      "formation_enthalpy_kJ_mol": -30.0,
+      "melting_point_K": 863,
+      "lattice_constant_A": 5.200,
+      "synthesis_conditions": {
+        "T_opt_K": 773,
+        "P_opt_GPa": 0.1,
+        "time_h": 6.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.31,
+        "equilibrium_distance_fm": 3.0,
+        "gradient_threshold": 0.09
+      }
+    },
+    {
+      "bond_id": "Fe3Al_D03",
+      "formula": "Fe3Al",
+      "elements": ["Fe", "Al"],
+      "stoichiometry": [3, 1],
+      "crystal_structure": "D03",
+      "symmetry_compatibility": 0.90,
+      "frequency_ratio": 1.048,
+      "frequency_resonance": 0.92,
+      "formation_enthalpy_kJ_mol": -42.5,
+      "melting_point_K": 1520,
+      "lattice_constant_A": 5.780,
+      "synthesis_conditions": {
+        "T_opt_K": 1473,
+        "P_opt_GPa": 0.1,
+        "time_h": 4.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.44,
+        "equilibrium_distance_fm": 2.6,
+        "gradient_threshold": 0.11
+      }
+    },
+    {
+      "bond_id": "Ti3Al_D019",
+      "formula": "Ti3Al",
+      "elements": ["Ti", "Al"],
+      "stoichiometry": [3, 1],
+      "crystal_structure": "D019",
+      "symmetry_compatibility": 0.93,
+      "frequency_ratio": 1.020,
+      "frequency_resonance": 0.94,
+      "formation_enthalpy_kJ_mol": -68.7,
+      "melting_point_K": 1850,
+      "lattice_constant_A": 5.650,
+      "synthesis_conditions": {
+        "T_opt_K": 1773,
+        "P_opt_GPa": 0.1,
+        "time_h": 5.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.71,
+        "equilibrium_distance_fm": 2.9,
+        "gradient_threshold": 0.14
+      }
+    },
+    {
+      "bond_id": "Fe5Al8_D82",
+      "formula": "Fe5Al8",
+      "elements": ["Fe", "Al"],
+      "stoichiometry": [5, 8],
+      "crystal_structure": "D82",
+      "symmetry_compatibility": 0.94,
+      "frequency_ratio": 1.055,
+      "frequency_resonance": 0.92,
+      "formation_enthalpy_kJ_mol": -45.2,
+      "melting_point_K": 1520,
+      "lattice_constant_A": 5.780,
+      "synthesis_conditions": {
+        "T_opt_K": 1520,
+        "P_opt_GPa": 0.1,
+        "time_h": 8.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.47,
+        "equilibrium_distance_fm": 2.7,
+        "gradient_threshold": 0.13
+      },
+      "note": "Экспериментально подтверждена в 2019 (Stein et al., Acta Mater.)"
+    },
+    {
+      "bond_id": "CoAl_B2",
+      "formula": "CoAl",
+      "elements": ["Co", "Al"],
+      "stoichiometry": [1, 1],
+      "crystal_structure": "B2",
+      "symmetry_compatibility": 0.91,
+      "frequency_ratio": 1.037,
+      "frequency_resonance": 0.93,
+      "formation_enthalpy_kJ_mol": -55.3,
+      "melting_point_K": 1650,
+      "lattice_constant_A": 2.860,
+      "synthesis_conditions": {
+        "T_opt_K": 1573,
+        "P_opt_GPa": 0.1,
+        "time_h": 3.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.57,
+        "equilibrium_distance_fm": 2.5,
+        "gradient_threshold": 0.12
+      }
+    },
+    {
+      "bond_id": "NiAl_B2",
+      "formula": "NiAl",
+      "elements": ["Ni", "Al"],
+      "stoichiometry": [1, 1],
+      "crystal_structure": "B2",
+      "symmetry_compatibility": 0.87,
+      "frequency_ratio": 1.028,
+      "frequency_resonance": 0.90,
+      "formation_enthalpy_kJ_mol": -58.0,
+      "melting_point_K": 1911,
+      "lattice_constant_A": 2.887,
+      "synthesis_conditions": {
+        "T_opt_K": 1773,
+        "P_opt_GPa": 0.1,
+        "time_h": 2.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.60,
+        "equilibrium_distance_fm": 2.5,
+        "gradient_threshold": 0.13
+      }
+    },
+    {
+      "bond_id": "V3Al_A15",
+      "formula": "V3Al",
+      "elements": ["V", "Al"],
+      "stoichiometry": [3, 1],
+      "crystal_structure": "A15",
+      "symmetry_compatibility": 0.87,
+      "frequency_ratio": 1.074,
+      "frequency_resonance": 0.84,
+      "formation_enthalpy_kJ_mol": -35.6,
+      "melting_point_K": 1450,
+      "lattice_constant_A": 4.850,
+      "synthesis_conditions": {
+        "T_opt_K": 1450,
+        "P_opt_GPa": 5.0,
+        "time_h": 10.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.37,
+        "equilibrium_distance_fm": 2.7,
+        "gradient_threshold": 0.14
+      },
+      "note": "Сверхпроводник, T_c ~ 8-10 K (прогноз VMMS)"
+    },
+    {
+      "bond_id": "Nb3Fe_A15",
+      "formula": "Nb3Fe",
+      "elements": ["Nb", "Fe"],
+      "stoichiometry": [3, 1],
+      "crystal_structure": "A15",
+      "symmetry_compatibility": 0.90,
+      "frequency_ratio": 0.985,
+      "frequency_resonance": 0.86,
+      "formation_enthalpy_kJ_mol": -42.1,
+      "melting_point_K": 1680,
+      "lattice_constant_A": 5.120,
+      "synthesis_conditions": {
+        "T_opt_K": 1680,
+        "P_opt_GPa": 0.1,
+        "time_h": 6.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.44,
+        "equilibrium_distance_fm": 2.8,
+        "gradient_threshold": 0.12
+      },
+      "note": "Сверхпроводник, T_c ~ 14-17 K (прогноз VMMS)"
+    },
+    {
+      "bond_id": "TaFe2_C14",
+      "formula": "TaFe2",
+      "elements": ["Ta", "Fe"],
+      "stoichiometry": [1, 2],
+      "crystal_structure": "C14",
+      "symmetry_compatibility": 0.85,
+      "frequency_ratio": 0.892,
+      "frequency_resonance": 0.82,
+      "formation_enthalpy_kJ_mol": -28.5,
+      "melting_point_K": 1520,
+      "lattice_constant_A": 4.850,
+      "synthesis_conditions": {
+        "T_opt_K": 1520,
+        "P_opt_GPa": 0.1,
+        "time_h": 8.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.30,
+        "equilibrium_distance_fm": 2.9,
+        "gradient_threshold": 0.10
+      },
+      "note": "Сверхпроводник, T_c ~ 5-7 K (прогноз VMMS)"
+    },
+    {
+      "bond_id": "FeB2_AlB2",
+      "formula": "FeB2",
+      "elements": ["Fe", "B"],
+      "stoichiometry": [1, 2],
+      "crystal_structure": "AlB2",
+      "symmetry_compatibility": 0.88,
+      "frequency_ratio": 0.959,
+      "frequency_resonance": 0.89,
+      "formation_enthalpy_kJ_mol": -52.4,
+      "melting_point_K": 1650,
+      "lattice_constant_A": 3.050,
+      "synthesis_conditions": {
+        "T_opt_K": 1573,
+        "P_opt_GPa": 0.1,
+        "time_h": 4.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.54,
+        "equilibrium_distance_fm": 2.3,
+        "gradient_threshold": 0.15
+      },
+      "note": "Сверхпроводник, T_c ~ 18-22 K (прогноз VMMS)"
+    },
+    {
+      "bond_id": "NiTi3_A15",
+      "formula": "NiTi3",
+      "elements": ["Ni", "Ti"],
+      "stoichiometry": [1, 3],
+      "crystal_structure": "A15",
+      "symmetry_compatibility": 0.92,
+      "frequency_ratio": 1.007,
+      "frequency_resonance": 0.91,
+      "formation_enthalpy_kJ_mol": -48.3,
+      "melting_point_K": 1580,
+      "lattice_constant_A": 5.080,
+      "synthesis_conditions": {
+        "T_opt_K": 1580,
+        "P_opt_GPa": 0.1,
+        "time_h": 6.0
+      },
+      "field_H_parameters": {
+        "bond_energy": -0.50,
+        "equilibrium_distance_fm": 2.8,
+        "gradient_threshold": 0.13
+      },
+      "note": "Сверхпроводник, T_c ~ 12-15 K (прогноз VMMS)"
+    }
+  ]
+}

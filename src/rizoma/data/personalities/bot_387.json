@@ -1,0 +1,73 @@
+{
+  "id": "bot_387",
+  "name": "Наблюдатель",
+  "tau": 6.5,
+  "k": 2,
+  "n": 13.0,
+  "defects": [],
+  "rhythm": 1.1242897003343157,
+  "entities": {
+    "default": {
+      "entity_id": "default",
+      "name": "Наблюдатель_основной",
+      "tau": 5.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.0,
+      "active": false,
+      "last_active": "2026-03-16T14:44:19.373978"
+    },
+    "entity_1": {
+      "entity_id": "entity_1",
+      "name": "Воин",
+      "tau": 8.5,
+      "k": 3,
+      "defects": [],
+      "rhythm": 1.097433167951059,
+      "active": false,
+      "last_active": "2026-03-16T14:44:19.420985"
+    },
+    "entity_2": {
+      "entity_id": "entity_2",
+      "name": "Дипломат",
+      "tau": 4.3,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.070187268044063,
+      "active": false,
+      "last_active": "2026-03-16T22:42:46.536644"
+    },
+    "entity_3": {
+      "entity_id": "entity_3",
+      "name": "Философ",
+      "tau": 7.2,
+      "k": 3,
+      "defects": [],
+      "rhythm": 0.9571343586278394,
+      "active": false,
+      "last_active": "2026-03-16T14:56:53.251987"
+    },
+    "entity_4": {
+      "entity_id": "entity_4",
+      "name": "????????",
+      "tau": 6.5,
+      "k": 2,
+      "defects": [],
+      "rhythm": 1.1242897003343157,
+      "active": true,
+      "last_active": "2026-03-16T22:42:46.536644"
+    }
+  },
+  "active_entity": "entity_4",
+  "inner_dialogue": [],
+  "memory": {
+    "owner_id": "bot_387",
+    "core_traces": [],
+    "branches": {},
+    "public_branch": {
+      "branch_id": "public",
+      "traces": []
+    }
+  },
+  "relations": {}
+}

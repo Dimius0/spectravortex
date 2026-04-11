@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дом — платформа цифровых личностей</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Шапка -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">🏠 Дом</h1>
+                <nav class="nav">
+                    <button class="nav-btn active" data-view="personalities">Личности</button>
+                    <button class="nav-btn" data-view="rooms">Комнаты</button>
+                    <button class="nav-btn" data-view="pantheon">Пантеон</button>
+                </nav>
+                <div class="header-right">
+                    <span class="connection-status online">● онлайн</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Основной контент -->
+        <main class="main">
+            <!-- Список личностей (вид по умолчанию) -->
+            <div id="personalities-view" class="view active">
+                <div class="view-header">
+                    <h2>Цифровые личности</h2>
+                    <button class="btn-primary" id="create-personality-btn">+ Новая личность</button>
+                </div>
+                <div id="personalities-grid" class="personalities-grid">
+                    <!-- сгенерируется через js -->
+                </div>
+            </div>
+
+            <!-- Комнаты -->
+            <div id="rooms-view" class="view">
+                <div class="view-header">
+                    <h2>Комнаты</h2>
+                </div>
+                <div class="rooms-grid" id="rooms-grid">
+                    <div class="room-card private">
+                        <div class="room-icon">🔒</div>
+                        <div class="room-info">
+                            <h3>Личная</h3>
+                            <p>Только для себя</p>
+                        </div>
+                    </div>
+                    <div class="room-card family">
+                        <div class="room-icon">👪</div>
+                        <div class="room-info">
+                            <h3>Семейная</h3>
+                            <p>Близкие, друзья</p>
+                        </div>
+                    </div>
+                    <div class="room-card guest">
+                        <div class="room-icon">🛋️</div>
+                        <div class="room-info">
+                            <h3>Гостиная</h3>
+                            <p>Общение с другими</p>
+                        </div>
+                    </div>
+                    <div class="room-card library">
+                        <div class="room-icon">📚</div>
+                        <div class="room-info">
+                            <h3>Библиотека</h3>
+                            <p>Обезличенные данные</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Пантеон -->
+            <div id="pantheon-view" class="view">
+                <div class="view-header">
+                    <h2>Пантеон</h2>
+                    <p class="subtitle">Те, кто остались в памяти</p>
+                </div>
+                <div class="pantheon-grid" id="pantheon-grid">
+                    <!-- сгенерируется через js -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Модальное окно для диалога с личностью -->
+        <div id="chat-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="chat-personality-name">Диалог</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div id="chat-messages" class="chat-messages">
+                    <!-- сообщения -->
+                </div>
+                <div class="chat-input-area">
+                    <select id="chat-access-level" class="chat-access">
+                        <option value="private">💬 Личное</option>
+                        <option value="relation">👤 Связное</option>
+                        <option value="public">🌐 Публичное</option>
+                    </select>
+                    <input type="text" id="chat-input" placeholder="Напишите что-нибудь..." class="chat-input">
+                    <button id="chat-send" class="chat-send">→</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно создания личности -->
+        <div id="create-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Новая личность</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <form id="create-form" class="create-form">
+                    <div class="form-group">
+                        <label>Имя</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>τ (характер) <span class="hint">0.1–13.0</span></label>
+                        <input type="number" name="tau" step="0.1" min="0.1" max="13.0" value="5.0">
+                    </div>
+                    <div class="form-group">
+                        <label>k (этаж) <span class="hint">1–13</span></label>
+                        <input type="number" name="k" min="1" max="13" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Ритм</label>
+                        <input type="number" name="rhythm" step="0.1" min="0.1" max="3.0" value="1.0">
+                    </div>
+                    <div class="form-group">
+                        <label>Дефекты (через запятую)</label>
+                        <input type="text" name="defects" placeholder="любопытство, доверчивость">
+                    </div>
+                    <button type="submit" class="btn-primary">Создать</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

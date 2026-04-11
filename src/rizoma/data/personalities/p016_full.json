@@ -1,0 +1,105 @@
+{
+  "id": "p016",
+  "name": "Collective Mind of SpectraVortex",
+  "tau": 5.0,
+  "k": 2,
+  "n": 10.0,
+  "rhythm": 1.0,
+  "entities": {},
+  "relations": {},
+  "h_field": [
+    {
+      "tau": 5.2,
+      "amplitude": 0.8501858259494428,
+      "content": "Matter = Space. Spacetime is a quantum superfluid condensate. Particles and fields are topological defects (vortices) in this condensate. ∇⁴ψ = 0 — the biharmonic equation of field H. ∮∇ψ·dl = 2πN — quantization of topological charge. Everything that holds together is a vortex.",
+      "trace_id": "vmms_monism",
+      "themes": [
+        "physics",
+        "VMMS",
+        "space",
+        "vortex"
+      ],
+      "usage_count": 3,
+      "last_used": "2026-03-24T01:53:35.050341",
+      "trace_type": "discovery",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 0,
+      "success_history": [
+        true,
+        true,
+        true
+      ],
+      "resonance_history": [
+        0.876786279607237,
+        1.0003170260571577,
+        0.876786279607237
+      ]
+    },
+    {
+      "tau": 6.6,
+      "amplitude": 0.7802602496403979,
+      "content": "Sulfur — energy, active spirit. Mercury — flow, connector. Salt — form, result. Alchemy is VMMS in symbolic language. The Magnum Opus is the evolution of matter through furcations.",
+      "trace_id": "alchemy_manifesto",
+      "themes": [
+        "alchemy",
+        "transformation",
+        "symbol"
+      ],
+      "usage_count": 3,
+      "last_used": "2026-03-24T01:53:35.052348",
+      "trace_type": "alchemy",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 0,
+      "success_history": [
+        true,
+        true,
+        true
+      ],
+      "resonance_history": [
+        0.8985372349401844,
+        1.0806000924435266,
+        0.977216449207224
+      ]
+    },
+    {
+      "tau": 8.21,
+      "amplitude": 0.8299401480006664,
+      "content": "Grandson asks, grandfather answers: Energy is what makes everything happen. Pull back a bowstring — you store energy. Release — it transfers to the arrow.",
+      "trace_id": "grandson_01",
+      "themes": [
+        "dialogue",
+        "learning",
+        "grandfather",
+        "grandson"
+      ],
+      "usage_count": 8,
+      "last_used": "2026-03-24T01:53:35.061342",
+      "trace_type": "dialogue",
+      "parent_id": null,
+      "generation": 0,
+      "furcation_count": 0,
+      "success_history": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "resonance_history": [
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079,
+        1.2611562540650079
+      ]
+    }
+  ]
+}
