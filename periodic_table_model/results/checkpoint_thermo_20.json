@@ -1,8 +1,3 @@
-{
-  "iteration": 20,
-  "energy": 2189365528.9387994,
-  "min_distance": 2.829450683262732,
-  "T": 300.0,
-  "P": 0.1,
-  "timestamp": "2026-04-11T00:40:35.483548"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:b94cb75e0e25aa89ea90133afe1dedb6f15884bc07f99a875f55264d4424f99f
+size 168

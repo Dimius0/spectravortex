@@ -1,7 +1,3 @@
-{
-  "step": 50,
-  "energy": 24890.425656892923,
-  "T": 300.0,
-  "P": 0.1,
-  "timestamp": "2026-04-11T01:43:24.440102"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:2bf16b6e89f142c0c7bb2f57cd5c1baacf408fd12729e4a4cba5cb8c5d31c250
+size 125

@@ -1,33 +1,3 @@
-{
-  "id": "p012",
-  "name": "??????????",
-  "tau": 5.5,
-  "k": 2,
-  "n": 11.0,
-  "defects": [],
-  "rhythm": 1.0,
-  "entities": {
-    "default": {
-      "entity_id": "default",
-      "name": "??????????_основной",
-      "tau": 5.5,
-      "k": 2,
-      "defects": [],
-      "rhythm": 1.0,
-      "active": true,
-      "last_active": null
-    }
-  },
-  "active_entity": "default",
-  "inner_dialogue": [],
-  "memory": {
-    "owner_id": "p012",
-    "core_traces": [],
-    "branches": {},
-    "public_branch": {
-      "branch_id": "public",
-      "traces": []
-    }
-  },
-  "relations": {}
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:d12d6db545836f6152f9e28483ff73f20c8c2fb8d152a0cb3de5463508c23cd1
+size 622

@@ -1,11 +1,3 @@
-{
-  "current_N": 100,
-  "last_stable_N": 100,
-  "collapse_point": null,
-  "jump_attempt": 5,
-  "stabilization_counter": 0,
-  "collapse_streak": 0,
-  "border_06": 100,
-  "border_confirmed": false,
-  "last_updated": "2026-02-12T23:41:36.280437"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:41826ac400df78c57430b09090893dda351282b62d5bbbc2eee05b1e5b216b52
+size 254
