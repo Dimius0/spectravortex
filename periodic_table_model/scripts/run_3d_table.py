@@ -1,5 +1,6 @@
 """
-Запуск 3D моделирования таблицы Менделеева с термодинамикой, фрактальным временем и ионизацией.
+Запуск 3D моделирования таблицы Менделеева с термодинамикой, фрактальным временем,
+ионизацией и АДАПТИВНОЙ НАСТРОЙКОЙ ЭЛЕКТРООТРИЦАТЕЛЬНОСТИ.
 ПОЛНАЯ ВЕРСИЯ: 103 элемента, 7 фрактальных уровней (K-Q оболочки).
 Сетка: 128³
 
@@ -33,6 +34,7 @@ from fractal_time import (
     TimeQuantum,
     FractalTimeBuffer
 )
+from adaptive_chi_tuner import AdaptiveChiTuner
 
 # ========== СОХРАНЕНИЕ JSON ==========
 
@@ -56,25 +58,24 @@ def load_json(path):
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# ========== ПОПРАВКА НА ИОНИЗАЦИЮ (ИЗ ПЕРВЫХ ПРИНЦИПОВ) ==========
+# ========== ПОПРАВКА НА ИОНИЗАЦИЮ ==========
 
 k_B_eV = 8.617333262145e-5
-hbar_eV = 6.582119569e-16
-m_e_eV = 0.51099895e6
-OMEGA_0 = hbar_eV / (m_e_eV * ((4 * np.pi * hbar_eV**2) / (m_e_eV))**2) if False else 27.2
+OMEGA_0 = 27.2
 
-def calculate_ionization_alpha(T: float, Z: int, N: int = None) -> float:
-    if T == 0: return 0.0
-    N = N or Z
-    P_neutral = 1.0
-    for n in range(1, min(N, 10) + 1):
-        omega_n = OMEGA_0 * (Z**2) / (n**2)
-        E_bind = hbar_eV * omega_n
-        P_neutral *= (1.0 - np.exp(-E_bind / (k_B_eV * T)))
-    return 1.0 - P_neutral
+def calculate_ionization_alpha(T: float, Z: int) -> float:
+    if T < 1000:
+        return 0.0
+    n_valence = min(Z, 8)
+    omega_n = OMEGA_0 * (Z ** 2) / (n_valence ** 2)
+    E_bind = omega_n
+    P_ion = np.exp(-E_bind / (k_B_eV * T))
+    alpha = 1.0 - np.exp(-P_ion)
+    return min(alpha, 1.0)
 
 def apply_ionization_correction(energy: float, Z: int, T: float, beta: float = 1.0) -> float:
-    if T == 0: return energy
+    if T == 0:
+        return energy
     alpha = calculate_ionization_alpha(T, Z)
     return energy * ((1.0 + beta * alpha) ** 2)
 
@@ -184,12 +185,16 @@ def main():
     parser.add_argument('--grid', type=int, default=128)
     parser.add_argument('--T', type=float, default=300.0)
     parser.add_argument('--P', type=float, default=0.1)
+    parser.add_argument('--resume', type=str, help='Путь к чекпоинту для продолжения')
     parser.add_argument('--checkpoint-interval', type=int, default=25)
+    parser.add_argument('--tune-interval', type=int, default=50, help='Интервал настройки χ (шагов)')
+    parser.add_argument('--no-tune', action='store_true', help='Отключить адаптивную настройку χ')
     args = parser.parse_args()
 
     start_time = datetime.now()
     print("=" * 70)
-    print("3D МОДЕЛИРОВАНИЕ ТАБЛИЦЫ МЕНДЕЛЕЕВА С ФРАКТАЛЬНЫМ ВРЕМЕНЕМ И ИОНИЗАЦИЕЙ")
+    print("3D МОДЕЛИРОВАНИЕ ТАБЛИЦЫ МЕНДЕЛЕЕВА С АДАПТИВНОЙ НАСТРОЙКОЙ χ")
+    print("Решатель: BiharmonicSolver3D + Thermodynamics + FractalTime + PID")
     print("=" * 70)
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -197,7 +202,12 @@ def main():
     os.makedirs(results_dir, exist_ok=True)
 
     grid_size, max_steps, T, P = args.grid, args.steps, args.T, args.P
-    print(f"\nСетка: {grid_size}³ | Шагов: {max_steps} | T: {T}K | P: {P}GPa | Чекпоинт: {args.checkpoint_interval}")
+    tune_interval = args.tune_interval
+    enable_tuning = not args.no_tune
+
+    print(f"\nСетка: {grid_size}³ | Шагов: {max_steps} | T: {T}K | P: {P}GPa")
+    print(f"Настройка χ: {'включена' if enable_tuning else 'отключена'} (интервал: {tune_interval})")
+    print(f"Чекпоинты: каждые {args.checkpoint_interval} шагов")
 
     level_activation = {lvl: max_steps // (2**lvl) for lvl in range(1, 8) if max_steps // (2**lvl) > 0}
     shells = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
@@ -206,11 +216,21 @@ def main():
     thermo_state = ThermodynamicState(T, P)
     thermo_calc = ThermodynamicCalculator(thermo_state)
 
-    print("\n[1/4] Загрузка элементов...")
+    print("\n[1/5] Загрузка элементов...")
     elements_config = load_json(os.path.join(base_dir, 'data', 'field_H_elements_complete.json'))
     all_elements = load_all_elements(elements_config)
     print(f"Загружено элементов: {len(all_elements)}")
 
+    # Инициализация адаптивного тюнера χ
+    chi_tuner = None
+    if enable_tuning:
+        print("\n[2/5] Инициализация адаптивного тюнера χ...")
+        chi_tuner = AdaptiveChiTuner(os.path.join(base_dir, 'data', 'field_H_elements_complete.json'))
+        print(f"    Создано регуляторов: {len(chi_tuner.controllers)}")
+    else:
+        print("\n[2/5] Адаптивная настройка χ отключена")
+
+    print(f"\n[{'3' if enable_tuning else '2'}/5] Инициализация 3D-решателя...")
     fields_by_level, components_data = {}, []
     np.random.seed(42)
     for elem in all_elements:
@@ -227,28 +247,39 @@ def main():
              'orientation': orient, 'symbol': elem['symbol'], 'Z': elem['Z']})
         fields_by_level[lvl]['components'].append(comp_data)
 
-    print(f"[2/4] Уровней: {len(fields_by_level)}")
+    print(f"    Уровней: {len(fields_by_level)}")
     evolution = FractalTimeEvolution(num_levels=7, base_dt=1.0)
     for lvl, data in fields_by_level.items():
         evolution.add_field(lvl, FractalFieldWrapper(data['architect'], lvl))
 
-    checkpoint_base = os.path.join(results_dir, f'autosave_T{T}_P{P}_{grid_size}')
+    checkpoint_base = os.path.join(results_dir, f'autosave_T{T}_P{P}_{grid_size}_local')
     energy_history = []
+    chi_history = []
+    start_step = 0
+
+    if args.resume and os.path.exists(args.resume):
+        print(f"[!] Восстановление из чекпоинта: {args.resume}")
+        saved = load_json(args.resume)
+        start_step = saved['metadata']['completed_steps']
+        energy_history = saved.get('energy_history', [])
+        print(f"    Продолжаем с шага {start_step + 1}")
 
     def save_checkpoint(step, is_final=False):
         state = [{'symbol': c['symbol'], 'Z': c['Z'], 'level': lvl, 'position': c['vortex'].position.tolist()}
                  for lvl, data in fields_by_level.items() for c in data['architect'].components]
-        chk = {'metadata': {'steps': step+1, 'T': T, 'P': P}, 'energy': energy_history, 'elements': state}
+        chk = {'metadata': {'completed_steps': step+1, 'T': T, 'P': P}, 'energy': energy_history, 'elements': state}
+        if chi_tuner:
+            chk['chi_values'] = chi_tuner.get_all_chi()
         suffix = 'final' if is_final else f'step_{step+1}'
         save_json(f"{checkpoint_base}_{suffix}.json", chk)
 
-    print(f"\n[3/4] Эволюция ({max_steps} шагов)...")
-    print("─" * 80)
-    header = f"{'Шаг':>5} | {'Энергия':>12} | {'d_min':>6} | {'Активны':>18} | {'α(U)':>6} | {'Время':>7} | {'Сохр':>4}"
+    print(f"\n[{'4' if enable_tuning else '3'}/5] Эволюция (шаги {start_step+1}-{max_steps})...")
+    print("─" * 85)
+    header = f"{'Шаг':>5} | {'Энергия':>12} | {'d_min':>6} | {'Активны':>18} | {'α(U)':>6} | {'Время':>7} | {'Сохр':>4} | {'Tune':>4}"
     print(header)
-    print("─" * 80)
+    print("─" * 85)
 
-    for step in range(max_steps):
+    for step in range(start_step, max_steps):
         evolution.evolve_step()
         total_energy = sum(f.compute_energy() for f in evolution.fields.values() if hasattr(f, 'compute_energy'))
         energy_history.append(total_energy)
@@ -259,10 +290,51 @@ def main():
         min_dist = float('inf')
         for data in fields_by_level.values():
             for c in data['architect'].components:
+                pos = c['vortex'].position
                 for c2 in data['architect'].components:
                     if c != c2:
-                        d = np.linalg.norm(c['vortex'].position - c2['vortex'].position)
-                        if d < min_dist: min_dist = d
+                        d = np.linalg.norm(pos - c2['vortex'].position)
+                        if d < min_dist: 
+                            min_dist = d
+
+        # Адаптивная настройка χ (только когда нужно)
+        tune_mark = ''
+        if enable_tuning and chi_tuner and (step + 1) % tune_interval == 0 and step > 0:
+            all_positions_global = []
+            all_charges_global = []
+            for data in fields_by_level.values():
+                for c in data['architect'].components:
+                    pos = c['vortex'].position
+                    all_positions_global.append(pos)
+                    charge = c['vortex'].charge if hasattr(c['vortex'], 'charge') else c.get('Z', 1)
+                    all_charges_global.append(charge)
+            
+            for lvl, data in fields_by_level.items():
+                architect = data['architect']
+                for comp in architect.components:
+                    symbol = comp['symbol']
+                    pos = comp['vortex'].position
+                    local_e = chi_tuner.compute_local_energy(pos, all_positions_global, all_charges_global)
+                    chi_tuner.update_local_energy(symbol, local_e)
+            
+            new_chi = chi_tuner.tune_all()
+            chi_history.append({'step': step + 1, 'chi': new_chi.copy()})
+            tune_mark = '🎯'
+
+        # Адаптивная настройка χ
+        tune_mark = ''
+        if enable_tuning and chi_tuner and (step + 1) % tune_interval == 0 and step > 0:
+            for lvl, data in fields_by_level.items():
+                architect = data['architect']
+                for comp in architect.components:
+                    symbol = comp['symbol']
+                    pos = comp['vortex'].position
+                    local_e = chi_tuner.compute_local_energy(pos, all_positions_global, all_charges_global)
+                    chi_tuner.update_local_energy(symbol, local_e)
+            
+            new_chi = chi_tuner.tune_all()
+            chi_history.append({'step': step + 1, 'chi': new_chi.copy()})
+            tune_mark = '🎯'
 
         alpha_u = calculate_ionization_alpha(T, 92)
         step_time = (datetime.now() - start_time).total_seconds()
@@ -271,12 +343,24 @@ def main():
             save_checkpoint(step, step == max_steps - 1)
             saved = '💾'
 
-        print(f"{step+1:5} | {total_energy:12.1f} | {min_dist:6.2f} | {evolved_str:>18} | {alpha_u:6.3f} | {step_time:7.1f}s | {saved:>4}")
+        progress = (step + 1 - start_step) / (max_steps - start_step)
+        bar_length = 15
+        filled = int(progress * bar_length)
+        bar = '█' * filled + '░' * (bar_length - filled)
+        
+        print(f"{step+1:5} | {total_energy:12.1f} | {min_dist:6.2f} | {evolved_str:>18} | {alpha_u:6.3f} | {step_time:7.1f}s | {saved:>4} | {tune_mark:>4} [{bar}]")
         sys.stdout.flush()
 
-    print("─" * 80)
-    print("[4/4] Анализ связей...")
-    # (здесь можно добавить финальный анализ связей как в предыдущей версии)
+    print("─" * 85)
+    print(f"\n[{'5' if enable_tuning else '4'}/5] Анализ связей...")
+
+    # Сохранение результатов настройки χ
+    if enable_tuning and chi_tuner:
+        chi_tuner.save_results(os.path.join(results_dir, f'chi_tuned_T{T}_P{P}.json'))
+        chi_tuner.print_summary()
+
+    # Финальное сохранение
+    save_checkpoint(max_steps - 1, is_final=True)
     print(f"\nГОТОВО. Финальная энергия: {energy_history[-1]:.1f}")
 
 if __name__ == "__main__":

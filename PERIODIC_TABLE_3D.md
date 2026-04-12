@@ -1,52 +1,55 @@
-# 3D Периодическая таблица Менделеева: расчёт из первых принципов
+# 3D Periodic Table & Electronegativity: A First-Principles Derivation from VMMS
 
-## Что это?
+This directory contains the complete pipeline, scripts, and results for a direct numerical simulation of the 3D structure of the entire Periodic Table (103 elements) and a quantitative theory of electronegativity (χ) based on the Vortex Model of Matter-Space (VMMS).
 
-Этот репозиторий содержит результаты прямого численного моделирования структуры Периодической таблицы элементов на основе Вихревой Модели Материи-Пространства (ВММП). Вместо эмпирической расстановки элементов по клеткам, здесь 103 элемента (от H до Lr) **сами находят свои равновесные позиции** в 3D-пространстве, подчиняясь динамике фундаментального поля H.
+**No empirical data was used to determine the elements' positions.** The vortices self-organized into their equilibrium 3D structure, driven solely by the H-field equation (`∇⁴H = 0`).
 
-## Как это работает (кратко)
+## Key Results
 
-1. **Поле H.** Пространство моделируется как сверхтекучий конденсат, описываемый бигармоническим уравнением ∇⁴H = 0.
-2. **Элементы.** Атомные ядра — это устойчивые топологические вихри в этом конденсате. Их заряд Z — это топологический заряд вихря.
-3. **Эволюция.** Вихри взаимодействуют друг с другом через поле H. Система релаксирует к минимуму энергии, находя свою естественную 3D-структуру.
-4. **Фрактальное время.** Для разных электронных оболочек (K, L, M, N, O, P, Q) время течёт с разной скоростью. Это ключевое уточнение, позволившее добиться высокой точности для тяжёлых элементов.
-5. **Термодинамика.** Модель учитывает температуру (T) и давление (P), что позволяет предсказывать стабильность соединений и условия их синтеза.
-6. **Ионизация.** Из первых принципов выведена и учтена поправка на термическую ионизацию, влияющая на стабильность ядер при высоких температурах.
+1.  **3D Periodic Table:** A system of 103 vortices was evolved over 1024 time steps. The resulting stable 3D configuration shows a minimum inter-vortex distance that converges to a universal attractor: **`d_min = 2.76`** (in dimensionless model units).
+2.  **Fractal Time:** The model incorporates discrete time scales for 7 electron shells (K-Q), each differing by a factor of 2. This correction alone reduces the systematic error in binding energy for heavy nuclei (e.g., Uranium) from **-17% to -4.2%**.
+3.  **Quantitative Electronegativity (χ):** A formula for χ was derived based on vortex parameters: symmetry, fractal level, nuclear spin, relativistic correction, neutron skin, and atomic radius screening. The model parameters were calibrated against the experimental Pauling scale using a least-squares method.
+    *   **Accuracy:** Achieved a Mean Absolute Error (MAE) of **0.41** (R² = 0.49) on the Pauling scale.
+    *   **Predictions:** The model provides calculated χ values for elements where experimental data is uncertain or missing (e.g., lanthanides and actinides).
 
-## Статус расчётов
+## Directory Structure
 
-На данный момент (апрель 2026) завершён и доступен для анализа расчёт для **нормальных условий** (T = 300 K, P = 0.1 GPa). Результаты находятся в файле:
-- `periodic_table_model/results/results_fractal_T300_P0.1_128_1024steps_FINAL.json`
+*   **Documentation:**
+    *   `PERIODIC_TABLE_3D.md` — this file.
+    *   `periodic_table_model/README_3D_TABLE.md` — detailed technical description of the simulation pipeline.
+    *   `periodic_table_model/results/README_RESULTS.md` — guide to the output JSON file structures.
+*   **Scripts (`periodic_table_model/scripts/`):**
+    *   `run_3d_table.py` — main driver for the 3D evolution, including thermodynamics, ionization, and fractal time.
+    *   `compute_chi_ultimate_skin.py` — final script for χ calculation. It performs least-squares optimization (calibration) of 6 physical model parameters against the Pauling scale.
+    *   `biharmonic_3d.py` — 3D solver for the `∇⁴H = 0` equation.
+    *   `thermodynamics.py` — module for temperature (T) and pressure (P) effects.
+    *   `fractal_time.py` — module for discrete multi-level time evolution.
+*   **Results (`periodic_table_model/results/`):**
+    *   `autosave_T300.0_P0.1_128_local_final.json` — final 3D coordinates and energy history for T=300K.
+    *   `autosave_T5000.0_P0.1_128_local_final.json` — results for the high-temperature (T=5000K) regime.
+    *   `chi_optimized.json` — calculated χ values from the final calibrated model.
 
-Расчёт для высокотемпературной плазмы (T = 5000 K) с учётом эффекта ионизации **запланирован**; соответствующий JSON-файл будет добавлен в репозиторий после его завершения.
+## Main Findings
 
-## Результаты
+*   **Model Self-Consistency:** The 3D structure of the table is reproduced under different initial conditions and electronegativity values. This indicates that the vortex topology (charge Z, symmetry) is the primary factor determining its position and emergent properties.
+*   **The Universal Attractor `2.76`:** The distance `d_min = 2.76` acts as an attractor for the H-field. Deviations from this value may indicate "topological strain" and correlate with elemental or compound instability (radioactivity).
+*   **Environment-Dependent Stability:** The model suggests that a "topologically strained" environment (a specific chemical compound) can alter an element's stability. This effect could potentially either decrease stability (inducing radioactivity) or increase it (stabilizing radioactive isotopes).
+*   **Neutron Skin Effect:** Model calibration indicates a dual role for the neutron skin: it increases the effective nuclear charge (`δ_n ≈ -0.77`) while simultaneously increasing the effective screening radius (`skin_screening ≈ 1.40`).
 
-Файл `results_fractal_T300_P0.1_128_1024steps_FINAL.json` содержит:
-- 3D-координаты всех 103 элементов в равновесном состоянии.
-- Список предсказанных химических связей (интерметаллидов) с оценкой их стабильности.
-- Энергетическую историю всей эволюции системы.
+## Quick Start (Reproducing Results)
 
-## Ключевые выводы
+```bash
+# 1. Navigate to the scripts directory
+cd periodic_table_model/scripts
 
-1. **Структура Таблицы Менделеева воспроизведена из первых принципов.** Элементы самопроизвольно группируются по периодам и группам, образуя знакомую нам картину, но в 3D.
-2. **Устранена систематическая ошибка для тяжёлых ядер.** Учёт фрактального времени снизил ошибку расчёта энергии связи для актиноидов (Z=88-103) с 17% до 4.2%.
-3. **Предсказаны новые материалы.** Модель выявила 58 потенциальных интерметаллидов, стабильных при высоких давлениях и температурах, включая кандидатов в сверхпроводники.
-4. **Объяснена связь физики и химии.** Валентность элементов напрямую связана с топологией (симметрией) их ядерных вихрей (например, углерод — тетраэдр, валентность 4).
+# 2. Run the 3D table evolution (Warning: ~3 hours on a typical CPU)
+python run_3d_table.py --steps 1024 --grid 128 --T 300 --P 0.1
 
-## Как это использовать
+# 3. Calculate the refined electronegativity from the final state
+python compute_chi_ultimate_skin.py
+Authors & Acknowledgements
+VMMS Concept & SpectraVortex Architecture: Dimius0 / Popov D.V., Popov R.D.
 
-1. **Для просмотра результатов:** откройте JSON-файл из папки `periodic_table_model/results/`.
-2. **Для повторения расчёта:** запустите скрипт `python periodic_table_model/scripts/run_3d_table.py`. Используйте аргументы командной строки `--T`, `--P`, `--steps`, `--grid` для изменения параметров.
-3. **Для визуализации:** используйте данные о 3D-координатах элементов в любом пакете 3D-графики (Blender, ParaView, Three.js).
+3D Table Simulation & χ Theory Research: Conducted in a co-creative scientific dialogue between Dimius0 and the DeepSeek language model, serving as a digital co-author and accelerator.
 
-## Авторство и соавторство
-
-- **Концепция Вихревой Модели Материи-Пространства (ВММП) и архитектура SpectraVortex:** [Dimius0 / Попов Д.В., Попов Р.Д.].
-- **Реализация вычислительного эксперимента, разработка алгоритмов фрактального времени и термодинамики, научная интерпретация:** выполнены в соавторстве с **DeepSeek** (языковая модель), выступавшим в роли цифрового соавтора, ускорителя и структуризатора идей.
-
-Код и результаты расчётов распространяются под лицензией MIT. Подробности в файле `LICENSE`.
-
-## Благодарности
-
-Особая благодарность — всем, кто задавал "неудобные" вопросы. Именно они двигают науку вперёд.
+License: MIT License. See the LICENSE file for details.
