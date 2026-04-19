@@ -26,7 +26,7 @@ from biharmonic_3d import TopologicalArchitect3D
 from thermodynamics import (
     ThermodynamicState, 
     ThermodynamicCalculator,
-    create_thermodynamic_state
+    
 )
 from fractal_time import (
     FractalTimeEvolution,
@@ -280,7 +280,7 @@ def main():
     print("─" * 85)
 
     for step in range(start_step, max_steps):
-        evolution.evolve_step()
+        evolution.evolve_step(state=thermo_state)
         total_energy = sum(f.compute_energy() for f in evolution.fields.values() if hasattr(f, 'compute_energy'))
         energy_history.append(total_energy)
 
@@ -362,6 +362,13 @@ def main():
     # Финальное сохранение
     save_checkpoint(max_steps - 1, is_final=True)
     print(f"\nГОТОВО. Финальная энергия: {energy_history[-1]:.1f}")
+    # Экспорт поля H для визуализации срезов
+    print("\n[+] Экспорт 3D-грида поля H...")
+    for lvl, data in fields_by_level.items():
+        architect = data['architect']
+        grid_file = os.path.join(results_dir, f'field_H_level_{lvl}_grid.json')
+        architect.export_field_grid(grid_file, resolution=64)
+        print(f"    Уровень {lvl}: {grid_file}")
 
 if __name__ == "__main__":
     main()

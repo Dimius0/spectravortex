@@ -150,100 +150,6 @@ class FractalTimeBuffer:
         }
 
 
-class FractalTimeEvolution:
-    """Эволюция системы с дискретным фрактальным временем."""
-    
-    def __init__(self, num_levels: int = 7, base_dt: float = 1.0, lambda_scale: float = 2.0):
-        self.num_levels = num_levels
-        self.base_dt = base_dt
-        self.lambda_scale = lambda_scale
-        
-        self.time_quanta = {
-            k: TimeQuantum(k, base_dt, lambda_scale) 
-            for k in range(1, num_levels + 1)
-        }
-        
-        self.buffer = FractalTimeBuffer(num_levels)
-        self.fields: Dict[int, Any] = {}
-        self.global_time: float = 0.0
-        self.global_ticks: int = 0
-        
-    def add_field(self, level: int, field: Any):
-        self.fields[level] = field
-        if hasattr(field, 'set_time_buffer'):
-            field.set_time_buffer(self.buffer)
-        if hasattr(field, 'set_time_quantum'):
-            field.set_time_quantum(self.time_quanta[level])
-        
-    def should_evolve(self, level: int) -> bool:
-        if level not in self.time_quanta:
-            return False
-        tq = self.time_quanta[level]
-        return self.global_ticks % tq.ticks_per_global == 0
-    
-    def evolve_step(self) -> Dict[int, Any]:
-        self.global_ticks += 1
-        self.global_time += self.base_dt
-        evolved_levels = []
-        
-        for level, field in self.fields.items():
-            if self.should_evolve(level):
-                if hasattr(field, 'evolve'):
-                    field.evolve(self.global_ticks)
-                
-                state = {}
-                if hasattr(field, 'field') and hasattr(field.field, 'H'):
-                    state['H'] = field.field.H.copy()
-                elif hasattr(field, 'H'):
-                    state['H'] = field.H.copy()
-                    
-                if hasattr(field, 'compute_energy'):
-                    state['energy'] = field.compute_energy()
-                elif hasattr(field, 'field') and hasattr(field.field, 'compute_energy'):
-                    state['energy'] = field.field.compute_energy()
-                else:
-                    state['energy'] = 0.0
-                    
-                self.buffer.store_state(level, state)
-                evolved_levels.append(level)
-        
-        if evolved_levels:
-            self.fields = self.buffer.synchronize_all(self.fields)
-        
-        return self.fields
-    
-    def evolve(self, num_steps: int, callback=None) -> Dict:
-        history = {
-            'global_ticks': [],
-            'energies': {level: [] for level in self.fields.keys()},
-            'evolved_levels': []
-        }
-        
-        for step in range(num_steps):
-            self.evolve_step()
-            history['global_ticks'].append(self.global_ticks)
-            history['evolved_levels'].append(
-                [l for l in self.fields.keys() if self.should_evolve(l)]
-            )
-            
-            for level, field in self.fields.items():
-                if hasattr(field, 'compute_energy'):
-                    history['energies'][level].append(field.compute_energy())
-                elif hasattr(field, 'field') and hasattr(field.field, 'compute_energy'):
-                    history['energies'][level].append(field.field.compute_energy())
-            
-            if callback:
-                callback(step, self)
-        
-        history['statistics'] = self.buffer.get_statistics()
-        history['time_quanta'] = {
-            k: {'dt': tq.dt, 'dilation': tq.time_dilation} 
-            for k, tq in self.time_quanta.items()
-        }
-        
-        return history
-
-
 class FractalFieldWrapper:
     """Обёртка для поля H с поддержкой фрактального времени."""
     
@@ -263,7 +169,8 @@ class FractalFieldWrapper:
     def set_time_quantum(self, tq: TimeQuantum):
         self.time_quantum = tq
         
-    def evolve(self, global_tick: int):
+    def evolve(self, global_tick: int, state=None):
+        """Эволюция поля с учётом фрактального времени и термодинамического состояния."""
         if self.effective_potential is not None:
             self._apply_effective_potential()
         
@@ -273,6 +180,15 @@ class FractalFieldWrapper:
         if hasattr(self.field, 'evolve_time'):
             dt = self.time_quantum.dt if self.time_quantum else 1.0
             self.field.evolve_time(dt)
+        
+        # Вызываем relax_vortices с передачей state
+        if hasattr(self.field, 'relax_vortices'):
+            if state is not None:
+                # Новый вызов с термодинамическим состоянием
+                self.field.relax_vortices(max_iter=1, learning_rate=0.05, state=state, thermal_scale=0.3)
+            else:
+                # Старый вызов для обратной совместимости
+                self.field.relax_vortices(max_iter=1, learning_rate=0.05)
         
         self._add_quantum_fluctuations()
         
@@ -310,6 +226,103 @@ class FractalFieldWrapper:
         if hasattr(self.field, 'compute_energy'):
             return self.field.compute_energy()
         return 0.0
+
+
+class FractalTimeEvolution:
+    """Эволюция системы с дискретным фрактальным временем."""
+    
+    def __init__(self, num_levels: int = 7, base_dt: float = 1.0, lambda_scale: float = 2.0):
+        self.num_levels = num_levels
+        self.base_dt = base_dt
+        self.lambda_scale = lambda_scale
+        
+        self.time_quanta = {
+            k: TimeQuantum(k, base_dt, lambda_scale) 
+            for k in range(1, num_levels + 1)
+        }
+        
+        self.buffer = FractalTimeBuffer(num_levels)
+        self.fields: Dict[int, Any] = {}
+        self.global_time: float = 0.0
+        self.global_ticks: int = 0
+        
+    def add_field(self, level: int, field: Any):
+        self.fields[level] = field
+        if hasattr(field, 'set_time_buffer'):
+            field.set_time_buffer(self.buffer)
+        if hasattr(field, 'set_time_quantum'):
+            field.set_time_quantum(self.time_quanta[level])
+        
+    def should_evolve(self, level: int) -> bool:
+        if level not in self.time_quanta:
+            return False
+        tq = self.time_quanta[level]
+        return self.global_ticks % tq.ticks_per_global == 0
+    
+    def evolve_step(self, state=None) -> Dict[int, Any]:
+        """Один шаг глобальной эволюции с передачей термодинамического состояния."""
+        self.global_ticks += 1
+        self.global_time += self.base_dt
+        evolved_levels = []
+        
+        for level, field in self.fields.items():
+            if self.should_evolve(level):
+                if hasattr(field, 'evolve'):
+                    # Передаём state в метод evolve обёртки
+                    field.evolve(self.global_ticks, state)
+                
+                state_data = {}
+                if hasattr(field, 'field') and hasattr(field.field, 'H'):
+                    state_data['H'] = field.field.H.copy()
+                elif hasattr(field, 'H'):
+                    state_data['H'] = field.H.copy()
+                    
+                if hasattr(field, 'compute_energy'):
+                    state_data['energy'] = field.compute_energy()
+                elif hasattr(field, 'field') and hasattr(field.field, 'compute_energy'):
+                    state_data['energy'] = field.field.compute_energy()
+                else:
+                    state_data['energy'] = 0.0
+                    
+                self.buffer.store_state(level, state_data)
+                evolved_levels.append(level)
+        
+        if evolved_levels:
+            self.fields = self.buffer.synchronize_all(self.fields)
+        
+        return self.fields
+    
+    def evolve(self, num_steps: int, state=None, callback=None) -> Dict:
+        """Эволюция на несколько шагов с передачей термодинамического состояния."""
+        history = {
+            'global_ticks': [],
+            'energies': {level: [] for level in self.fields.keys()},
+            'evolved_levels': []
+        }
+        
+        for step in range(num_steps):
+            self.evolve_step(state)
+            history['global_ticks'].append(self.global_ticks)
+            history['evolved_levels'].append(
+                [l for l in self.fields.keys() if self.should_evolve(l)]
+            )
+            
+            for level, field in self.fields.items():
+                if hasattr(field, 'compute_energy'):
+                    history['energies'][level].append(field.compute_energy())
+                elif hasattr(field, 'field') and hasattr(field.field, 'compute_energy'):
+                    history['energies'][level].append(field.field.compute_energy())
+            
+            if callback:
+                callback(step, self)
+        
+        history['statistics'] = self.buffer.get_statistics()
+        history['time_quanta'] = {
+            k: {'dt': tq.dt, 'dilation': tq.time_dilation} 
+            for k, tq in self.time_quanta.items()
+        }
+        
+        return history
 
 
 # ========== ТЕСТ ==========
@@ -362,6 +375,8 @@ if __name__ == "__main__":
         def set_time_quantum(self, tq): self.time_quantum = tq
         def compute_energy(self): return 100.0 / self.level
         def evolve_time(self, dt): self.H += 0.01 * np.random.randn(*self.H.shape)
+        def relax_vortices(self, max_iter=1, learning_rate=0.05, state=None, thermal_scale=0.3):
+            pass  # Заглушка для теста
 
     for level in range(1, 4):
         field = TestField(level)
