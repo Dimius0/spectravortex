@@ -1,0 +1,14 @@
+STDOUT:
+======================================================================
+
+STDERR:
+Traceback (most recent call last):
+  File "C:\Users\Dim\source\repos\spectravortex\periodic_table_model\scripts\run_3d_table.py", line 374, in <module>
+    main()
+  File "C:\Users\Dim\source\repos\spectravortex\periodic_table_model\scripts\run_3d_table.py", line 196, in main
+    print("3D МОДЕЛИРОВАНИЕ ТАБЛИЦЫ МЕНДЕЛЕЕВА С АДАПТИВНОЙ НАСТРОЙКОЙ \u03c7")
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\encodings\cp1251.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u03c7' in position 60: character maps to <undefined>
+

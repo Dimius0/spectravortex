@@ -1,0 +1,607 @@
+"""
+Biharmonic 3D Solver for Vortex Model of Matter-Space (VMMS)
+
+Этот модуль реализует численное решение бигармонического уравнения ∇⁴H = 0
+в 3D для системы топологических вихрей, представляющих атомные ядра.
+
+Основные классы:
+- Vortex3D: описание одиночного вихря
+- BiharmonicSolver3D: спектральный решатель бигармонического уравнения
+- TopologicalArchitect3D: высокоуровневый API для синтеза конфигураций
+
+Учёт термодинамики:
+- Давление (P) увеличивает силу, действующую на вихри
+- Давление уменьшает равновесное расстояние d_min
+- Температура (T) добавляет тепловой шум (увеличенная амплитуда)
+"""
+
+import numpy as np
+from typing import List, Tuple, Optional, Dict, Any
+import os
+import json
+
+try:
+    from pyfftw import interfaces as fft
+    FFTW_AVAILABLE = True
+except ImportError:
+    import numpy.fft as fft
+    FFTW_AVAILABLE = False
+
+
+class Vortex3D:
+    """
+    3D вихрь с топологическим зарядом.
+    
+    Атрибуты:
+    - position: вектор положения [x, y, z]
+    - charge: топологический заряд (аналог атомного номера Z)
+    - orientation: направление вихревой нити [ux, uy, uz]
+    """
+    
+    def __init__(self, position: np.ndarray = None, charge: float = 1.0,
+                 orientation: np.ndarray = None):
+        self.position = position if position is not None else np.zeros(3)
+        self.charge = charge
+        self.orientation = orientation if orientation is not None else np.array([0, 0, 1])
+        # Нормализуем ориентацию
+        norm = np.linalg.norm(self.orientation)
+        if norm > 0:
+            self.orientation = self.orientation / norm
+
+
+class BiharmonicSolver3D:
+    """
+    Спектральный решатель бигармонического уравнения ∇⁴H = 0.
+    
+    Метод:
+    - Использует быстрое преобразование Фурье (FFT)
+    - Решает уравнение в пространстве Фурье: (k²)² H̃ = 0
+    - Вихри задаются как источники через граничные условия
+    
+    Параметры:
+    - grid_shape: размер сетки (nx, ny, nz)
+    - box_size: физический размер области (Lx, Ly, Lz)
+    """
+    
+    def __init__(self, grid_shape: Tuple[int, int, int] = (64, 64, 64),
+                 box_size: Tuple[float, float, float] = None):
+        
+        self.nx, self.ny, self.nz = grid_shape
+        self.Lx, self.Ly, self.Lz = box_size if box_size else (100.0, 100.0, 100.0)
+        
+        self.dx = self.Lx / self.nx
+        self.dy = self.Ly / self.ny
+        self.dz = self.Lz / self.nz
+        
+        # Создаём сетку
+        x = np.linspace(0, self.Lx, self.nx)
+        y = np.linspace(0, self.Ly, self.ny)
+        z = np.linspace(0, self.Lz, self.nz)
+        self.X, self.Y, self.Z = np.meshgrid(x, y, z, indexing='ij')
+        
+        # Волновые числа
+        kx = 2 * np.pi * fft.fftfreq(self.nx, self.dx)
+        ky = 2 * np.pi * fft.fftfreq(self.ny, self.dy)
+        kz = 2 * np.pi * fft.fftfreq(self.nz, self.dz)
+        self.Kx, self.Ky, self.Kz = np.meshgrid(kx, ky, kz, indexing='ij')
+        
+        self.K2 = self.Kx**2 + self.Ky**2 + self.Kz**2
+        self.K4 = self.K2**2
+        
+        # Избегаем деления на ноль
+        self.K4[0, 0, 0] = 1.0
+        
+        self.vortices: List[Vortex3D] = []
+        self.H = np.zeros(grid_shape, dtype=np.complex128)
+        self._field_computed = False
+        
+    def add_vortex(self, vortex: Vortex3D) -> None:
+        """Добавить вихрь в систему."""
+        self.vortices.append(vortex)
+        self._field_computed = False
+        
+    def remove_vortex(self, index: int) -> None:
+        """Удалить вихрь по индексу."""
+        if 0 <= index < len(self.vortices):
+            self.vortices.pop(index)
+            self._field_computed = False
+            
+    def clear_vortices(self) -> None:
+        """Удалить все вихри."""
+        self.vortices.clear()
+        self._field_computed = False
+        
+    def compute_vortex_field(self, vortex: Vortex3D) -> np.ndarray:
+        """
+        Вычислить поле H от одиночного вихря.
+        
+        Вихрь моделируется как линия с циркуляцией.
+        Используется сглаженное ядро для избежания сингулярности.
+        """
+        # Позиция вихря в координатах сетки
+        x0, y0, z0 = vortex.position
+        
+        # Относительные координаты с учётом периодических граничных условий
+        dx_rel = (self.X - x0)
+        dy_rel = (self.Y - y0)
+        dz_rel = (self.Z - z0)
+        
+        # Периодические граничные условия (минимальное изображение)
+        dx_rel = np.where(dx_rel > self.Lx/2, dx_rel - self.Lx, dx_rel)
+        dx_rel = np.where(dx_rel < -self.Lx/2, dx_rel + self.Lx, dx_rel)
+        dy_rel = np.where(dy_rel > self.Ly/2, dy_rel - self.Ly, dy_rel)
+        dy_rel = np.where(dy_rel < -self.Ly/2, dy_rel + self.Ly, dy_rel)
+        dz_rel = np.where(dz_rel > self.Lz/2, dz_rel - self.Lz, dz_rel)
+        dz_rel = np.where(dz_rel < -self.Lz/2, dz_rel + self.Lz, dz_rel)
+        
+        # Ориентация вихря
+        ux, uy, uz = vortex.orientation
+        
+        # Расстояние до оси вихря
+        r_perp_sq = (dy_rel*uz - dz_rel*uy)**2 + (dz_rel*ux - dx_rel*uz)**2 + (dx_rel*uy - dy_rel*ux)**2
+        r_perp_sq = np.maximum(r_perp_sq, 1e-10)
+        r_perp = np.sqrt(r_perp_sq)
+        
+        # Проекция на ось вихря
+        r_parallel = dx_rel*ux + dy_rel*uy + dz_rel*uz
+        
+        # Азимутальный угол вокруг оси вихря
+        numerator = dy_rel*uz - dz_rel*uy
+        denominator = r_parallel + 1e-10
+        H_vortex = vortex.charge * np.arctan2(numerator, denominator)
+        
+        # Сглаживание ядра вихря (избегаем сингулярности)
+        core_radius = 2.0
+        smooth_factor = 1.0 - np.exp(-r_perp_sq / core_radius**2)
+        
+        H_vortex = H_vortex * smooth_factor
+        H_vortex = np.clip(H_vortex, -10.0, 10.0)
+        
+        return H_vortex.astype(np.complex128)
+    
+    def compute_total_field(self) -> np.ndarray:
+        """Вычислить полное поле H от всех вихрей."""
+        self.H = np.zeros(self.H.shape, dtype=np.complex128)
+        for vortex in self.vortices:
+            H_v = self.compute_vortex_field(vortex)
+            self.H += H_v
+        self._field_computed = True
+        return self.H
+    
+    def solve_biharmonic(self, max_iter: int = 100, tol: float = 1e-6) -> np.ndarray:
+        """
+        Решить ∇⁴H = 0 с граничными условиями от вихрей.
+        
+        Использует итерационный метод в Фурье-пространстве.
+        Начальное поле от вихрей служит источником.
+        """
+        # Начальное поле от вихрей (источник)
+        H_source = self.compute_total_field()
+        H_source_fft = fft.fftn(H_source)
+        
+        # Итерационное решение
+        H_fft = H_source_fft.copy()
+        
+        for iteration in range(max_iter):
+            H_fft_new = H_source_fft.copy()
+            
+            # Применяем бигармонический оператор: H_new = H_source - ∇⁴H / K⁴
+            mask = self.K4 > 1e-10
+            H_fft_new[mask] = H_fft_new[mask] - H_fft[mask] / self.K4[mask]
+            
+            # Проверка сходимости
+            diff = np.max(np.abs(H_fft_new - H_fft))
+            H_fft = H_fft_new
+            
+            if diff < tol:
+                if iteration % 20 == 0:
+                    print(f"    Сходимость на итерации {iteration + 1}, diff = {diff:.2e}")
+                break
+        
+        # Обратное преобразование
+        self.H = np.real(fft.ifftn(H_fft))
+        self.H = np.clip(self.H, -100.0, 100.0)
+        self._field_computed = True
+        
+        return self.H
+    
+    def compute_energy(self) -> float:
+        """
+        Вычислить энергию поля: E = ∫ |∇H|² dV
+        """
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        
+        # Плотность энергии
+        energy_density = grad_x**2 + grad_y**2 + grad_z**2
+        
+        # Интегрирование
+        energy = np.sum(energy_density) * self.dx * self.dy * self.dz
+        
+        # Проверка на выбросы
+        if np.isnan(energy) or np.isinf(energy):
+            return 1e10
+        
+        return float(energy)
+    
+    def compute_gradient(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Вычислить градиент поля H.
+        
+        Возвращает:
+        - grad_x, grad_y, grad_z: компоненты градиента
+        """
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        # Градиент в Фурье-пространстве
+        H_fft = fft.fftn(self.H)
+        
+        grad_x = np.real(fft.ifftn(1j * self.Kx * H_fft))
+        grad_y = np.real(fft.ifftn(1j * self.Ky * H_fft))
+        grad_z = np.real(fft.ifftn(1j * self.Kz * H_fft))
+        
+        # Ограничиваем выбросы
+        grad_x = np.clip(grad_x, -1e3, 1e3)
+        grad_y = np.clip(grad_y, -1e3, 1e3)
+        grad_z = np.clip(grad_z, -1e3, 1e3)
+        
+        return grad_x, grad_y, grad_z
+    
+    def relax_vortices(self, max_iter: int = 100, learning_rate: float = 0.05,
+                       state=None, thermal_scale: float = 0.3) -> Dict[str, Any]:
+        """
+        Релаксация позиций вихрей к минимуму энергии.
+        
+        Параметры:
+        - max_iter: максимальное число итераций
+        - learning_rate: шаг градиентного спуска
+        - state: ThermodynamicState (T, P)
+        - thermal_scale: коэффициент теплового шума (0.1-0.5)
+        
+        Возвращает:
+        - dict с историей энергии, финальными позициями и d_min
+        """
+        # Импортируем ThermodynamicState, если передан state
+        if state is not None:
+            try:
+                from thermodynamics import ThermodynamicState
+            except ImportError:
+                # Если импорт не удался, создаём простой объект
+                class SimpleState:
+                    def __init__(self, T, P):
+                        self.temperature = T
+                        self.pressure = P
+                state = SimpleState(state.temperature, state.pressure) if hasattr(state, 'temperature') else state
+        else:
+            # Создаём состояние по умолчанию
+            try:
+                from thermodynamics import ThermodynamicState
+                state = ThermodynamicState(300.0, 0.1)
+            except ImportError:
+                class SimpleState:
+                    def __init__(self, T, P):
+                        self.temperature = T
+                        self.pressure = P
+                state = SimpleState(300.0, 0.1)
+        
+        K0 = 200.0  # модуль объёмного сжатия конденсата (GPa)
+        d_min_0 = 2.76  # равновесное расстояние при P=0
+        
+        # 1. Поправки на давление
+        pressure_force_factor = 1.0 + state.pressure / K0
+        d_min_P = d_min_0 * (1 + state.pressure / K0) ** (-1/6)
+        
+        # 2. Амплитуда теплового шума (увеличенная!)
+        #    Формула: sigma ~ sqrt(k_B * T / E_vortex) * d_min
+        #    При T=5000K, E_vortex~100 MeV -> sigma~0.1-0.3
+        thermal_amplitude = thermal_scale * np.sqrt(state.temperature / 300.0) * d_min_0
+        
+        energy_history = []
+        
+        print(f"    Релаксация: P={state.pressure} GPa, T={state.temperature} K")
+        print(f"    pressure_force_factor = {pressure_force_factor:.3f}")
+        print(f"    thermal_amplitude = {thermal_amplitude:.4f}")
+        print(f"    d_min(P) = {d_min_P:.3f}")
+        
+        for iteration in range(max_iter):
+            # Вычисляем поле и градиент
+            self.solve_biharmonic(max_iter=30, tol=1e-4)
+            energy = self.compute_energy()
+            energy_history.append(energy)
+            
+            grad_x, grad_y, grad_z = self.compute_gradient()
+            
+            # Проверка на выбросы
+            if np.isnan(energy) or np.isinf(energy):
+                print(f"    !!! Итерация {iteration}: энергия = {energy}, прерывание")
+                break
+            
+            for vortex in self.vortices:
+                # Позиция вихря в индексах сетки
+                i = int(vortex.position[0] / self.dx) % self.nx
+                j = int(vortex.position[1] / self.dy) % self.ny
+                k = int(vortex.position[2] / self.dz) % self.nz
+                
+                # Сила пропорциональна градиенту, умноженному на pressure_factor
+                force = -np.array([
+                    grad_x[i, j, k],
+                    grad_y[i, j, k],
+                    grad_z[i, j, k]
+                ]) * pressure_force_factor
+                
+                # Ограничиваем силу для численной стабильности
+                force_norm = np.linalg.norm(force)
+                if force_norm > 10.0:
+                    force = force / force_norm * 10.0
+                
+                # Тепловой шум (увеличенная амплитуда!)
+                if state.temperature > 0:
+                    force += thermal_amplitude * np.random.randn(3)
+                
+                # Обновление позиции
+                vortex.position += learning_rate * force
+                
+                # Периодические граничные условия
+                vortex.position[0] = vortex.position[0] % self.Lx
+                vortex.position[1] = vortex.position[1] % self.Ly
+                vortex.position[2] = vortex.position[2] % self.Lz
+            
+            if iteration % 50 == 0:
+                print(f"    Итерация {iteration}: энергия = {energy:.2f}, d_min(P) = {d_min_P:.3f}")
+        
+        return {
+            'final_energy': energy_history[-1] if energy_history else 0.0,
+            'energy_history': energy_history,
+            'final_positions': [v.position.tolist() for v in self.vortices],
+            'd_min_equilibrium': d_min_P
+        }
+    
+    def find_vortex_cores(self, threshold: float = 0.5) -> List[Tuple[np.ndarray, float]]:
+        """
+        Найти ядра вихрей (локальные максимумы |∇H|).
+        
+        Возвращает:
+        - список пар (позиция, сила)
+        """
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_magnitude = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        from scipy import ndimage
+        local_max = ndimage.maximum_filter(grad_magnitude, size=5) == grad_magnitude
+        
+        max_val = np.max(grad_magnitude)
+        if max_val > 0:
+            mask = local_max & (grad_magnitude > threshold * max_val)
+        else:
+            mask = local_max
+        
+        coords = np.argwhere(mask)
+        cores = []
+        
+        for coord in coords:
+            pos = np.array([
+                coord[0] * self.dx,
+                coord[1] * self.dy,
+                coord[2] * self.dz
+            ])
+            strength = float(grad_magnitude[coord[0], coord[1], coord[2]])
+            cores.append((pos, strength))
+        
+        return cores
+    
+    def export_field_grid(self, filename: str, resolution: int = 64) -> str:
+        """
+        Экспорт поля H и его градиента в JSON для визуализации срезов.
+        
+        Аргументы:
+        - filename: путь к выходному файлу
+        - resolution: разрешение экспортируемой сетки (может быть меньше исходной)
+        
+        Возвращает:
+        - путь к сохранённому файлу
+        """
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        # Вычисляем градиент
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_mag = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        # Если нужно понижаем дискретизацию
+        if resolution < self.nx:
+            step = self.nx // resolution
+            H_sub = self.H[::step, ::step, ::step]
+            grad_mag_sub = grad_mag[::step, ::step, ::step]
+        else:
+            H_sub = self.H
+            grad_mag_sub = grad_mag
+            resolution = self.nx
+        
+        # Конвертируем в список для JSON
+        data = {
+            'metadata': {
+                'grid_size': resolution,
+                'box_size': [self.Lx, self.Ly, self.Lz],
+                'num_vortices': len(self.vortices),
+                'dx': self.dx * (self.nx / resolution),
+                'dy': self.dy * (self.ny / resolution),
+                'dz': self.dz * (self.nz / resolution)
+            },
+            'vortices': [
+                {
+                    'position': v.position.tolist(),
+                    'charge': float(v.charge),
+                    'orientation': v.orientation.tolist()
+                }
+                for v in self.vortices
+            ],
+            'field': {
+                'H_min': float(np.min(np.real(H_sub))),
+                'H_max': float(np.max(np.real(H_sub))),
+                'gradient_min': float(np.min(grad_mag_sub)),
+                'gradient_max': float(np.max(grad_mag_sub))
+            },
+            'grid_data': {
+                'H': np.real(H_sub).flatten().tolist(),
+                'gradient_magnitude': grad_mag_sub.flatten().tolist()
+            }
+        }
+        
+        os.makedirs(os.path.dirname(filename) if os.path.dirname(filename) else '.', exist_ok=True)
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+        
+        file_size = os.path.getsize(filename) / (1024 * 1024)
+        print(f"    Поле H экспортировано: {filename} ({file_size:.1f} MB)")
+        
+        return filename
+    
+    def export_to_vtk(self, filename: str) -> None:
+        """
+        Экспорт поля Н в VTK формат для визуализации в ParaView/Blender.
+        """
+        try:
+            from pyevtk.hl import gridToVTK
+        except ImportError:
+            print("pyevtk не установлен. Установить: pip install pyevtk")
+            return
+        
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        x = np.linspace(0, self.Lx, self.nx)
+        y = np.linspace(0, self.Ly, self.ny)
+        z = np.linspace(0, self.Lz, self.nz)
+        
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_mag = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        gridToVTK(
+            filename,
+            x, y, z,
+            pointData={
+                'H': np.real(self.H).astype(np.float32),
+                'gradient': grad_mag.astype(np.float32),
+                'energy_density': (grad_mag**2).astype(np.float32)
+            }
+        )
+        
+        print(f"Поле экспортировано в {filename}.vtr")
+
+
+class TopologicalArchitect3D(BiharmonicSolver3D):
+    """
+    Расширение BiharmonicSolver3D с методами для топологического размещения.
+    Совместим с API TopologicalArchitect.
+    """
+    
+    def __init__(self, grid_shape=(64, 64, 64), box_size=None):
+        super().__init__(grid_shape, box_size)
+        self.components = []  # список компонентов с метаданными
+    
+    def add_component(self, component_data: dict):
+        """
+        Добавить компонент (элемент) в систему.
+        
+        Аргументы:
+        - component_data: словарь с параметрами:
+            - charge: топологический заряд
+            - position: начальная позиция [x, y, z]
+            - orientation: ориентация вихря [x, y, z]
+            - symbol: символ элемента
+            - Z: атомный номер
+        """
+        orientation = component_data.get('orientation', [0, 0, 1])
+        if np.linalg.norm(orientation) < 1e-6:
+            orientation = [0, 0, 1]
+        
+        vortex = Vortex3D(
+            charge=component_data.get('charge', 1.0),
+            position=np.array(component_data.get('position', [0, 0, 0])),
+            orientation=np.array(orientation)
+        )
+        
+        self.add_vortex(vortex)
+        
+        self.components.append({
+            'vortex': vortex,
+            'symbol': component_data.get('symbol', '?'),
+            'Z': component_data.get('Z', 0),
+            'charge': component_data.get('charge', 1.0),
+            'data': component_data
+        })
+    
+    def optimize(self, objective='minimize_energy', max_iterations=100,
+                 temperature=0.0, state=None, **kwargs) -> dict:
+        """
+        Оптимизация размещения компонентов.
+        
+        Аргументы:
+        - objective: целевая функция ('minimize_energy')
+        - max_iterations: максимальное число итераций
+        - temperature: температура для теплового шума (устаревшее, используйте state)
+        - state: термодинамическое состояние
+        """
+        # Для обратной совместимости
+        if state is None and temperature > 0:
+            try:
+                from thermodynamics import ThermodynamicState
+                state = ThermodynamicState(temperature, 0.1)
+            except ImportError:
+                class SimpleState:
+                    def __init__(self, T, P):
+                        self.temperature = T
+                        self.pressure = P
+                state = SimpleState(temperature, 0.1)
+        
+        result = self.relax_vortices(
+            max_iter=max_iterations,
+            learning_rate=0.05,
+            state=state,
+            thermal_scale=0.3
+        )
+        
+        # Формируем результат в стиле TopologicalArchitect
+        class Solution:
+            def __init__(self, energy, positions, components, d_min):
+                self.energy = energy
+                self.positions = positions
+                self.components = components
+                self.d_min = d_min
+                self.min_distance = self._compute_min_distance(positions)
+                self.packing_coefficient = self._compute_packing(positions)
+                self.total_charge = sum(c.get('charge', 1.0) for c in components)
+            
+            def _compute_min_distance(self, positions):
+                if len(positions) < 2:
+                    return float('inf')
+                min_dist = float('inf')
+                for i in range(len(positions)):
+                    for j in range(i+1, len(positions)):
+                        dist = np.linalg.norm(np.array(positions[i]) - np.array(positions[j]))
+                        min_dist = min(min_dist, dist)
+                return min_dist
+            
+            def _compute_packing(self, positions):
+                if len(positions) < 2:
+                    return 1.0
+                return 0.5  # Упрощённая оценка
+        
+        return Solution(
+            energy=result['final_energy'],
+            positions=result['final_positions'],
+            components=self.components,
+            d_min=result['d_min_equilibrium']
+        )
+    
+    def get_vortex_positions(self) -> List[np.ndarray]:
+        """Получить текущие позиции всех вихрей."""
+        return [v.position for v in self.vortices]
+    
+    def get_vortex_charges(self) -> List[float]:
+        """Получить заряды всех вихрей."""
+        return [v.charge for v in self.vortices]

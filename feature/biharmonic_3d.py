@@ -1,0 +1,345 @@
+﻿import numpy as np
+from typing import List, Tuple, Dict, Any
+import os
+import json
+
+try:
+    from pyfftw import interfaces as fft
+    FFTW_AVAILABLE = True
+except ImportError:
+    import numpy.fft as fft
+    FFTW_AVAILABLE = False
+
+
+class Vortex3D:
+    def __init__(self, position: np.ndarray = None, charge: float = 1.0,
+                 orientation: np.ndarray = None):
+        self.position = position if position is not None else np.zeros(3, dtype=np.float64)
+        self.charge = float(charge)
+        self.orientation = orientation if orientation is not None else np.array([0, 0, 1], dtype=np.float64)
+        norm = np.linalg.norm(self.orientation)
+        if norm > 0:
+            self.orientation = self.orientation / norm
+
+
+class BiharmonicSolver3D:
+    def __init__(self, grid_shape: Tuple[int, int, int] = (64, 64, 64),
+                 box_size: Tuple[float, float, float] = None):
+        self.nx, self.ny, self.nz = grid_shape
+        self.Lx, self.Ly, self.Lz = box_size if box_size else (100.0, 100.0, 100.0)
+        self.dx = self.Lx / self.nx
+        self.dy = self.Ly / self.ny
+        self.dz = self.Lz / self.nz
+        
+        x = np.linspace(0, self.Lx, self.nx)
+        y = np.linspace(0, self.Ly, self.ny)
+        z = np.linspace(0, self.Lz, self.nz)
+        self.X, self.Y, self.Z = np.meshgrid(x, y, z, indexing='ij')
+        
+        kx = 2 * np.pi * fft.fftfreq(self.nx, self.dx)
+        ky = 2 * np.pi * fft.fftfreq(self.ny, self.dy)
+        kz = 2 * np.pi * fft.fftfreq(self.nz, self.dz)
+        self.Kx, self.Ky, self.Kz = np.meshgrid(kx, ky, kz, indexing='ij')
+        self.K2 = self.Kx**2 + self.Ky**2 + self.Kz**2
+        self.K4 = self.K2**2
+        self.K4[0, 0, 0] = 1.0
+        
+        self.vortices: List[Vortex3D] = []
+        self.H = np.zeros(grid_shape, dtype=np.complex128)
+        self._field_computed = False
+    
+    def add_vortex(self, vortex: Vortex3D) -> None:
+        self.vortices.append(vortex)
+        self._field_computed = False
+    
+    def remove_vortex(self, index: int) -> None:
+        if 0 <= index < len(self.vortices):
+            self.vortices.pop(index)
+            self._field_computed = False
+    
+    def clear_vortices(self) -> None:
+        self.vortices.clear()
+        self._field_computed = False
+    
+    def compute_vortex_field(self, vortex: Vortex3D) -> np.ndarray:
+        x0, y0, z0 = vortex.position
+        dx_rel = (self.X - x0)
+        dy_rel = (self.Y - y0)
+        dz_rel = (self.Z - z0)
+        dx_rel = np.where(dx_rel > self.Lx/2, dx_rel - self.Lx, dx_rel)
+        dx_rel = np.where(dx_rel < -self.Lx/2, dx_rel + self.Lx, dx_rel)
+        dy_rel = np.where(dy_rel > self.Ly/2, dy_rel - self.Ly, dy_rel)
+        dy_rel = np.where(dy_rel < -self.Ly/2, dy_rel + self.Ly, dy_rel)
+        dz_rel = np.where(dz_rel > self.Lz/2, dz_rel - self.Lz, dz_rel)
+        dz_rel = np.where(dz_rel < -self.Lz/2, dz_rel + self.Lz, dz_rel)
+        
+        ux, uy, uz = vortex.orientation
+        r_perp_sq = (dy_rel*uz - dz_rel*uy)**2 + (dz_rel*ux - dx_rel*uz)**2 + (dx_rel*uy - dy_rel*ux)**2
+        r_perp_sq = np.maximum(r_perp_sq, 1e-10)
+        numerator = dy_rel*uz - dz_rel*uy
+        denominator = np.sqrt(r_perp_sq) + 1e-10
+        H_vortex = vortex.charge * np.arctan2(numerator, denominator)
+        core_radius = 2.0
+        smooth_factor = 1.0 - np.exp(-r_perp_sq / core_radius**2)
+        H_vortex = H_vortex * smooth_factor
+        H_vortex = np.clip(H_vortex, -10.0, 10.0)
+        return H_vortex.astype(np.complex128)
+    
+    def compute_total_field(self) -> np.ndarray:
+        self.H = np.zeros(self.H.shape, dtype=np.complex128)
+        for vortex in self.vortices:
+            self.H += self.compute_vortex_field(vortex)
+        self._field_computed = True
+        return self.H
+    
+    def solve_biharmonic(self, max_iter: int = 100, tol: float = 1e-6) -> np.ndarray:
+        H_source = self.compute_total_field()
+        H_source_fft = fft.fftn(H_source)
+        H_fft = H_source_fft.copy()
+        for iteration in range(max_iter):
+            H_fft_new = H_source_fft.copy()
+            mask = self.K4 > 1e-10
+            H_fft_new[mask] = H_fft_new[mask] - H_fft[mask] / self.K4[mask]
+            diff = np.max(np.abs(H_fft_new - H_fft))
+            H_fft = H_fft_new
+            if diff < tol:
+                break
+        self.H = np.real(fft.ifftn(H_fft))
+        self.H = np.clip(self.H, -100.0, 100.0)
+        self._field_computed = True
+        return self.H
+    
+    def compute_energy(self) -> float:
+        if not self._field_computed:
+            self.solve_biharmonic()
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        energy_density = grad_x**2 + grad_y**2 + grad_z**2
+        energy = np.sum(energy_density) * self.dx * self.dy * self.dz
+        if np.isnan(energy) or np.isinf(energy):
+            return 1e10
+        return float(energy)
+    
+    def compute_gradient(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if not self._field_computed:
+            self.solve_biharmonic()
+        H_fft = fft.fftn(self.H)
+        grad_x = np.real(fft.ifftn(1j * self.Kx * H_fft))
+        grad_y = np.real(fft.ifftn(1j * self.Ky * H_fft))
+        grad_z = np.real(fft.ifftn(1j * self.Kz * H_fft))
+        grad_x = np.clip(grad_x, -1e3, 1e3)
+        grad_y = np.clip(grad_y, -1e3, 1e3)
+        grad_z = np.clip(grad_z, -1e3, 1e3)
+        return grad_x, grad_y, grad_z
+    
+    def relax_vortices(self, max_iter: int = 100, learning_rate: float = 0.05,
+                       state=None, thermal_scale=None):
+        if state is None:
+            class DefaultState:
+                def __init__(self):
+                    self.temperature = 300.0
+                    self.pressure = 0.1
+            state = DefaultState()
+        
+        K0 = 200.0
+        d_min_0 = 2.76
+        pressure_force_factor = 1.0 + float(state.pressure) / K0
+        d_min_P = d_min_0 * (1 + float(state.pressure) / K0) ** (-1/6)
+        
+        # ==============================================
+        # ТЬЫ С СТ thermal_scale
+        # ==============================================
+        k_B_eV = 8.617333262145e-5
+        E_vortex_eV = 100.0 * 1e6  # 100 э
+        thermal_scale = np.sqrt(k_B_eV * float(state.temperature) / E_vortex_eV)
+        thermal_amplitude = thermal_scale * d_min_0
+        
+        energy_history = []
+        
+        print(f"    Relax: P={state.pressure} GPa, T={state.temperature} K")
+        print(f"    pressure_force_factor = {pressure_force_factor:.6f}")
+        print(f"    thermal_scale = {thermal_scale:.3e}")
+        print(f"    thermal_amplitude = {thermal_amplitude:.3e}")
+        
+        for iteration in range(int(max_iter)):
+            self.solve_biharmonic(max_iter=30, tol=1e-4)
+            energy = self.compute_energy()
+            energy_history.append(energy)
+            
+            grad_x, grad_y, grad_z = self.compute_gradient()
+            
+            if np.isnan(energy) or np.isinf(energy):
+                break
+            
+            for vortex in self.vortices:
+                i = int(vortex.position[0] / self.dx) % self.nx
+                j = int(vortex.position[1] / self.dy) % self.ny
+                k = int(vortex.position[2] / self.dz) % self.nz
+                
+                gx = float(grad_x[i, j, k])
+                gy = float(grad_y[i, j, k])
+                gz = float(grad_z[i, j, k])
+                
+                force = -np.array([gx, gy, gz], dtype=np.float64) * pressure_force_factor
+                
+                force_norm = np.linalg.norm(force)
+                if force_norm > 10.0:
+                    force = force / force_norm * 10.0
+                
+                if state.temperature > 0:
+                    noise = np.random.randn(3).astype(np.float64) * thermal_amplitude
+                    force = force + noise
+                
+                vortex.position = vortex.position + learning_rate * force
+                
+                vortex.position[0] = vortex.position[0] % self.Lx
+                vortex.position[1] = vortex.position[1] % self.Ly
+                vortex.position[2] = vortex.position[2] % self.Lz
+            
+            if iteration % 50 == 0 and iteration > 0:
+                print(f"    Iter {iteration}: energy = {energy:.2f}")
+        
+        return {
+            'final_energy': energy_history[-1] if energy_history else 0.0,
+            'energy_history': energy_history,
+            'final_positions': [v.position.tolist() for v in self.vortices],
+            'd_min_equilibrium': d_min_P
+        }
+    
+    def find_vortex_cores(self, threshold: float = 0.5) -> List[Tuple[np.ndarray, float]]:
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_magnitude = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        from scipy import ndimage
+        local_max = ndimage.maximum_filter(grad_magnitude, size=5) == grad_magnitude
+        
+        max_val = np.max(grad_magnitude)
+        if max_val > 0:
+            mask = local_max & (grad_magnitude > threshold * max_val)
+        else:
+            mask = local_max
+        
+        coords = np.argwhere(mask)
+        cores = []
+        
+        for coord in coords:
+            pos = np.array([
+                coord[0] * self.dx,
+                coord[1] * self.dy,
+                coord[2] * self.dz
+            ])
+            strength = float(grad_magnitude[coord[0], coord[1], coord[2]])
+            cores.append((pos, strength))
+        
+        return cores
+    
+    def export_field_grid(self, filename: str, resolution: int = 64) -> str:
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_mag = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        if resolution < self.nx:
+            step = self.nx // resolution
+            H_sub = self.H[::step, ::step, ::step]
+            grad_mag_sub = grad_mag[::step, ::step, ::step]
+        else:
+            H_sub = self.H
+            grad_mag_sub = grad_mag
+            resolution = self.nx
+        
+        data = {
+            'metadata': {
+                'grid_size': resolution,
+                'box_size': [self.Lx, self.Ly, self.Lz],
+                'num_vortices': len(self.vortices),
+                'dx': self.dx * (self.nx / resolution),
+                'dy': self.dy * (self.ny / resolution),
+                'dz': self.dz * (self.nz / resolution)
+            },
+            'vortices': [
+                {
+                    'position': v.position.tolist(),
+                    'charge': float(v.charge),
+                    'orientation': v.orientation.tolist()
+                }
+                for v in self.vortices
+            ],
+            'field': {
+                'H_min': float(np.min(np.real(H_sub))),
+                'H_max': float(np.max(np.real(H_sub))),
+                'gradient_min': float(np.min(grad_mag_sub)),
+                'gradient_max': float(np.max(grad_mag_sub))
+            },
+            'grid_data': {
+                'H': np.real(H_sub).flatten().tolist(),
+                'gradient_magnitude': grad_mag_sub.flatten().tolist()
+            }
+        }
+        
+        os.makedirs(os.path.dirname(filename) if os.path.dirname(filename) else '.', exist_ok=True)
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+        
+        file_size = os.path.getsize(filename) / (1024 * 1024)
+        print(f"    Field H exported: {filename} ({file_size:.1f} MB)")
+        
+        return filename
+    
+    def export_to_vtk(self, filename: str) -> None:
+        try:
+            from pyevtk.hl import gridToVTK
+        except ImportError:
+            print("pyevtk not installed. Run: pip install pyevtk")
+            return
+        
+        if not self._field_computed:
+            self.solve_biharmonic()
+        
+        x = np.linspace(0, self.Lx, self.nx)
+        y = np.linspace(0, self.Ly, self.ny)
+        z = np.linspace(0, self.Lz, self.nz)
+        
+        grad_x, grad_y, grad_z = self.compute_gradient()
+        grad_mag = np.sqrt(grad_x**2 + grad_y**2 + grad_z**2)
+        
+        gridToVTK(
+            filename,
+            x, y, z,
+            pointData={
+                'H': np.real(self.H).astype(np.float32),
+                'gradient': grad_mag.astype(np.float32),
+                'energy_density': (grad_mag**2).astype(np.float32)
+            }
+        )
+        
+        print(f"Field exported to {filename}.vtr")
+
+
+class TopologicalArchitect3D(BiharmonicSolver3D):
+    def __init__(self, grid_shape=(64, 64, 64), box_size=None):
+        super().__init__(grid_shape, box_size)
+        self.components = []
+    
+    def add_component(self, component_data: dict):
+        orientation = component_data.get('orientation', [0, 0, 1])
+        if np.linalg.norm(orientation) < 1e-6:
+            orientation = [0, 0, 1]
+        vortex = Vortex3D(
+            charge=float(component_data.get('charge', 1.0)),
+            position=np.array(component_data.get('position', [0, 0, 0]), dtype=np.float64),
+            orientation=np.array(orientation, dtype=np.float64)
+        )
+        self.add_vortex(vortex)
+        self.components.append({
+            'vortex': vortex,
+            'symbol': component_data.get('symbol', '?'),
+            'Z': component_data.get('Z', 0)
+        })
+    
+    def get_vortex_positions(self) -> List[np.ndarray]:
+        return [v.position for v in self.vortices]
+    
+    def get_vortex_charges(self) -> List[float]:
+        return [v.charge for v in self.vortices]
