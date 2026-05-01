@@ -107,21 +107,13 @@
       margin-bottom: 5px;
       font-family: inherit;
     }
-    #oracle-log {
-      position: absolute;
-      bottom: 90px;
-      right: 20px;
-      width: 300px;
-      height: 150px;
-      background: rgba(0,0,0,0.8);
-      border: 1px solid #0f0;
-      padding: 10px;
-      color: #0f0;
-      z-index: 10;
-      overflow-y: auto;
-      font-size: 11px;
+    .element-label {
+      color: #fff;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      text-shadow: 0 0 5px #000;
       pointer-events: none;
-      display: none;
+      user-select: none;
     }
   </style>
 </head>
@@ -156,14 +148,13 @@
   <div id="reactorResult" style="margin-top:10px;"></div>
 </div>
 
-<div id="oracle-log"></div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 
 <script>
   // ========== ГЛОБАЛЬНОЕ СОСТОЯНИЕ ==========
-  let scene, camera, renderer, controls;
+  let scene, camera, renderer, labelRenderer, controls;
   let trajectoryData = [];
   let currentFrame = 0;
   let playing = false;
@@ -182,38 +173,6 @@
 
   const groupRadii = { 1: 0.4, 2: 0.6, 3: 0.8, 4: 1.0, 5: 1.2, 6: 1.4, 7: 1.6 };
 
-  // ========== ШЕЙДЕР ВИХРЯ ==========
-  const vertexShader = `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `;
-
-  const fragmentShader = `
-    varying vec2 vUv;
-    uniform float uTime;
-    uniform vec3 uColor;
-    void main() {
-      vec2 centered = vUv - 0.5;
-      float angle = atan(centered.y, centered.x);
-      float dist = length(centered) * 2.0;
-      
-      float spiral = sin(angle * 5.0 + uTime * 0.001 + dist * 10.0);
-      float intensity = smoothstep(0.2, 0.8, spiral * 0.5 + 0.5);
-      
-      float poleGlow = abs(vUv.y - 0.5) * 2.0;
-      
-      vec3 finalColor = uColor * (0.3 + intensity * 0.7) + vec3(0.5, 0.8, 1.0) * poleGlow * 0.3;
-      float alpha = 0.8;
-      
-      if (dist > 1.0) discard;
-      
-      gl_FragColor = vec4(finalColor, alpha);
-    }
-  `;
-
   // ========== ИНИЦИАЛИЗАЦИЯ СЦЕНЫ ==========
   function initScene() {
     scene = new THREE.Scene();
@@ -223,10 +182,24 @@
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+    
+    labelRenderer = new THREE.CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(labelRenderer.domElement);
+    
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     const gridHelper = new THREE.GridHelper(100, 20, 0x112233, 0x050510);
     scene.add(gridHelper);
+    
+    const ambientLight = new THREE.AmbientLight(0x404040);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(1, 1, 1);
+    scene.add(dirLight);
   }
 
   // ========== ЗАГРУЗКА ДАННЫХ ==========
@@ -248,10 +221,13 @@
 
   document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
 
-  // ========== СОЗДАНИЕ ВИХРЕВЫХ СФЕР ==========
+  // ========== СОЗДАНИЕ СФЕР С ЛЕЙБЛАМИ ==========
   function createAllSpheres() {
     for (let g in groupObjects) {
-      groupObjects[g].forEach(obj => scene.remove(obj.mesh));
+      groupObjects[g].forEach(obj => {
+        scene.remove(obj.mesh);
+        if (obj.label) scene.remove(obj.label);
+      });
     }
     groupObjects = {};
     
@@ -262,28 +238,27 @@
     for (let g = 1; g <= 7; g++) {
       if (!sampleFrame.groups[g]) continue;
       groupObjects[g] = [];
-      const color = new THREE.Color(colors[g-1]);
+      const color = colors[g-1];
       const radius = groupRadii[g] || 0.6;
-      const geo = new THREE.SphereGeometry(radius, 32, 24);
+      const geo = new THREE.SphereGeometry(radius, 16, 12);
       
       sampleFrame.groups[g].forEach(() => {
-        const uniforms = {
-          uTime: { value: 0 },
-          uColor: { value: color }
-        };
-        const mat = new THREE.ShaderMaterial({
-          vertexShader: vertexShader,
-          fragmentShader: fragmentShader,
-          uniforms: uniforms,
-          transparent: true,
-          depthWrite: false
-        });
-        
+        const mat = new THREE.MeshPhongMaterial({ color: color, shininess: 30, emissive: new THREE.Color(color).multiplyScalar(0.2) });
         const sphere = new THREE.Mesh(geo, mat);
         sphere.visible = true;
-        sphere.userData = { symbol: symbols[elemCounter+1] || '?', group: g, index: elemCounter, uniforms: uniforms };
+        
+        const symbol = symbols[elemCounter+1] || '?';
+        sphere.userData = { symbol: symbol, group: g, index: elemCounter };
         scene.add(sphere);
-        groupObjects[g].push({ mesh: sphere, data: sphere.userData, trail: [] });
+        
+        const div = document.createElement('div');
+        div.className = 'element-label';
+        div.textContent = symbol;
+        const label = new THREE.CSS2DObject(div);
+        label.position.set(0, radius * 2, 0);
+        sphere.add(label);
+        
+        groupObjects[g].push({ mesh: sphere, label: label, data: sphere.userData, trail: [] });
         elemCounter++;
       });
     }
@@ -310,13 +285,14 @@
           const [x, y, z] = frame.groups[g][i];
           obj.mesh.position.set(x, y, z);
           obj.mesh.visible = true;
-          if (obj.data.uniforms) obj.data.uniforms.uTime.value = performance.now() * 0.001;
+          obj.label.visible = !playing;
           if (!playing) {
             obj.trail.push(obj.mesh.position.clone());
             if (obj.trail.length > 15) obj.trail.shift();
           }
         } else {
           obj.mesh.visible = false;
+          obj.label.visible = false;
         }
       });
     }
@@ -342,7 +318,7 @@
     }
   }
 
-  // ========== ЛУЧИ КВАНТОРА ==========
+  // ========== ЛУЧИ КВАНТОРА (ГРУППОВОЙ АНАЛИЗ) ==========
   function drawQuantumLines() {
     const threshold = 12.0;
     const allObjs = [];
@@ -351,6 +327,11 @@
         groupObjects[g].forEach(o => { if (o.mesh.visible) allObjs.push(o); });
       }
     }
+    
+    // Строим матрицу связей
+    const connections = {};
+    allObjs.forEach(o => connections[o.data.index] = new Set());
+    
     for (let i = 0; i < allObjs.length; i++) {
       for (let j = i+1; j < allObjs.length; j++) {
         const a = allObjs[i].mesh.position;
@@ -360,9 +341,16 @@
           const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.4, transparent: true }));
           scene.add(line);
           quantumLines.push(line);
+          
+          connections[allObjs[i].data.index].add(allObjs[j].data.index);
+          connections[allObjs[j].data.index].add(allObjs[i].data.index);
         }
       }
     }
+    
+    // Поиск клик (групп связанных атомов)
+    window.lastConnections = connections;
+    window.lastAllObjs = allObjs;
   }
 
   // ========== УПРАВЛЕНИЕ ==========
@@ -378,7 +366,7 @@
     loadFrame(parseInt(e.target.value));
   });
 
-  // ========== ЗАХВАТ СОСТОЯНИЯ (СКРИНШОТ + ОТЧЁТ) ==========
+  // ========== ЗАХВАТ СОСТОЯНИЯ (СКРИНШОТ + ОТЧЁТ С КОМПЛЕКСАМИ) ==========
   document.getElementById('captureBtn').addEventListener('click', () => {
     // 1. Скриншот
     renderer.render(scene, camera);
@@ -390,29 +378,24 @@
 
     // 2. Текстовый отчёт
     const frame = trajectoryData[currentFrame];
-    let report = `SpectraVortex — Отчёт Оракула\n`;
-    report += `Шаг: ${frame.step} | d_min: ${frame.d_min.toFixed(3)}\n`;
+    let report = `=== ОТЧЁТ ОРАКУЛА ===\n`;
+    report += `Возможные продукты синтеза (расчётные данные для ДБР-реактора с заморозкой на выходе)\n`;
+    report += `Условия: Шаг: ${frame.step} | d_min: ${frame.d_min.toFixed(3)}\n`;
     report += `Активных атомов: ${Object.values(groupObjects).flat().filter(o => o.mesh.visible).length}\n`;
-    report += `\n--- Обнаруженные связи ---\n`;
+    report += `\n--- Найденные связи (пары) ---\n`;
     
-    const threshold = 12.0;
-    let found = false;
-    const allObjs = [];
-    for (let g = 1; g <= 7; g++) {
-      if (groupObjects[g]) {
-        groupObjects[g].forEach(o => { if (o.mesh.visible) allObjs.push(o); });
-      }
-    }
+    const connections = window.lastConnections || {};
+    const allObjs = window.lastAllObjs || [];
     
+    // Пары
+    let pairFound = false;
     for (let i = 0; i < allObjs.length; i++) {
       for (let j = i+1; j < allObjs.length; j++) {
-        const a = allObjs[i].mesh.position;
-        const b = allObjs[j].mesh.position;
-        const dist = a.distanceTo(b);
-        if (dist < threshold) {
-          found = true;
+        if (connections[allObjs[i].data.index]?.has(allObjs[j].data.index)) {
+          pairFound = true;
           const s1 = allObjs[i].data.symbol;
           const s2 = allObjs[j].data.symbol;
+          const dist = allObjs[i].mesh.position.distanceTo(allObjs[j].mesh.position);
           const grpDiff = Math.abs(allObjs[i].data.group - allObjs[j].data.group);
           let stab = 'НЕСТАБИЛЕН';
           if (grpDiff === 0) stab = 'СТАБИЛЕН';
@@ -421,8 +404,33 @@
         }
       }
     }
+    if (!pairFound) report += `Связей не обнаружено.\n`;
     
-    if (!found) report += `Связей не обнаружено.\n`;
+    // Поиск тройных и более комплексов
+    report += `\n--- Обнаруженные комплексы ---\n`;
+    const visited = new Set();
+    let complexFound = false;
+    
+    allObjs.forEach(obj => {
+      if (visited.has(obj.data.index)) return;
+      const component = [];
+      const queue = [obj.data.index];
+      while (queue.length > 0) {
+        const idx = queue.shift();
+        if (visited.has(idx)) continue;
+        visited.add(idx);
+        component.push(idx);
+        (connections[idx] || []).forEach(neighbor => {
+          if (!visited.has(neighbor)) queue.push(neighbor);
+        });
+      }
+      if (component.length >= 3) {
+        complexFound = true;
+        const syms = component.map(idx => allObjs.find(o => o.data.index === idx)?.data.symbol || '?').join('-');
+        report += `Комплекс из ${component.length} атомов: ${syms}\n`;
+      }
+    });
+    if (!complexFound) report += `Комплексов не обнаружено.\n`;
     
     const blob = new Blob([report], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -486,6 +494,7 @@
     }
     controls.update();
     renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
   }
 
   window.startApp = function() {
