@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>SpectraVortex — Quantum Reactor</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      background-color: #000;
+      color: #0f0;
+    }
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+    #loading-screen h1 {
+      font-size: 2em;
+      margin-bottom: 0.5em;
+      text-shadow: 0 0 10px #0f0;
+    }
+    #loading-screen button {
+      background: transparent;
+      color: #0f0;
+      border: 2px solid #0f0;
+      padding: 15px 40px;
+      font-size: 1.5em;
+      cursor: pointer;
+      margin-top: 2em;
+      font-family: inherit;
+    }
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-left: 3px solid #0f0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+    button {
+      background: #0f0;
+      color: #000;
+      border: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: inherit;
+    }
+    button:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+    input[type=range] {
+      flex-grow: 1;
+      cursor: pointer;
+      background: #222;
+      height: 4px;
+      accent-color: #0f0;
+    }
+    #alchemy-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid #ff0;
+      padding: 10px;
+      color: #ff0;
+      z-index: 10;
+      width: 250px;
+      display: none;
+      font-size: 12px;
+    }
+    #alchemy-panel select {
+      width: 100%;
+      background: #111;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 5px;
+      margin-bottom: 5px;
+      font-family: inherit;
+    }
+    #oracle-log {
+      position: absolute;
+      bottom: 90px;
+      right: 20px;
+      width: 300px;
+      height: 150px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid #0f0;
+      padding: 10px;
+      color: #0f0;
+      z-index: 10;
+      overflow-y: auto;
+      font-size: 11px;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <h1>SpectraVortex VMMS</h1>
+  <p>Существует только движение. Материя — замкнутые вихри. Гравитация — приталкивание.</p>
+  <p>Помните: шары не существуют. Существуют только вихри.</p>
+  <button onclick="startApp()">ВОЙТИ В КРОЛИЧЬЮ НОРУ</button>
+</div>
+
+<div id="info-panel" style="display:none;">
+  <b>SpectraVortex</b><br>
+  Шаг: <span id="stepLabel">0</span> | d_min: <span id="dminLabel">—</span>
+</div>
+
+<div id="controls" style="display:none;">
+  <button id="loadBtn">📂 JSON</button>
+  <button id="playBtn" disabled>▶</button>
+  <input type="range" id="slider" min="0" max="0" value="0" step="1" disabled>
+  <button id="captureBtn" disabled>📸 Зафиксировать</button>
+  <button id="alchemyToggle">⚗️ Реактор</button>
+  <input type="file" id="fileInput" accept=".json" style="display:none;">
+</div>
+
+<div id="alchemy-panel">
+  <h4>⚗️ Алхимический Реактор</h4>
+  <select id="el1"></select>
+  <select id="el2"></select>
+  <button onclick="runReactor()">СИНТЕЗИРОВАТЬ</button>
+  <div id="reactorResult" style="margin-top:10px;"></div>
+</div>
+
+<div id="oracle-log"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+  // ========== ГЛОБАЛЬНОЕ СОСТОЯНИЕ ==========
+  let scene, camera, renderer, controls;
+  let trajectoryData = [];
+  let currentFrame = 0;
+  let playing = false;
+  let groupObjects = {};
+  let quantumLines = [];
+  let trailLines = [];
+
+  // ========== ДАННЫЕ ЭЛЕМЕНТОВ ==========
+  const colors = ['#ff4444', '#44ff44', '#4488ff', '#ffaa00', '#ff44ff', '#44ffff', '#ffffff'];
+  const symbols = ['?', 'H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar',
+    'K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr',
+    'Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe',
+    'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu',
+    'Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra',
+    'Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr'];
+
+  const groupRadii = { 1: 0.4, 2: 0.6, 3: 0.8, 4: 1.0, 5: 1.2, 6: 1.4, 7: 1.6 };
+
+  // ========== ШЕЙДЕР ВИХРЯ ==========
+  const vertexShader = `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    varying vec2 vUv;
+    uniform float uTime;
+    uniform vec3 uColor;
+    void main() {
+      vec2 centered = vUv - 0.5;
+      float angle = atan(centered.y, centered.x);
+      float dist = length(centered) * 2.0;
+      
+      float spiral = sin(angle * 5.0 + uTime * 0.001 + dist * 10.0);
+      float intensity = smoothstep(0.2, 0.8, spiral * 0.5 + 0.5);
+      
+      float poleGlow = abs(vUv.y - 0.5) * 2.0;
+      
+      vec3 finalColor = uColor * (0.3 + intensity * 0.7) + vec3(0.5, 0.8, 1.0) * poleGlow * 0.3;
+      float alpha = 0.8;
+      
+      if (dist > 1.0) discard;
+      
+      gl_FragColor = vec4(finalColor, alpha);
+    }
+  `;
+
+  // ========== ИНИЦИАЛИЗАЦИЯ СЦЕНЫ ==========
+  function initScene() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050510);
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(60, 40, 80);
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    const gridHelper = new THREE.GridHelper(100, 20, 0x112233, 0x050510);
+    scene.add(gridHelper);
+  }
+
+  // ========== ЗАГРУЗКА ДАННЫХ ==========
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      trajectoryData = JSON.parse(ev.target.result);
+      document.getElementById('slider').max = trajectoryData.length - 1;
+      document.getElementById('slider').disabled = false;
+      document.getElementById('playBtn').disabled = false;
+      document.getElementById('captureBtn').disabled = false;
+      createAllSpheres();
+      loadFrame(0);
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+
+  // ========== СОЗДАНИЕ ВИХРЕВЫХ СФЕР ==========
+  function createAllSpheres() {
+    for (let g in groupObjects) {
+      groupObjects[g].forEach(obj => scene.remove(obj.mesh));
+    }
+    groupObjects = {};
+    
+    if (!trajectoryData.length) return;
+    const sampleFrame = trajectoryData[0];
+    let elemCounter = 0;
+
+    for (let g = 1; g <= 7; g++) {
+      if (!sampleFrame.groups[g]) continue;
+      groupObjects[g] = [];
+      const color = new THREE.Color(colors[g-1]);
+      const radius = groupRadii[g] || 0.6;
+      const geo = new THREE.SphereGeometry(radius, 32, 24);
+      
+      sampleFrame.groups[g].forEach(() => {
+        const uniforms = {
+          uTime: { value: 0 },
+          uColor: { value: color }
+        };
+        const mat = new THREE.ShaderMaterial({
+          vertexShader: vertexShader,
+          fragmentShader: fragmentShader,
+          uniforms: uniforms,
+          transparent: true,
+          depthWrite: false
+        });
+        
+        const sphere = new THREE.Mesh(geo, mat);
+        sphere.visible = true;
+        sphere.userData = { symbol: symbols[elemCounter+1] || '?', group: g, index: elemCounter, uniforms: uniforms };
+        scene.add(sphere);
+        groupObjects[g].push({ mesh: sphere, data: sphere.userData, trail: [] });
+        elemCounter++;
+      });
+    }
+  }
+
+  // ========== ОТРИСОВКА КАДРА ==========
+  function loadFrame(idx) {
+    if (!trajectoryData.length) return;
+    const frame = trajectoryData[idx];
+    document.getElementById('stepLabel').textContent = frame.step;
+    document.getElementById('dminLabel').textContent = frame.d_min.toFixed(3);
+    document.getElementById('slider').value = idx;
+    currentFrame = idx;
+
+    quantumLines.forEach(l => scene.remove(l));
+    quantumLines = [];
+    trailLines.forEach(l => scene.remove(l));
+    trailLines = [];
+
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g] || !frame.groups[g]) continue;
+      groupObjects[g].forEach((obj, i) => {
+        if (i < frame.groups[g].length) {
+          const [x, y, z] = frame.groups[g][i];
+          obj.mesh.position.set(x, y, z);
+          obj.mesh.visible = true;
+          if (obj.data.uniforms) obj.data.uniforms.uTime.value = performance.now() * 0.001;
+          if (!playing) {
+            obj.trail.push(obj.mesh.position.clone());
+            if (obj.trail.length > 15) obj.trail.shift();
+          }
+        } else {
+          obj.mesh.visible = false;
+        }
+      });
+    }
+
+    if (!playing) {
+      drawTrails();
+      drawQuantumLines();
+    }
+  }
+
+  // ========== ХВОСТЫ ==========
+  function drawTrails() {
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g]) continue;
+      groupObjects[g].forEach(obj => {
+        if (obj.mesh.visible && obj.trail.length > 1) {
+          const geo = new THREE.BufferGeometry().setFromPoints(obj.trail);
+          const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: colors[g-1], opacity: 0.6, transparent: true }));
+          scene.add(line);
+          trailLines.push(line);
+        }
+      });
+    }
+  }
+
+  // ========== ЛУЧИ КВАНТОРА ==========
+  function drawQuantumLines() {
+    const threshold = 12.0;
+    const allObjs = [];
+    for (let g = 1; g <= 7; g++) {
+      if (groupObjects[g]) {
+        groupObjects[g].forEach(o => { if (o.mesh.visible) allObjs.push(o); });
+      }
+    }
+    for (let i = 0; i < allObjs.length; i++) {
+      for (let j = i+1; j < allObjs.length; j++) {
+        const a = allObjs[i].mesh.position;
+        const b = allObjs[j].mesh.position;
+        if (a.distanceTo(b) < threshold) {
+          const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+          const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.4, transparent: true }));
+          scene.add(line);
+          quantumLines.push(line);
+        }
+      }
+    }
+  }
+
+  // ========== УПРАВЛЕНИЕ ==========
+  document.getElementById('playBtn').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('playBtn').textContent = playing ? '⏸' : '▶';
+    if (!playing) loadFrame(currentFrame);
+  });
+
+  document.getElementById('slider').addEventListener('input', (e) => {
+    playing = false;
+    document.getElementById('playBtn').textContent = '▶';
+    loadFrame(parseInt(e.target.value));
+  });
+
+  // ========== ЗАХВАТ СОСТОЯНИЯ (СКРИНШОТ + ОТЧЁТ) ==========
+  document.getElementById('captureBtn').addEventListener('click', () => {
+    // 1. Скриншот
+    renderer.render(scene, camera);
+    const dataURL = renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = `frame_${currentFrame}.png`;
+    a.click();
+
+    // 2. Текстовый отчёт
+    const frame = trajectoryData[currentFrame];
+    let report = `SpectraVortex — Отчёт Оракула\n`;
+    report += `Шаг: ${frame.step} | d_min: ${frame.d_min.toFixed(3)}\n`;
+    report += `Активных атомов: ${Object.values(groupObjects).flat().filter(o => o.mesh.visible).length}\n`;
+    report += `\n--- Обнаруженные связи ---\n`;
+    
+    const threshold = 12.0;
+    let found = false;
+    const allObjs = [];
+    for (let g = 1; g <= 7; g++) {
+      if (groupObjects[g]) {
+        groupObjects[g].forEach(o => { if (o.mesh.visible) allObjs.push(o); });
+      }
+    }
+    
+    for (let i = 0; i < allObjs.length; i++) {
+      for (let j = i+1; j < allObjs.length; j++) {
+        const a = allObjs[i].mesh.position;
+        const b = allObjs[j].mesh.position;
+        const dist = a.distanceTo(b);
+        if (dist < threshold) {
+          found = true;
+          const s1 = allObjs[i].data.symbol;
+          const s2 = allObjs[j].data.symbol;
+          const grpDiff = Math.abs(allObjs[i].data.group - allObjs[j].data.group);
+          let stab = 'НЕСТАБИЛЕН';
+          if (grpDiff === 0) stab = 'СТАБИЛЕН';
+          else if (grpDiff <= 2) stab = 'МЕТАСТАБИЛЕН';
+          report += `${s1}-${s2} | Дист: ${dist.toFixed(2)} | Статус: ${stab}\n`;
+        }
+      }
+    }
+    
+    if (!found) report += `Связей не обнаружено.\n`;
+    
+    const blob = new Blob([report], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const bLink = document.createElement('a');
+    bLink.href = url;
+    bLink.download = `frame_${currentFrame}_report.txt`;
+    bLink.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ========== АЛХИМИЧЕСКИЙ РЕАКТОР ==========
+  document.getElementById('alchemyToggle').addEventListener('click', () => {
+    const panel = document.getElementById('alchemy-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    populateSelects();
+  });
+
+  function populateSelects() {
+    const allSyms = symbols.filter(s => s !== '?');
+    [document.getElementById('el1'), document.getElementById('el2')].forEach(sel => {
+      if (sel.options.length === 0) {
+        allSyms.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; sel.appendChild(opt); });
+      }
+    });
+  }
+
+  window.runReactor = function() {
+    const s1 = document.getElementById('el1').value;
+    const s2 = document.getElementById('el2').value;
+    let obj1 = null, obj2 = null;
+    for (let g in groupObjects) {
+      groupObjects[g].forEach(o => {
+        if (o.data.symbol === s1 && o.mesh.visible) obj1 = o;
+        if (o.data.symbol === s2 && o.mesh.visible) obj2 = o;
+      });
+    }
+    const resultDiv = document.getElementById('reactorResult');
+    if (!obj1 || !obj2) {
+      resultDiv.innerHTML = 'Элементы не найдены на сцене.';
+      return;
+    }
+    const dist = obj1.mesh.position.distanceTo(obj2.mesh.position);
+    const grpDiff = Math.abs(obj1.data.group - obj2.data.group);
+    let prob = 0, stab = 'НЕСТАБИЛЕН', color = '#f00';
+    if (dist < 8) prob = 90;
+    else if (dist < 15) prob = 60;
+    else prob = Math.max(5, 30 - grpDiff * 8);
+    
+    if (prob > 70) { stab = 'СТАБИЛЕН'; color = '#0f0'; }
+    else if (prob > 40) { stab = 'МЕТАСТАБИЛЕН'; color = '#ff0'; }
+    
+    resultDiv.innerHTML = `<b style="color:${color}">${s1}${s2}</b> | P: ${prob}%<br>${stab} (Дист: ${dist.toFixed(1)})`;
+  };
+
+  // ========== АНИМАЦИЯ ==========
+  function animate() {
+    requestAnimationFrame(animate);
+    if (playing && trajectoryData.length) {
+      const next = (currentFrame + 1) % trajectoryData.length;
+      loadFrame(next);
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  window.startApp = function() {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('info-panel').style.display = 'block';
+    document.getElementById('controls').style.display = 'flex';
+    initScene();
+    animate();
+  };
+</script>
+</body>
+</html>
