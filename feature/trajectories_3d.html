@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D periodic table "SpectraVortex VMMS"</title>
+    <style>
+        :root {
+            --bg: #000;
+            --text: #0f0;
+            --text-dim: #888;
+            --border: #0f0;
+            --warning: #ff0;
+            --panel-bg: rgba(0, 0, 0, 0.85);
+            --hover-bg: #0f0;
+            --hover-text: #000;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            background-color: var(--bg);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: var(--text);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            text-align: center;
+            padding: 20px;
+            transition: opacity 0.5s;
+        }
+        #loading-screen .title {
+            font-size: 24px;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px var(--text);
+        }
+        #loading-screen .subtitle {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 30px;
+        }
+        #loading-screen .line {
+            margin: 4px 0;
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
+        }
+        #loading-screen .reminder {
+            margin-top: 20px;
+            font-size: 13px;
+            max-width: 600px;
+            line-height: 1.5;
+            text-align: left;
+            border: 1px solid #333;
+            padding: 15px;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        #loading-screen .reminder b {
+            color: #ff0;
+        }
+        #loading-screen .start-btn {
+            margin-top: 25px;
+            background: transparent;
+            color: var(--text);
+            border: 2px solid var(--text);
+            padding: 12px 40px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        #loading-screen .start-btn:hover {
+            background: var(--hover-bg);
+            color: var(--hover-text);
+            box-shadow: 0 0 20px var(--text);
+        }
+        #loading-screen .lang-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+        #loading-screen .lang-btn {
+            background: transparent;
+            color: #666;
+            border: 1px solid #333;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        #loading-screen .lang-btn.active {
+            color: var(--text);
+            border-color: var(--text);
+        }
+        #loading-screen .lang-btn:hover {
+            color: var(--text);
+            border-color: var(--text);
+        }
+        #loading-screen .github-link {
+            margin-top: 15px;
+            color: #666;
+            font-size: 12px;
+            text-decoration: none;
+            border-bottom: 1px dotted #444;
+            transition: all 0.2s;
+        }
+        #loading-screen .github-link:hover {
+            color: var(--text);
+            border-color: var(--text);
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        #loading-screen .loading-bar {
+            width: 200px;
+            height: 3px;
+            background: #111;
+            border-radius: 2px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        #loading-screen .loading-bar-fill {
+            height: 100%;
+            background: var(--text);
+            width: 0%;
+            animation: loadingProgress 3s ease-in-out infinite;
+        }
+
+        @keyframes loadingProgress {
+            0% {
+                width: 0%;
+            }
+            50% {
+                width: 70%;
+            }
+            100% {
+                width: 100%;
+            }
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: var(--text);
+            background: var(--panel-bg);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 13px;
+            border-left: 3px solid var(--text);
+            z-index: 10;
+            pointer-events: auto;
+        }
+        #info a {
+            color: #0ff;
+            text-decoration: none;
+            font-size: 11px;
+            border-bottom: 1px dotted #0ff;
+        }
+        #info a:hover {
+            color: #fff;
+            border-color: #fff;
+        }
+
+        #warning {
+            position: absolute;
+            bottom: 100px;
+            left: 20px;
+            color: var(--warning);
+            background: var(--panel-bg);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            z-index: 10;
+            border: 1px solid var(--warning);
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        #oracle-panel {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            width: 320px;
+            height: 180px;
+            background: var(--panel-bg);
+            border: 1px solid var(--text);
+            border-radius: 8px;
+            padding: 10px;
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow: hidden;
+            z-index: 10;
+            pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+        }
+        #oracle-title {
+            text-align: center;
+            border-bottom: 1px solid var(--text);
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            opacity: 0.8;
+            font-size: 13px;
+        }
+        #oracle-log {
+            height: calc(100% - 28px);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .oracle-line {
+            margin: 1px 0;
+            opacity: 0;
+            transform: translateY(8px);
+            transition: opacity 0.3s, transform 0.3s;
+            text-shadow: 0 0 5px var(--text);
+            word-break: break-all;
+            line-height: 1.3;
+            font-size: 11px;
+        }
+        .oracle-line.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .oracle-line.fade {
+            opacity: 0;
+            transition: opacity 1.5s;
+        }
+
+        #tooltip {
+            position: absolute;
+            background: var(--panel-bg);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            border: 1px solid var(--text);
+            font-family: 'Courier New', monospace;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: var(--panel-bg);
+            padding: 8px 14px;
+            border-radius: 8px;
+            color: #ccc;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            border-top: 1px solid #333;
+            z-index: 10;
+        }
+        button {
+            background: var(--text);
+            color: #000;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #4f4;
+        }
+        button:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        input[type=range] {
+            flex-grow: 1;
+            cursor: pointer;
+            background: #222;
+            height: 4px;
+            border-radius: 4px;
+            accent-color: var(--text);
+            min-width: 80px;
+        }
+        #groupCheckboxes {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        #groupCheckboxes label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            font-size: 11px;
+            color: #aaa;
+        }
+        input[type=checkbox] {
+            accent-color: var(--text);
+            cursor: pointer;
+        }
+        .circle {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            margin-right: 2px;
+            border: 1px solid #fff;
+        }
+
+        #help-btn {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--text);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 20;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        #help-btn:hover {
+            background: var(--text);
+            color: #000;
+        }
+
+        #help-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--panel-bg);
+            border: 2px solid var(--text);
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 2000;
+            color: var(--text);
+            font-size: 13px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+            min-width: 350px;
+        }
+        #help-modal.active {
+            display: block;
+        }
+        #help-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1999;
+        }
+        #help-overlay.active {
+            display: block;
+        }
+        .help-close {
+            float: right;
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--text);
+            padding: 2px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+        .help-close:hover {
+            background: var(--text);
+            color: #000;
+        }
+
+        #alchemy-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 280px;
+            background: var(--panel-bg);
+            border: 1px solid #ff0;
+            border-radius: 8px;
+            padding: 12px;
+            color: #ff0;
+            font-size: 12px;
+            z-index: 20;
+            display: none;
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.2);
+        }
+        #alchemy-panel.active {
+            display: block;
+        }
+        #alchemy-panel h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        #alchemy-panel select {
+            width: 100%;
+            background: #111;
+            color: var(--text);
+            border: 1px solid #333;
+            padding: 6px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 12px;
+        }
+        #alchemy-panel .synthesis-btn {
+            width: 100%;
+            background: #ff0;
+            color: #000;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        #alchemy-panel .synthesis-btn:hover {
+            background: #fff;
+        }
+        #alchemy-result {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: none;
+            border: 1px solid;
+        }
+        #alchemy-panel .detail-btn {
+            font-size: 10px;
+            background: transparent;
+            color: #0ff;
+            border: 1px solid #0ff;
+            padding: 2px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-top: 6px;
+            display: none;
+        }
+
+        #quality-indicator {
+            position: absolute;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #666;
+            font-size: 10px;
+            z-index: 10;
+            pointer-events: none;
+            transition: color 0.5s;
+        }
+        #quality-indicator.high {
+            color: var(--text);
+        }
+
+        #detail-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--panel-bg);
+            border: 2px solid #ff0;
+            border-radius: 10px;
+            padding: 20px;
+            z-index: 2000;
+            color: #ff0;
+            font-size: 12px;
+            box-shadow: 0 0 30px rgba(255, 255, 0, 0.3);
+            min-width: 300px;
+        }
+        #detail-modal.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН ЗАГРУЗКИ -->
+    <div id="loading-screen">
+        <div class="lang-switch">
+            <button class="lang-btn active" data-lang="ru">RU</button>
+            <button class="lang-btn" data-lang="en">EN</button>
+            <button class="lang-btn" data-lang="cn">CN</button>
+        </div>
+        <div class="title">&lt; SpectraVortex VMMS /&gt;</div>
+        <div class="subtitle">Interactive 3D periodic table</div>
+        <div class="line" style="animation-delay: 0.2s;" data-ru="Инициализация поля H..." data-en="Initializing field H..." data-cn="初始化H场...">Инициализация поля H...</div>
+        <div class="line" style="animation-delay: 0.5s;" data-ru="Загрузка конфигурации вихрей" data-en="Loading vortex configurations" data-cn="加载涡旋配置">Загрузка конфигурации вихрей</div>
+        <div class="line" style="animation-delay: 0.8s;" data-ru="Расчёт ступенек (d_min)..." data-en="Calculating steps (d_min)..." data-cn="计算步长(d_min)...">Расчёт ступенек (d_min)...</div>
+        <div class="line" style="animation-delay: 1.1s;" data-ru="Построение траекторий..." data-en="Building trajectories..." data-cn="构建轨迹...">Построение траекторий...</div>
+        <div class="line" style="animation-delay: 1.4s;" data-ru="Оракул готов" data-en="Oracle ready" data-cn="预言机就绪">Оракул готов</div>
+        <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+        <div class="reminder" data-ru="<b>ВММП:</b> Существует только движение. Материя — замкнутые топологические дефекты. Гравитация — приталкивание. Без подгоночных параметров.<br><br><b>Помните: шары не существуют. Существуют только вихри.</b>" data-en="<b>VMMS:</b> Only motion exists. Matter — closed topological defects. Gravity — pushing, not attraction. No fitting parameters.<br><br><b>Remember: spheres don't exist. Only vortices exist.</b>" data-cn="<b>VMMS:</b> 只有运动存在。物质——闭合拓扑缺陷。引力——推斥，非吸引。无拟合参数。<br><br><b>记住：球体不存在。只有涡旋存在。</b>">
+            <b>ВММП:</b> Существует только движение. Материя — замкнутые топологические дефекты. Гравитация — приталкивание. Без подгоночных параметров.<br><br><b>Помните: шары не существуют. Существуют только вихри.</b>
+        </div>
+        <a href="https://github.com/Dimius0/spectravortex" target="_blank" class="github-link">github.com/Dimius0/spectravortex</a>
+        <button class="start-btn" onclick="startApp()" data-ru="СТАРТ" data-en="START" data-cn="开始">СТАРТ</button>
+    </div>
+
+    <!-- ИНФО-ПАНЕЛЬ -->
+    <div id="info" style="display:none;">
+        <b>SpectraVortex VMMS</b><br>
+        <span data-ru="Шаг:" data-en="Step:" data-cn="步骤:">Шаг:</span> <span id="stepLabel">0</span> | d_min: <span id="dminLabel">—</span><br>
+        <span style="color:var(--text-dim);"><span data-ru="Активные:" data-en="Active:" data-cn="活跃:">Активные:</span> <span id="activeCount">0</span></span><br>
+        <a href="https://github.com/Dimius0/spectravortex" target="_blank" style="font-size:10px;">GitHub ↗</a>
+    </div>
+
+    <!-- ПРЕДУПРЕЖДЕНИЕ -->
+    <div id="warning" style="display:none;" data-ru="⚠ ШАРЫ НЕ СУЩЕСТВУЮТ. Визуализация вихревых структур упрощена." data-en="⚠ SPHERES DON'T EXIST. Vortex structure visualization simplified." data-cn="⚠ 球体不存在。涡旋结构可视化已简化。">
+        ⚠ ШАРЫ НЕ СУЩЕСТВУЮТ. Визуализация вихревых структур упрощена.
+    </div>
+
+    <!-- ОРАКУЛ -->
+    <div id="oracle-panel" style="display:none;">
+        <div id="oracle-title">&lt; <span data-ru="ОРАКУЛ СИНТЕЗА" data-en="SYNTHESIS ORACLE" data-cn="合成预言机">ОРАКУЛ СИНТЕЗА</span> /&gt;</div>
+        <div id="oracle-log"></div>
+    </div>
+
+    <!-- ИНДИКАТОР КАЧЕСТВА -->
+    <div id="quality-indicator" style="display:none;">● <span id="quality-label">LOW</span></div>
+
+    <!-- ТУЛТИП -->
+    <div id="tooltip"></div>
+
+    <!-- КНОПКИ ВЕРХНЕГО ПРАВОГО УГЛА -->
+    <div style="position:absolute; top:20px; right:20px; display:flex; gap:8px; z-index:20; display:none;" id="top-right-btns">
+        <button id="help-btn" title="Help">?</button>
+        <button id="screenshot-btn" title="Screenshot" style="background:transparent; color:var(--text); border:1px solid var(--text);">📸</button>
+        <button id="alchemy-toggle-btn" title="Alchemical Reactor" style="background:transparent; color:#ff0; border:1px solid #ff0;">⚗️</button>
+    </div>
+
+    <!-- АЛХИМИЧЕСКАЯ ПАНЕЛЬ -->
+    <div id="alchemy-panel">
+        <h4>⚗️ <span data-ru="Реактор" data-en="Reactor" data-cn="反应器">Реактор</span></h4>
+        <select id="alchemy-el1"></select>
+        <select id="alchemy-el2"></select>
+        <button class="synthesis-btn" onclick="runQuickSynthesis()"><span data-ru="СИНТЕЗ" data-en="SYNTHESIZE" data-cn="合成">СИНТЕЗ</span></button>
+        <div id="alchemy-result"></div>
+        <button class="detail-btn" onclick="openFullReactor()" style="display:none;"><span data-ru="Подробнее..." data-en="Details..." data-cn="详情...">Подробнее...</span></button>
+    </div>
+
+    <!-- МОДАЛКА ПОДСКАЗОК -->
+    <div id="help-overlay"></div>
+    <div id="help-modal">
+        <button class="help-close" onclick="closeHelp()">✕</button>
+        <h3 data-ru="Управление" data-en="Controls" data-cn="控制">Управление</h3>
+        <p data-ru="<b>Мышь:</b> Вращение (ЛКМ), Перемещение (ПКМ), Зум (колёсико)" data-en="<b>Mouse:</b> Rotate (LMB), Pan (RMB), Zoom (wheel)" data-cn="<b>鼠标:</b> 旋转(左键), 平移(右键), 缩放(滚轮)"><b>Мышь:</b> Вращение (ЛКМ), Перемещение (ПКМ), Зум (колёсико)</p>
+        <p data-ru="<b>Клавиши:</b> ← → = шаги, Пробел = Play/Pause, R = сброс вида" data-en="<b>Keys:</b> ← → = steps, Space = Play/Pause, R = reset view" data-cn="<b>按键:</b> ← → = 步骤, 空格 = 播放/暂停, R = 重置视角"><b>Клавиши:</b> ← → = шаги, Пробел = Play/Pause, R = сброс вида</p>
+        <p data-ru="<b>Слайдер:</b> Быстрая навигация по шагам" data-en="<b>Slider:</b> Fast step navigation" data-cn="<b>滑块:</b> 快速步骤导航"><b>Слайдер:</b> Быстрая навигация по шагам</p>
+        <p data-ru="<b>Остановитесь</b> на кадре — включится высокая детализация" data-en="<b>Pause</b> on a frame — high detail activates" data-cn="<b>暂停</b>在某一帧——高细节激活"><b>Остановитесь</b> на кадре — включится высокая детализация</p>
+    </div>
+
+    <!-- МОДАЛКА ДЕТАЛЕЙ СИНТЕЗА -->
+    <div id="detail-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1999;" onclick="closeDetailModal()"></div>
+    <div id="detail-modal">
+        <button class="help-close" onclick="closeDetailModal()">✕</button>
+        <h3>🧪 <span data-ru="Совместимость элементов" data-en="Element Compatibility" data-cn="元素兼容性">Совместимость элементов</span></h3>
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <thead>
+                <tr style="color:#ff0;">
+                    <th style="border-bottom:1px solid #ff0; padding:4px;" data-ru="Группа" data-en="Group" data-cn="组">Группа</th>
+                    <th style="border-bottom:1px solid #ff0; padding:4px;" data-ru="Совместимость" data-en="Compatibility" data-cn="兼容性">Совместимость</th>
+                    <th style="border-bottom:1px solid #ff0; padding:4px;" data-ru="T½" data-en="T½" data-cn="半衰期">T½</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td style="padding:4px;">K ↔ K</td><td style="color:#0f0;">Стабилен</td><td>&gt; 10⁶ лет</td></tr>
+                <tr><td style="padding:4px;">K ↔ L</td><td style="color:#ff0;">Метастабилен</td><td>~ 10² - 10⁴ лет</td></tr>
+                <tr><td style="padding:4px;">K ↔ M</td><td style="color:#f00;">Нестабилен</td><td>&lt; 1 мс</td></tr>
+                <tr><td style="padding:4px;">L ↔ M</td><td style="color:#ff0;">Метастабилен</td><td>~ 10² - 10⁴ лет</td></tr>
+                <tr><td style="padding:4px;">M ↔ N</td><td style="color:#ff0;">Метастабилен</td><td>~ 10² - 10⁴ лет</td></tr>
+            </tbody>
+        </table>
+        <p style="font-size:10px; color:#888; margin-top:10px;" data-ru="Основано на текущем шаге и позициях" data-en="Based on current step and positions" data-cn="基于当前步骤和位置">Основано на текущем шаге и позициях</p>
+    </div>
+
+    <!-- КОНТРОЛИ -->
+    <div id="controls" style="display:none;">
+        <button id="loadBtn">📂 <span data-ru="JSON" data-en="JSON" data-cn="JSON">JSON</span></button>
+        <button id="prevBtn" disabled>◀◀</button>
+        <button id="playBtn" disabled>▶</button>
+        <button id="nextBtn" disabled>▶▶</button>
+        <span id="sliderLabel" style="min-width:50px;">-</span>
+        <input type="range" id="slider" min="0" max="0" value="0" step="1" disabled>
+        <div style="border-left:1px solid #333; height:20px; margin:0 4px;"></div>
+        <div id="groupCheckboxes"><span style="color:#ccc;" data-ru="Группы:" data-en="Groups:" data-cn="组:">Группы:</span></div>
+    </div>
+
+    <input type="file" id="fileInput" accept=".json" style="display:none;">
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ========== КОНФИГУРАЦИЯ ==========
+        const CONFIG = {
+            MAX_FPS: 30,
+            FRAME_TIME: 1000 / 30,
+            TRAIL_MAX_LENGTH: 15,
+            QUANTUM_THRESHOLD: 12.0,
+            MAX_QUANTUM_LINES: 50,
+            ORACLE_THROTTLE: 1000,
+            ORACLE_MAX_LINES: 4,
+            ORACLE_LIFETIME: 8000,
+            PIXEL_RATIO_FAST: Math.min(window.devicePixelRatio, 1.2),
+            PIXEL_RATIO_IDLE: Math.min(window.devicePixelRatio, 2.5),
+            IDLE_THRESHOLD: 350,
+            STEP_THROTTLE: 120,
+            SPATIAL_CELL_SIZE: 12
+        };
+
+        // ========== ЯЗЫКОВОЙ МОДУЛЬ ==========
+        let currentLang = 'ru';
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.querySelector(`.lang-btn[data-lang="${lang}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            document.querySelectorAll('[data-ru]').forEach(el => {
+                const text = el.getAttribute(`data-${lang}`);
+                if (text !== null && text !== undefined) el.innerHTML = text;
+            });
+            localStorage.setItem('spectravortex-lang', lang);
+        }
+
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+        });
+
+        const savedLang = localStorage.getItem('spectravortex-lang') || 'ru';
+        setLanguage(savedLang);
+
+        // ========== ЗАГРУЗОЧНЫЙ ЭКРАН ==========
+        window.startApp = function() {
+            const loadingScreen = document.getElementById('loading-screen');
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                document.getElementById('info').style.display = 'block';
+                document.getElementById('warning').style.display = 'block';
+                document.getElementById('oracle-panel').style.display = 'block';
+                document.getElementById('controls').style.display = 'flex';
+                document.getElementById('top-right-btns').style.display = 'flex';
+                document.getElementById('quality-indicator').style.display = 'block';
+                initDemo();
+            }, 500);
+        };
+
+        // ========== ДЕМО-ДАННЫЕ ==========
+        function generateDemoData() {
+            const frames = [];
+            const elements = ['H', 'He', 'Li', 'C', 'O'];
+            const groups = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+            const phi = 1.618033988749895;
+
+            for (let step = 0; step < 120; step++) {
+                const progress = step / 120;
+                const frame = { step: step, d_min: 1.5 + Math.sin(progress * Math.PI * 4) * 0.4, groups: {} };
+
+                elements.forEach((el, i) => {
+                    let g;
+                    if (el === 'H') g = 1;
+                    else if (el === 'He') g = 1;
+                    else if (el === 'Li') g = 2;
+                    else if (el === 'C') g = 3;
+                    else g = 4;
+
+                    const angle = (i / elements.length) * Math.PI * 2 + step * 0.03;
+                    const radius = 8 + Math.sin(step * 0.05 + i) * 3;
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle * phi) * radius * 0.6;
+                    const z = Math.sin(angle) * radius;
+
+                    if (!frame.groups[g]) frame.groups[g] = [];
+                    frame.groups[g].push([x, y, z]);
+                });
+
+                frames.push(frame);
+            }
+            return frames;
+        }
+
+        function initDemo() {
+            trajectoryData = generateDemoData();
+            document.getElementById('slider').max = trajectoryData.length - 1;
+            document.getElementById('slider').disabled = false;
+            document.getElementById('playBtn').disabled = false;
+            document.getElementById('prevBtn').disabled = false;
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('sliderLabel').textContent = `1 / ${trajectoryData.length}`;
+            buildCheckboxes();
+            createAllSpheres();
+            loadFrame(0, true);
+            populateAlchemySelects();
+        }
+
+        // ========== ПРОСТРАНСТВЕННЫЙ ХЕШ ==========
+        class SpatialHash {
+            constructor(cellSize = CONFIG.SPATIAL_CELL_SIZE) {
+                this.cellSize = cellSize;
+                this.grid = new Map();
+            }
+            clear() { this.grid.clear(); }
+            addObject(obj) {
+                const key = this.getCellKey(obj.mesh.position);
+                if (!this.grid.has(key)) this.grid.set(key, []);
+                this.grid.get(key).push(obj);
+            }
+            getNearbyObjects(position, radius) {
+                const nearby = [];
+                const parts = this.getCellKey(position).split(',');
+                if (parts.length !== 3) return nearby;
+                const cx = Number(parts[0]);
+                const cy = Number(parts[1]);
+                const cz = Number(parts[2]);
+                if (isNaN(cx) || isNaN(cy) || isNaN(cz)) return nearby;
+                const cellRadius = Math.ceil(radius / this.cellSize);
+                for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+                    for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+                        for (let dz = -cellRadius; dz <= cellRadius; dz++) {
+                            const key = `${cx+dx},${cy+dy},${cz+dz}`;
+                            if (this.grid.has(key)) {
+                                const cell = this.grid.get(key);
+                                if (cell) nearby.push(...cell);
+                            }
+                        }
+                    }
+                }
+                return nearby;
+            }
+            getCellKey(position) {
+                const x = Math.floor(position.x / this.cellSize);
+                const y = Math.floor(position.y / this.cellSize);
+                const z = Math.floor(position.z / this.cellSize);
+                return `${x},${y},${z}`;
+            }
+        }
+        const spatialHash = new SpatialHash();
+
+        // ========== СЦЕНА ==========
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050510);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.set(60, 40, 80);
+        const renderer = new THREE.WebGLRenderer({
+            antialias: false,
+            powerPreference: "high-performance",
+            alpha: false,
+            depth: true,
+            stencil: false,
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(CONFIG.PIXEL_RATIO_FAST);
+        renderer.sortObjects = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.2;
+        controls.minDistance = 8;
+        controls.maxDistance = 200;
+        controls.enablePan = true;
+        controls.panSpeed = 0.8;
+        controls.screenSpacePanning = true;
+
+        const gridHelper = new THREE.GridHelper(100, 20, 0x112233, 0x050510);
+        scene.add(gridHelper);
+
+        // ========== ДАННЫЕ ==========
+        const colors = ['#ff4444', '#44ff44', '#4488ff', '#ffaa00', '#ff44ff', '#44ffff', '#ffffff'];
+        const groupNames = ['', 'K', 'L', 'M', 'N', 'O', 'P', 'Q'];
+        const symbols = ['?', 'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S',
+            'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se',
+            'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te',
+            'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+            'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra',
+            'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr'
+        ];
+        const groupRadii = { 1: 0.5, 2: 0.7, 3: 0.9, 4: 1.1, 5: 1.3, 6: 1.5, 7: 1.7 };
+
+        let groupObjects = {};
+        let activeConnections = new Map();
+        let trajectoryData = [];
+        let currentFrame = 0;
+        let playing = false;
+        let needUpdate = true;
+        let isIdle = false;
+        let justBecameIdle = false;
+        let idleTimer = null;
+        let lastStepTime = 0;
+        let sliderBusy = false;
+
+        // Массивы для отслеживания созданных линий (защита от утечек памяти)
+        let quantumLines = [];
+        let trailLines = [];
+        // Set для гарантированной очистки всех мешей сфер
+        let knownSphereMeshes = new Set();
+
+        // ========== ОРАКУЛ ==========
+        const oracleLog = document.getElementById('oracle-log');
+        let lastOracleUpdate = 0;
+        let lastOraclePairs = new Map();
+
+        function addOracleLine(elA, elB, dist, compound) {
+            const now = Date.now();
+            if (now - lastOracleUpdate < CONFIG.ORACLE_THROTTLE) return;
+            lastOracleUpdate = now;
+            const symbolA = elA.symbol;
+            const symbolB = elB.symbol;
+            const probability = Math.max(0, Math.round((1 - dist / 12) * 100));
+            if (probability < 40) return;
+            const pairKey = [Math.min(elA.index, elB.index), Math.max(elA.index, elB.index), compound].join('-');
+            if (lastOraclePairs.has(pairKey) && (now - lastOraclePairs.get(pairKey)) < 15000) return;
+            lastOraclePairs.set(pairKey, now);
+            const groupDiff = Math.abs(elA.group - elB.group);
+            let stability, tHalf;
+            if (groupDiff === 0) {
+                stability = "СТАБИЛЕН";
+                tHalf = "> 10⁶ лет";
+            } else if (groupDiff <= 2) {
+                stability = "МЕТАСТАБИЛЕН";
+                tHalf = "~ 10² - 10⁴ лет";
+            } else {
+                stability = "НЕСТАБИЛЕН";
+                tHalf = "< 1 мс";
+            }
+            const timeStr = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = 'oracle-line';
+            line.innerHTML =
+                `<span style="color:#fff;">[${timeStr}]</span> <span style="color:#ff0;">${symbolA}+${symbolB}→${compound}</span> <span style="color:#0ff;">P:${probability}%</span> <span style="color:#f0f;">T½:${tHalf}</span> <span style="color:#0f0;">(${stability})</span>`;
+            oracleLog.appendChild(line);
+            while (oracleLog.children.length > CONFIG.ORACLE_MAX_LINES) {
+                const old = oracleLog.firstChild;
+                if (old) {
+                    old.classList.add('fade');
+                    setTimeout(() => { if (old.parentNode) old.remove(); }, 2000);
+                }
+            }
+            requestAnimationFrame(() => line.classList.add('show'));
+            setTimeout(() => {
+                if (line.parentNode) {
+                    line.classList.add('fade');
+                    setTimeout(() => { if (line.parentNode) line.remove(); }, 2000);
+                }
+            }, CONFIG.ORACLE_LIFETIME);
+            // Периодическая очистка старых записей
+            if (lastOraclePairs.size > 100) {
+                for (const [key, ts] of lastOraclePairs.entries()) {
+                    if (now - ts > 30000) lastOraclePairs.delete(key);
+                }
+            }
+        }
+
+        // ========== ПОСТРОЕНИЕ ГРУПП ==========
+        function buildCheckboxes() {
+            const container = document.getElementById('groupCheckboxes');
+            const lang = currentLang;
+            const labelText = lang === 'ru' ? 'Группы:' : lang === 'cn' ? '组:' : 'Groups:';
+            container.innerHTML = `<span style="color:#ccc;">${labelText}</span>`;
+            for (let g = 1; g <= 7; g++) {
+                const label = document.createElement('label');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = g;
+                cb.checked = true;
+                cb.addEventListener('change', () => {
+                    needUpdate = true;
+                    loadFrame(currentFrame, true);
+                });
+                const circle = document.createElement('span');
+                circle.className = 'circle';
+                circle.style.backgroundColor = colors[g - 1];
+                label.appendChild(cb);
+                label.appendChild(circle);
+                label.appendChild(document.createTextNode(groupNames[g]));
+                container.appendChild(label);
+            }
+        }
+
+        function getVisibleGroups() {
+            const cbs = document.querySelectorAll('#groupCheckboxes input[type=checkbox]');
+            return Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
+        }
+
+        // ========== СОЗДАНИЕ СФЕР ==========
+        const sphereGeometries = {};
+        const sphereMaterials = {};
+
+        function disposeObject3D(obj) {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) {
+                if (Array.isArray(obj.material)) {
+                    obj.material.forEach(m => m.dispose());
+                } else {
+                    obj.material.dispose();
+                }
+            }
+        }
+
+        function createAllSpheres() {
+            // Гарантированная очистка ВСЕХ известных мешей сфер
+            knownSphereMeshes.forEach(mesh => {
+                scene.remove(mesh);
+                disposeObject3D(mesh);
+            });
+            knownSphereMeshes.clear();
+
+            // Очистка старых трейлов
+            trailLines.forEach(line => {
+                scene.remove(line);
+                disposeObject3D(line);
+            });
+            trailLines = [];
+
+            // Очистка квантовых линий
+            quantumLines.forEach(line => {
+                scene.remove(line);
+                disposeObject3D(line);
+            });
+            quantumLines = [];
+
+            groupObjects = {};
+            activeConnections = new Map();
+
+            if (!trajectoryData.length) return;
+            const sampleFrame = trajectoryData[0];
+            let elemCounter = 0;
+
+            for (let g = 1; g <= 7; g++) {
+                groupObjects[g] = [];
+                if (!sampleFrame.groups[g]) continue;
+                const color = colors[g - 1];
+                const count = sampleFrame.groups[g].length;
+                const radius = groupRadii[g] || 0.8;
+                if (!sphereGeometries[g]) sphereGeometries[g] = new THREE.SphereGeometry(radius, 8, 6);
+                if (!sphereMaterials[g]) sphereMaterials[g] = new THREE.MeshBasicMaterial({ color: color });
+
+                for (let i = 0; i < count; i++) {
+                    const sphere = new THREE.Mesh(sphereGeometries[g], sphereMaterials[g]);
+                    sphere.visible = true;
+                    sphere.userData = {
+                        symbol: symbols[elemCounter + 1] || '?',
+                        group: g,
+                        index: elemCounter
+                    };
+                    scene.add(sphere);
+                    knownSphereMeshes.add(sphere);
+                    groupObjects[g].push({
+                        mesh: sphere,
+                        group: g,
+                        elementIndex: elemCounter,
+                        symbol: sphere.userData.symbol,
+                        index: elemCounter,
+                        trailPoints: [],
+                        trailLine: null
+                    });
+                    elemCounter++;
+                }
+            }
+        }
+
+        // ========== ТУЛТИП ==========
+        const tooltip = document.getElementById('tooltip');
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('mousemove', (event) => {
+            if (playing) {
+                if (tooltip.style.display !== 'none') tooltip.style.display = 'none';
+                return;
+            }
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const allMeshes = [];
+            for (let g = 1; g <= 7; g++) {
+                if (groupObjects[g]) {
+                    groupObjects[g].forEach(o => { if (o.mesh.visible) allMeshes.push(o.mesh); });
+                }
+            }
+            const intersects = raycaster.intersectObjects(allMeshes);
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                const conns = activeConnections.get(obj.userData.index) || [];
+                const connSymbols = conns.map(idx => symbols[idx + 1] || '?').join(', ');
+                tooltip.style.display = 'block';
+                tooltip.style.left = (event.clientX + 15) + 'px';
+                tooltip.style.top = (event.clientY - 15) + 'px';
+                tooltip.textContent = connSymbols.length > 0 ?
+                    `${obj.userData.symbol}: ${conns.length} связей с ${connSymbols} (G${obj.userData.group})` :
+                    `${obj.userData.symbol}: свободен (G${obj.userData.group})`;
+            } else {
+                tooltip.style.display = 'none';
+            }
+        });
+
+        // ========== ОБНОВЛЕНИЕ ВИЗУАЛИЗАЦИИ ==========
+        function updateTrails() {
+            trailLines.forEach(line => {
+                scene.remove(line);
+                disposeObject3D(line);
+            });
+            trailLines = [];
+
+            if (playing) return;
+
+            for (let g = 1; g <= 7; g++) {
+                if (!groupObjects[g]) continue;
+                groupObjects[g].forEach(obj => {
+                    if (!obj.mesh.visible || obj.trailPoints.length < 2) return;
+                    const geo = new THREE.BufferGeometry().setFromPoints(obj.trailPoints);
+                    const mat = new THREE.LineBasicMaterial({
+                        color: colors[g - 1],
+                        transparent: true,
+                        opacity: 0.5
+                    });
+                    const line = new THREE.Line(geo, mat);
+                    scene.add(line);
+                    trailLines.push(line);
+                });
+            }
+        }
+
+        function updateQuantums() {
+            quantumLines.forEach(line => {
+                scene.remove(line);
+                disposeObject3D(line);
+            });
+            quantumLines = [];
+            activeConnections = new Map();
+
+            if (playing) return;
+
+            const allObjs = [];
+            for (let g = 1; g <= 7; g++) {
+                if (!groupObjects[g]) continue;
+                groupObjects[g].forEach(obj => {
+                    if (obj.mesh.visible) allObjs.push(obj);
+                });
+            }
+
+            spatialHash.clear();
+            allObjs.forEach(obj => spatialHash.addObject(obj));
+
+            const threshold = CONFIG.QUANTUM_THRESHOLD;
+            const checkedPairs = new Set();
+            const linesPerAtom = new Map();
+            const triggeredPairs = [];
+            let lineCount = 0;
+
+            for (const objA of allObjs) {
+                if (lineCount >= CONFIG.MAX_QUANTUM_LINES) break;
+                const nearby = spatialHash.getNearbyObjects(objA.mesh.position, threshold);
+                for (const objB of nearby) {
+                    if (objA === objB) continue;
+                    if (lineCount >= CONFIG.MAX_QUANTUM_LINES) break;
+                    const pairKey = [Math.min(objA.index, objB.index), Math.max(objA.index, objB.index)].join('-');
+                    if (checkedPairs.has(pairKey)) continue;
+                    checkedPairs.add(pairKey);
+                    const dist = objA.mesh.position.distanceTo(objB.mesh.position);
+                    if (dist >= threshold) continue;
+                    const linesA = linesPerAtom.get(objA.index) || 0;
+                    const linesB = linesPerAtom.get(objB.index) || 0;
+                    if (linesA >= 2 || linesB >= 2) continue;
+
+                    const points = [objA.mesh.position.clone(), objB.mesh.position.clone()];
+                    const geo = new THREE.BufferGeometry().setFromPoints(points);
+                    const mat = new THREE.LineBasicMaterial({
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: Math.max(0, 1 - dist / threshold) * 0.7
+                    });
+                    const line = new THREE.Line(geo, mat);
+                    scene.add(line);
+                    quantumLines.push(line);
+
+                    lineCount++;
+                    linesPerAtom.set(objA.index, linesA + 1);
+                    linesPerAtom.set(objB.index, linesB + 1);
+                    if (!activeConnections.has(objA.index)) activeConnections.set(objA.index, []);
+                    if (!activeConnections.has(objB.index)) activeConnections.set(objB.index, []);
+                    activeConnections.get(objA.index).push(objB.index);
+                    activeConnections.get(objB.index).push(objA.index);
+
+                    if (dist < threshold * 0.5) {
+                        const symbolA = objA.symbol;
+                        const symbolB = objB.symbol;
+                        const compound = Math.random() > 0.7 ? symbolA + symbolB + symbolA : symbolA + symbolB;
+                        triggeredPairs.push({ elA: objA, elB: objB, dist, compound });
+                    }
+                }
+            }
+            triggeredPairs.forEach(p => addOracleLine(p.elA, p.elB, p.dist, p.compound));
+        }
+
+        // ========== ЗАГРУЗКА КАДРА ==========
+        function loadFrame(idx, forceUpdate = false) {
+            if (!trajectoryData.length) return;
+            if (idx === currentFrame && !forceUpdate && !needUpdate) return;
+            needUpdate = false;
+            const frame = trajectoryData[idx];
+            document.getElementById('stepLabel').textContent = frame.step;
+            document.getElementById('dminLabel').textContent = frame.d_min.toFixed(3);
+            document.getElementById('slider').value = idx;
+            document.getElementById('sliderLabel').textContent = `${idx+1} / ${trajectoryData.length}`;
+            currentFrame = idx;
+
+            const visibleGroups = getVisibleGroups();
+            for (let g = 1; g <= 7; g++) {
+                if (!groupObjects[g]) continue;
+                const isVis = visibleGroups.includes(String(g)) && frame.groups[g];
+                groupObjects[g].forEach((obj, i) => {
+                    if (isVis && frame.groups[g] && i < frame.groups[g].length) {
+                        const pos = frame.groups[g][i];
+                        obj.mesh.position.set(pos[0], pos[1], pos[2]);
+                        obj.mesh.visible = true;
+                        obj.trailPoints.push(obj.mesh.position.clone());
+                        if (obj.trailPoints.length > CONFIG.TRAIL_MAX_LENGTH) obj.trailPoints.shift();
+                    } else {
+                        obj.mesh.visible = false;
+                        obj.trailPoints.length = 0;
+                    }
+                });
+            }
+            updateTrails();
+            updateQuantums();
+
+            const activeCount = Object.values(groupObjects).flat().filter(o => o.mesh.visible).length;
+            document.getElementById('activeCount').textContent = activeCount;
+        }
+
+        // ========== ПРОГРЕССИВНЫЙ РЕНДЕРИНГ ==========
+        function userIsActive() {
+            if (!isIdle) {
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(() => {
+                    isIdle = true;
+                    justBecameIdle = true;
+                    renderer.setPixelRatio(CONFIG.PIXEL_RATIO_IDLE);
+                    document.getElementById('quality-indicator').innerHTML = '● <span id="quality-label">HI</span>';
+                    document.getElementById('quality-indicator').classList.add('high');
+                    loadFrame(currentFrame, true);
+                    setTimeout(() => { justBecameIdle = false; }, 500);
+                }, CONFIG.IDLE_THRESHOLD);
+            }
+        }
+
+        function resetIdleState() {
+            isIdle = false;
+            justBecameIdle = false;
+            clearTimeout(idleTimer);
+            renderer.setPixelRatio(CONFIG.PIXEL_RATIO_FAST);
+            document.getElementById('quality-indicator').innerHTML = '● <span id="quality-label">LOW</span>';
+            document.getElementById('quality-indicator').classList.remove('high');
+        }
+
+        // ========== УПРАВЛЕНИЕ ФАЙЛАМИ ==========
+        const fileInput = document.getElementById('fileInput');
+        document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    trajectoryData = data;
+                    lastOraclePairs.clear();
+                    document.getElementById('slider').max = data.length - 1;
+                    document.getElementById('slider').disabled = false;
+                    document.getElementById('playBtn').disabled = false;
+                    document.getElementById('prevBtn').disabled = false;
+                    document.getElementById('nextBtn').disabled = false;
+                    document.getElementById('sliderLabel').textContent = `1 / ${data.length}`;
+                    buildCheckboxes();
+                    createAllSpheres();
+                    loadFrame(0, true);
+                    populateAlchemySelects();
+                } catch (err) {
+                    alert('Ошибка JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // ========== УПРАВЛЕНИЕ ВОСПРОИЗВЕДЕНИЕМ ==========
+        let sliderTimeout;
+
+        document.getElementById('slider').addEventListener('input', e => {
+            if (sliderBusy) return;
+            sliderBusy = true;
+            clearTimeout(sliderTimeout);
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
+            resetIdleState();
+            sliderTimeout = setTimeout(() => {
+                loadFrame(parseInt(e.target.value), true);
+                sliderBusy = false;
+            }, CONFIG.STEP_THROTTLE);
+        });
+
+        function stepForward() {
+            const now = Date.now();
+            if (now - lastStepTime < CONFIG.STEP_THROTTLE) return;
+            lastStepTime = now;
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
+            resetIdleState();
+            const next = Math.min(currentFrame + 1, trajectoryData.length - 1);
+            loadFrame(next, true);
+        }
+
+        function stepBackward() {
+            const now = Date.now();
+            if (now - lastStepTime < CONFIG.STEP_THROTTLE) return;
+            lastStepTime = now;
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
+            resetIdleState();
+            const prev = Math.max(currentFrame - 1, 0);
+            loadFrame(prev, true);
+        }
+
+        document.getElementById('nextBtn').addEventListener('click', stepForward);
+        document.getElementById('prevBtn').addEventListener('click', stepBackward);
+
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (playing) {
+                playing = false;
+                document.getElementById('playBtn').textContent = '▶';
+                loadFrame(currentFrame, true);
+                userIsActive();
+                return;
+            }
+            if (currentFrame >= trajectoryData.length - 1) {
+                currentFrame = 0;
+                loadFrame(0, true);
+            }
+            playing = true;
+            document.getElementById('playBtn').textContent = '⏸';
+            resetIdleState();
+            lastFrameTime = performance.now();
+        });
+
+        // ========== КЛАВИАТУРА ==========
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                stepForward();
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                stepBackward();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                document.getElementById('playBtn').click();
+            } else if (e.key === 'r' || e.key === 'R') {
+                camera.position.set(60, 40, 80);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            } else if (e.key === 'Escape') {
+                closeHelp();
+                closeDetailModal();
+                document.getElementById('alchemy-panel').classList.remove('active');
+            }
+        });
+
+        // ========== HELP MODAL ==========
+        document.getElementById('help-btn').addEventListener('click', openHelp);
+        document.getElementById('help-overlay').addEventListener('click', closeHelp);
+
+        function openHelp() {
+            document.getElementById('help-modal').classList.add('active');
+            document.getElementById('help-overlay').classList.add('active');
+        }
+
+        function closeHelp() {
+            document.getElementById('help-modal').classList.remove('active');
+            document.getElementById('help-overlay').classList.remove('active');
+        }
+
+        // ========== СКРИНШОТ ==========
+        document.getElementById('screenshot-btn').addEventListener('click', () => {
+            renderer.render(scene, camera);
+            const dataURL = renderer.domElement.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = `spectravortex_frame_${currentFrame}.png`;
+            a.click();
+        });
+
+        // ========== АЛХИМИЧЕСКАЯ ПАНЕЛЬ ==========
+        document.getElementById('alchemy-toggle-btn').addEventListener('click', () => {
+            const panel = document.getElementById('alchemy-panel');
+            panel.classList.toggle('active');
+            if (!panel.classList.contains('active')) {
+                document.getElementById('alchemy-result').style.display = 'none';
+                document.querySelector('#alchemy-panel .detail-btn').style.display = 'none';
+            }
+        });
+
+        function populateAlchemySelects() {
+            const allSymbols = symbols.filter(s => s !== '?' && s.length <= 3);
+            [document.getElementById('alchemy-el1'), document.getElementById('alchemy-el2')].forEach(select => {
+                select.innerHTML = '';
+                allSymbols.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    select.appendChild(opt);
+                });
+            });
+            if (allSymbols.length >= 2) {
+                document.getElementById('alchemy-el1').value = allSymbols[0];
+                document.getElementById('alchemy-el2').value = allSymbols[Math.min(7, allSymbols.length - 1)];
+            }
+        }
+
+        function runQuickSynthesis() {
+            const el1 = document.getElementById('alchemy-el1').value;
+            const el2 = document.getElementById('alchemy-el2').value;
+            const idx1 = symbols.indexOf(el1);
+            const idx2 = symbols.indexOf(el2);
+            if (idx1 < 0 || idx2 < 0) return;
+
+            const group1 = idx1 <= 2 ? 1 : idx1 <= 10 ? 2 : idx1 <= 18 ? 3 : idx1 <= 36 ? 4 : idx1 <= 54 ? 5 : idx1 <= 86 ?
+                6 : 7;
+            const group2 = idx2 <= 2 ? 1 : idx2 <= 10 ? 2 : idx2 <= 18 ? 3 : idx2 <= 36 ? 4 : idx2 <= 54 ? 5 : idx2 <= 86 ?
+                6 : 7;
+
+            const dist = calculateCurrentDistance(el1, el2);
+            const groupDiff = Math.abs(group1 - group2);
+            const probability = dist < CONFIG.QUANTUM_THRESHOLD ?
+                Math.max(0, Math.round((1 - dist / CONFIG.QUANTUM_THRESHOLD) * 100)) :
+                Math.max(5, 30 - groupDiff * 8);
+
+            const formula = probability > 60 ? el1 + el2 : el2 + el1;
+            let stability, color;
+            if (probability > 70) {
+                stability = 'СТАБИЛЕН';
+                color = '#0f0';
+            } else if (probability > 40) {
+                stability = 'МЕТАСТАБИЛЕН';
+                color = '#ff0';
+            } else {
+                stability = 'НЕСТАБИЛЕН';
+                color = '#f00';
+            }
+
+            const resultDiv = document.getElementById('alchemy-result');
+            resultDiv.style.display = 'block';
+            resultDiv.style.borderColor = color;
+            resultDiv.style.color = color;
+            resultDiv.innerHTML =
+                `<b>${formula}</b> | P: ${probability}%<br><span style="font-size:10px;">${stability} (шаг ${currentFrame})</span>`;
+
+            const detailBtn = document.querySelector('#alchemy-panel .detail-btn');
+            detailBtn.style.display = 'inline-block';
+            detailBtn.dataset.el1 = el1;
+            detailBtn.dataset.el2 = el2;
+        }
+
+        function calculateCurrentDistance(symbolA, symbolB) {
+            let objA = null,
+                objB = null;
+            for (let g = 1; g <= 7; g++) {
+                if (!groupObjects[g]) continue;
+                for (const obj of groupObjects[g]) {
+                    if (obj.symbol === symbolA && obj.mesh.visible) objA = obj;
+                    if (obj.symbol === symbolB && obj.mesh.visible) objB = obj;
+                }
+            }
+            if (!objA || !objB) return CONFIG.QUANTUM_THRESHOLD + 10;
+            return objA.mesh.position.distanceTo(objB.mesh.position);
+        }
+
+        window.runQuickSynthesis = runQuickSynthesis;
+
+        function openFullReactor() {
+            document.getElementById('detail-modal').classList.add('active');
+            document.getElementById('detail-overlay').style.display = 'block';
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').classList.remove('active');
+            document.getElementById('detail-overlay').style.display = 'none';
+        }
+
+        window.openFullReactor = openFullReactor;
+        window.closeDetailModal = closeDetailModal;
+
+        // ========== АНИМАЦИЯ ==========
+        let lastFrameTime = 0;
+        let frameCounter = 0;
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            if (time - lastFrameTime < CONFIG.FRAME_TIME) return;
+            lastFrameTime = time;
+
+            if (playing && trajectoryData.length) {
+                const next = currentFrame + 1;
+                if (next >= trajectoryData.length) {
+                    playing = false;
+                    document.getElementById('playBtn').textContent = '▶';
+                    loadFrame(currentFrame, true);
+                    userIsActive();
+                } else {
+                    loadFrame(next);
+                    frameCounter++;
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                playing = false;
+                document.getElementById('playBtn').textContent = '▶';
+            }
+        });
+
+        ['click', 'mousemove', 'wheel', 'keydown', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                if (!playing) userIsActive();
+            }, { passive: true });
+        });
+
+        // ========== ЗАПУСК ==========
+        requestAnimationFrame(animate);
+        console.log('🚀 SpectraVortex VMMS v1.1 ready. Memory-safe, progressive rendering active.');
+
+        // ========== ОТЛАДОЧНЫЙ ИНТЕРФЕЙС ==========
+        window.debug = {
+            getState: () => ({
+                playing,
+                currentFrame,
+                frameCount: trajectoryData.length,
+                isIdle,
+                pixelRatio: renderer.getPixelRatio(),
+                quantumLinesCount: quantumLines.length,
+                trailLinesCount: trailLines.length,
+                knownMeshes: knownSphereMeshes.size,
+                oracleCacheSize: lastOraclePairs.size,
+                memory: performance.memory ? {
+                    usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    totalJSHeapSize: (performance.memory.totalJSHeapSize / 1048576).toFixed(2) + ' MB'
+                } : 'N/A'
+            }),
+            forceUpdate: () => loadFrame(currentFrame, true),
+            forceGarbageCollection: () => {
+                quantumLines.forEach(line => { scene.remove(line);
+                    disposeObject3D(line); });
+                quantumLines = [];
+                trailLines.forEach(line => { scene.remove(line);
+                    disposeObject3D(line); });
+                trailLines = [];
+                lastOraclePairs.clear();
+                updateQuantums();
+                updateTrails();
+                console.log('🧹 Manual cleanup complete');
+            }
+        };
+    </script>
+</body>
+</html>
