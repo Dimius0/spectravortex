@@ -155,10 +155,10 @@ class BiharmonicSolver3D:
         
         energy_history = []
         
-        print(f"    Relax: P={state.pressure} GPa, T={state.temperature} K")
-        print(f"    pressure_force_factor = {pressure_force_factor:.6f}")
-        print(f"    thermal_scale = {thermal_scale:.3e}")
-        print(f"    thermal_amplitude = {thermal_amplitude:.3e}")
+        #print(f"    Relax: P={state.pressure} GPa, T={state.temperature} K")
+        #print(f"    pressure_force_factor = {pressure_force_factor:.6f}")
+        #print(f"    thermal_scale = {thermal_scale:.3e}")
+        #print(f"    thermal_amplitude = {thermal_amplitude:.3e}")
         
         for iteration in range(int(max_iter)):
             self.solve_biharmonic(max_iter=30, tol=1e-4)

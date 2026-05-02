@@ -1,17 +1,12 @@
 """
-Запуск 3D моделирования таблицы Менделеева с термодинамикой, фрактальным временем,
-ионизацией и АДАПТИВНОЙ НАСТРОЙКОЙ ЭЛЕКТРООТРИЦАТЕЛЬНОСТИ.
+ЗАПУСК 3D МОДЕЛИРОВАНИЯ ТАБЛИЦЫ МЕНДЕЛЕЕВА
+Версия: "Резонансный Перехват" + Пятифазный Взрывной Импульс + 3D-Траектории
 ПОЛНАЯ ВЕРСИЯ: 103 элемента, 7 фрактальных уровней (K-Q оболочки).
-
-Версия: "Резонансный Перехват" (Resonance Intercept) + Optimized Logger + AutoStop
 """
-
-import json
-import sys
-import os
-import argparse
+import json, sys, os, argparse, gc
 import numpy as np
 from datetime import datetime
+from collections import defaultdict
 
 # Пути
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,8 +17,7 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src', 'architect'))
 
 from biharmonic_3d import TopologicalArchitect3D
 from thermodynamics import ThermodynamicState, ThermodynamicCalculator
-from fractal_time import FractalTimeEvolution, FractalFieldWrapper, TimeQuantum, FractalTimeBuffer
-from adaptive_chi_tuner import AdaptiveChiTuner
+from fractal_time import FractalTimeEvolution, FractalFieldWrapper
 
 # ========== СОХРАНЕНИЕ JSON ==========
 def save_json(path, data):
@@ -45,24 +39,6 @@ def save_json(path, data):
 def load_json(path):
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
-
-# ========== ПОПРАВКА НА ИОНИЗАЦИЮ ==========
-k_B_eV = 8.617333262145e-5
-OMEGA_0 = 27.2
-
-def calculate_ionization_alpha(T: float, Z: int) -> float:
-    if T < 1000: return 0.0
-    n_valence = min(Z, 8)
-    omega_n = OMEGA_0 * (Z ** 2) / (n_valence ** 2)
-    E_bind = omega_n
-    P_ion = np.exp(-E_bind / (k_B_eV * T))
-    alpha = 1.0 - np.exp(-P_ion)
-    return min(alpha, 1.0)
-
-def apply_ionization_correction(energy: float, Z: int, T: float, beta: float = 1.0) -> float:
-    if T == 0: return energy
-    alpha = calculate_ionization_alpha(T, Z)
-    return energy * ((1.0 + beta * alpha) ** 2)
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_fractal_level(Z):
@@ -138,58 +114,53 @@ def main():
     parser.add_argument('--grid', type=int, default=128)
     parser.add_argument('--T', type=float, default=300.0)
     parser.add_argument('--P', type=float, default=0.1)
-    parser.add_argument('--resume', type=str, help='Путь к чекпоинту для продолжения')
-    parser.add_argument('--checkpoint-interval', type=int, default=25)
-    parser.add_argument('--tune-interval', type=int, default=50, help='Интервал настройки chi (шагов)')
-    parser.add_argument('--no-tune', action='store_true', help='Отключить адаптивную настройку chi')
+    parser.add_argument('--no-tune', action='store_true')
+    parser.add_argument('--resume', type=str, help='Путь к чекпоинту')
+    parser.add_argument('--checkpoint-interval', type=int, default=10000)
+    parser.add_argument('--pulse-step', type=int, default=1056, help='Шаг Укола (0 = без)')
+    parser.add_argument('--pulse-shockwave', action='store_true', help='Пятифазный взрывной импульс')
     args = parser.parse_args()
-
+    
+    # ========== НАСТРОЙКИ ПЯТИФАЗНОГО ИМПУЛЬСА ==========
+    SHOCKWAVE_START = args.pulse_step
+    PHASE_RISE1   = 2
+    PHASE_VACUUM  = 2
+    PHASE_RISE2   = 2
+    PHASE_HOLD    = 5
+    PHASE_COOL    = 5
+    PULSE_TOTAL   = PHASE_RISE1 + PHASE_VACUUM + PHASE_RISE2 + PHASE_HOLD + PHASE_COOL
+    
     start_time = datetime.now()
     print("=" * 70)
-    print("3D МОДЕЛИРОВАНИЕ ТАБЛИЦЫ МЕНДЕЛЕЕВА")
-    print("Решатель: BiharmonicSolver3D + Thermodynamics + FractalTime")
-    print("Стратегия: РЕЗОНАНСНЫЙ ПЕРЕХВАТ (Resonance Intercept) + Optimized Logger + AutoStop")
+    print("3D МОДЕЛИРОВАНИЕ ТАБЛИЦЫ МЕНДЕЛЕЕВА (Пятифазная Версия + 3D-Траектории)")
+    print(f"Режим: {'ВЗРЫВНОЙ СИНТЕЗ' if args.pulse_shockwave else 'ОБЫЧНЫЙ УКОЛ' if args.pulse_step > 0 else 'ЧИСТЫЙ'}")
     print("=" * 70)
-
+    
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     results_dir = os.path.join(base_dir, 'results')
     os.makedirs(results_dir, exist_ok=True)
-
+    
     grid_size, max_steps, T, P = args.grid, args.steps, args.T, args.P
-    tune_interval = args.tune_interval
-    enable_tuning = not args.no_tune
-
-    print(f"\nСетка: {grid_size}^3 | Шагов: {max_steps} | T: {T}K | P: {P}GPa")
-    print(f"Настройка chi: {'включена' if enable_tuning else 'отключена'} (интервал: {tune_interval})")
+    print(f"Сетка: {grid_size}^3 | Шагов: {max_steps} | T: {T}K | P: {P}GPa")
     print(f"Чекпоинты: каждые {args.checkpoint_interval} шагов")
-
-    level_activation = {lvl: max_steps // (2**lvl) for lvl in range(1, 8) if max_steps // (2**lvl) > 0}
-    shells = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
-    print("Активации: " + ", ".join([f"{shells[l-1]}:{level_activation[l]}" for l in sorted(level_activation)]))
-
+    
+    # ========== ФАЙЛ ДЛЯ 3D-ТРАЕКТОРИЙ ==========
+    trajectory_data = []
+    
     thermo_state = ThermodynamicState(T, P)
-    thermo_calc = ThermodynamicCalculator(thermo_state)
-
-    print("\n[1/5] Загрузка элементов...")
+    
+    print("\n[1/4] Загрузка элементов...")
     elements_config = load_json(os.path.join(base_dir, 'data', 'field_H_elements_complete.json'))
     all_elements = load_all_elements(elements_config)
     print(f"Загружено элементов: {len(all_elements)}")
-
-    chi_tuner = None
-    if enable_tuning:
-        print("\n[2/5] Инициализация адаптивного тюнера chi...")
-        chi_tuner = AdaptiveChiTuner(os.path.join(base_dir, 'data', 'field_H_elements_complete.json'))
-        print(f"    Создано регуляторов: {len(chi_tuner.controllers)}")
-    else:
-        print("\n[2/5] Адаптивная настройка chi отключена")
-
-    print(f"\n[{'3' if enable_tuning else '2'}/5] Инициализация 3D-решателя...")
+    
+    print("\n[2/4] Инициализация 3D-решателя...")
     fields_by_level, components_data = {}, []
     np.random.seed(42)
     for elem in all_elements:
         lvl = elem['fractal_level']
         pos = fractal_spiral_placement_3d(elem['Z'], 100.0, lvl)
-        orient = get_orientation(elem.get('symmetry_group', 'C∞v'), elem.get('vortex_number', 1))
+        orient = get_orientation(elem.get('symmetry_group', 'C…v'), elem.get('vortex_number', 1))
         comp_data = {'symbol': elem['symbol'], 'Z': elem['Z'], 'charge': elem.get('topological_charge', elem['Z']),
                      'data': elem, 'position': pos, 'orientation': orient, 'level': lvl}
         components_data.append(comp_data)
@@ -199,134 +170,108 @@ def main():
             {'charge': elem.get('topological_charge', elem['Z']), 'position': pos,
              'orientation': orient, 'symbol': elem['symbol'], 'Z': elem['Z']})
         fields_by_level[lvl]['components'].append(comp_data)
-
-    print(f"    Уровней: {len(fields_by_level)}")
+    
     evolution = FractalTimeEvolution(num_levels=7, base_dt=1.0)
     for lvl, data in fields_by_level.items():
         evolution.add_field(lvl, FractalFieldWrapper(data['architect'], lvl))
-
+    
     checkpoint_base = os.path.join(results_dir, f'autosave_T{T}_P{P}_{grid_size}_local')
-    energy_history, chi_history = [], []
+    energy_history = []
     start_step = 0
-
+    
     if args.resume and os.path.exists(args.resume):
         print(f"[!] Восстановление из чекпоинта: {args.resume}")
         saved = load_json(args.resume)
         start_step = saved['metadata']['completed_steps']
         energy_history = saved.get('energy_history', [])
-        print(f"    Продолжаем с шага {start_step + 1}")
-
+        print(f"   Продолжаем с шага {start_step + 1}")
+    
     def save_checkpoint(step, is_final=False):
-        state = [{'symbol': c['symbol'], 'Z': c['Z'], 'level': lvl, 'position': c['vortex'].position.tolist()}
-                 for lvl, data in fields_by_level.items() for c in data['architect'].components]
-        chk = {'metadata': {'completed_steps': step+1, 'T': T, 'P': P}, 'energy': energy_history, 'elements': state}
-        if chi_tuner: chk['chi_values'] = chi_tuner.get_all_chi()
+        chk = {'metadata': {'completed_steps': step+1, 'T': T, 'P': P}, 'energy': energy_history}
         suffix = 'final' if is_final else f'step_{step+1}'
         save_json(f"{checkpoint_base}_{suffix}.json", chk)
-
-    print(f"\n[{'4' if enable_tuning else '3'}/5] Эволюция (шаги {start_step+1}-{max_steps})...")
-    print("-" * 100)
-    header = f"{'Шаг':>5} | {'Энергия':>12} | {'d_min':>6} | {'dE_сглаж':>10} | {'Активны':>18} | {'Время':>7} | {'Причина'}"
-    print(header)
-    print("-" * 100)
-
-    # === ПЕРЕМЕННЫЕ ДЛЯ "ЗВЕРОЛОВА №2" (объявить ПЕРЕД циклом) ===
-    phase = "waiting"  # waiting, hunting, freezing
-    d_target = 2.5  # Цель для "Заморозки" (чуть ниже пика)
-    hunting_started = False # Флаг, что охота началась (после распухания)
-    prev_min_dist = float('inf') # Для хранения d_min с предыдущего шага
-    prev_energy = float('inf')   # ДЛЯ ДАТЧИКА ЖИВОСТИ
-    energy_history_smooth = []   # Для сглаживания dE
-    last_evolved = []
-    prev_min_dist_last = float('inf')
     
-    # === ПЕРЕМЕННЫЕ ДЛЯ "КРИТЕРИЯ СТАГНАЦИИ" ===
+    print(f"\n[3/4] Эволюция (шаги {start_step+1}-{max_steps})...")
+    print("-" * 100)
+    
+    STAGNATION_THRESHOLD = 100000
+    OSCILLATION_AMPLITUDE_THRESHOLD = 0.001
+    d_min_list = []
     stagnation_counter = 0
-    stagnation_threshold = 300
-    prev_d_min_for_stagnation = float('inf')
-    delta_E_threshold = 1.0
-    # ===========================================================
-
+    
     for step in range(start_step, max_steps):
-
-        # === СПЕЦОПЕРАЦИЯ "УДАР ПО РЕЛАКСАЦИИ" (шаг 25) ===
-        if step == 1056:
-            print("=" * 60)
-            print(f"[СПЕЦНАЗ]  Укол ПО РЕЛАКСИРОВАННОЙ СИСТЕМЕ! P=50, T=5000")
-            thermo_state.pressure = 500.0
-            thermo_state.temperature = 50000.0
-            if hasattr(thermo_state, 'update_factors'):
-                thermo_state.update_factors()
-            print("=" * 60)
-
-        if step == 1057:
-            print("=" * 60)
-            print(f"[СПЕЦНАЗ]  МГНОВЕННЫЙ СБРОС! P=0.00001, T=300")
-            thermo_state.pressure = 0.00001
-            thermo_state.temperature = 300.0
-            if hasattr(thermo_state, 'update_factors'):
-                thermo_state.update_factors()
-            print("=" * 60)
-    # ================================================================
-        # === СПЕЦОПЕРАЦИЯ "БАХНУТЬ И СБРОСИТЬ" (для легких элементов) ===
-        #if step == 1:
-        #    print("=" * 60)
-        #    print(f"[СПЕЦНАЗ] ШАГ 1: ИМПУЛЬСНЫЙ ОБЖИМ! P=50, T=5000")
-        #    thermo_state.pressure = 50.0
-        #    thermo_state.temperature = 5000.0
-        #    if hasattr(thermo_state, 'update_factors'):
-        #        thermo_state.update_factors()
-        #    print("=" * 60)
-
-        #if step == 2:
-        #    print("=" * 60)
-        #    print(f"[СПЕЦНАЗ] ШАГ 2: МГНОВЕННЫЙ СБРОС! P=0.1, T=100")
-        #    thermo_state.pressure = 0.1
-        #    thermo_state.temperature = 100.0
-        #    if hasattr(thermo_state, 'update_factors'):
-        #        thermo_state.update_factors()
-        #    print("=" * 60)
-    # ================================================================
-        # === "ГОРЯЧИЙ ОБЖИМ" НА 31-М ШАГУ ===
-    #    if step == 31:
-    #        phase = "hunting"
-    #        print("=" * 60)
-    #        print(f"[ЗВЕРОЛОВ] ШАГ {step}: ГОРЯЧИЙ ОБЖИМ! P=50, T=5000")
-    #        thermo_state.pressure = 50.0
-    #        thermo_state.temperature = 5000.0
-    #        if hasattr(thermo_state, 'update_factors'):
-    #            thermo_state.update_factors()
-    #        print("=" * 60)
-
-        # === ЛОГИКА "ЗВЕРОЛОВА №2" ===
-    #    if phase == "hunting":
-            # Ждём, пока система РАСПУХНЕТ хотя бы до 5.0 (чтобы не сработать сразу)
-    #        if not hunting_started and prev_min_dist > 5.0:
-    #            hunting_started = True
-    #            print(f"[ЗВЕРОЛОВ-2] ШАГ {step}: Система распухла до {prev_min_dist:.3f}. Начинаем слежку за спуском.")
+        # ========== ПЯТИФАЗНЫЙ ВЗРЫВНОЙ ИМПУЛЬС ==========
+        if args.pulse_shockwave and SHOCKWAVE_START > 0:
+            if SHOCKWAVE_START <= step < SHOCKWAVE_START + PULSE_TOTAL:
+                t = step - SHOCKWAVE_START
+                
+                if t < PHASE_RISE1:
+                    frac = (t + 1) / PHASE_RISE1
+                    P_inst = P + (500.0 - P) * frac
+                    T_inst = T + (50000.0 - T) * frac
+                    phase_name = "ДЕТОНАЦИЯ"
+                elif t < PHASE_RISE1 + PHASE_VACUUM:
+                    frac = (t - PHASE_RISE1 + 1) / PHASE_VACUUM
+                    P_inst = 500.0 - 550.0 * frac
+                    T_inst = 50000.0 - 20000.0 * frac
+                    phase_name = "ВАКУУМ"
+                elif t < PHASE_RISE1 + PHASE_VACUUM + PHASE_RISE2:
+                    frac = (t - PHASE_RISE1 - PHASE_VACUUM + 1) / PHASE_RISE2
+                    P_inst = -50.0 + 350.0 * frac
+                    T_inst = 30000.0 + 20000.0 * frac
+                    phase_name = "ПОВТОРНОЕ СЖАТИЕ"
+                elif t < PHASE_RISE1 + PHASE_VACUUM + PHASE_RISE2 + PHASE_HOLD:
+                    frac = (t - PHASE_RISE1 - PHASE_VACUUM - PHASE_RISE2 + 1) / PHASE_HOLD
+                    P_inst = 300.0
+                    T_inst = 50000.0 - 45000.0 * frac
+                    phase_name = "ЗАМОРОЗКА"
+                else:
+                    frac = (t - PHASE_RISE1 - PHASE_VACUUM - PHASE_RISE2 - PHASE_HOLD + 1) / PHASE_COOL
+                    P_inst = 300.0 - 299.9 * frac
+                    T_inst = 5000.0 - 4700.0 * frac
+                    phase_name = "ОСТЫВАНИЕ"
+                
+                print(f"[ВЗРЫВНОЙ СИНТЕЗ] Шаг {step} [{phase_name}]: P={P_inst:.1f}, T={T_inst:.1f}")
+                thermo_state.pressure = P_inst
+                thermo_state.temperature = T_inst
+                if hasattr(thermo_state, 'update_factors'):
+                    thermo_state.update_factors()
             
-            # А вот теперь, когда охота началась, ждём падения до цели
-    #        if hunting_started and prev_min_dist < d_target:
-    #            phase = "freezing"
-    #            print("=" * 60)
-    #            print(f"[ЗВЕРОЛОВ-2] ШАГ {step}: d_min = {prev_min_dist:.3f} < {d_target}. ЗАМОРОЗКА НА СПУСКЕ!")
-    #            thermo_state.pressure = 0.1
-    #            thermo_state.temperature = 300.0
-    #            if hasattr(thermo_state, 'update_factors'):
-    #                thermo_state.update_factors()
-    #            print("=" * 60)
-
-    #    if phase == "freezing":
-    #        pass # держим заморозку
-        # ==================================
-
+            if step == SHOCKWAVE_START + PULSE_TOTAL:
+                print(f"[ВЗРЫВНОЙ СИНТЕЗ] Цикл завершён. Возврат: P={P}, T={T}")
+                thermo_state.pressure = P
+                thermo_state.temperature = T
+                if hasattr(thermo_state, 'update_factors'):
+                    thermo_state.update_factors()
+        
+        # ========== ОБЫЧНЫЙ УКОЛ ==========
+        elif not args.pulse_shockwave and args.pulse_step > 0:
+            if step == args.pulse_step:
+                print("=" * 60)
+                print(f"[УКОЛ] Шаг {step}: P=500, T=50000")
+                print("=" * 60)
+                thermo_state.pressure = 500.0
+                thermo_state.temperature = 50000.0
+                if hasattr(thermo_state, 'update_factors'):
+                    thermo_state.update_factors()
+            if step == args.pulse_step + 1:
+                print("=" * 60)
+                print(f"[СБРОС] Шаг {step}: Возврат к норме")
+                print("=" * 60)
+                thermo_state.pressure = P
+                thermo_state.temperature = T
+                if hasattr(thermo_state, 'update_factors'):
+                    thermo_state.update_factors()
+        
+        # ========== ЭВОЛЮЦИЯ ==========
         evolution.evolve_step(state=thermo_state)
         total_energy = sum(f.compute_energy() for f in evolution.fields.values() if hasattr(f, 'compute_energy'))
         energy_history.append(total_energy)
-
+        
         evolved = [lvl for lvl in fields_by_level if evolution.should_evolve(lvl)]
-        evolved_str = ','.join(str(l) for l in evolved) if evolved else '···'
-
+        evolved_str = ','.join(str(l) for l in evolved) if evolved else '...'
+        
+        # ========== d_min ==========
         min_dist = float('inf')
         for data in fields_by_level.values():
             for c in data['architect'].components:
@@ -336,86 +281,52 @@ def main():
                         d = np.linalg.norm(pos - c2['vortex'].position)
                         if d < min_dist:
                             min_dist = d
-
-        prev_min_dist = min_dist
-
-        # === МОНИТОРИНГ "ЖИВОСТИ" (ДАТЧИК ДЕЛЬТЫ ЭНЕРГИИ) ===
-        smooth_delta = 0.0
-        if 'prev_energy' in locals() and prev_energy != float('inf'):
-            delta_E = abs(total_energy - prev_energy)
-            energy_history_smooth.append(delta_E)
-            if len(energy_history_smooth) > 20:
-                energy_history_smooth.pop(0)
-            smooth_delta = sum(energy_history_smooth) / len(energy_history_smooth)
-        prev_energy = total_energy
-        # ===================================================
-
-        # === КРИТЕРИЙ СТАГНАЦИИ + ОПТИМИЗИРОВАННЫЙ ВЫВОД ===
-        # Проверка стагнации
-        if 'smooth_delta' in locals() and smooth_delta > 0:
-            if (smooth_delta < delta_E_threshold) and (abs(min_dist - prev_d_min_for_stagnation) < 0.001):
+        
+        # ========== 3D-ТРАЕКТОРИИ: сбор каждые 100 шагов ==========
+        if step % 100 == 0 or step == 0:
+            frame = {'step': step+1, 'd_min': float(min_dist), 'groups': {}}
+            for lvl, data in fields_by_level.items():
+                centers = []
+                for c in data['architect'].components:
+                    centers.append([float(x) for x in c['vortex'].position])
+                frame['groups'][str(lvl)] = centers
+            trajectory_data.append(frame)
+        
+        d_min_list.append(min_dist)
+        if len(d_min_list) > 1000:
+            recent_d = d_min_list[-1000:]
+            osc_amplitude = max(recent_d) - min(recent_d)
+            if osc_amplitude < OSCILLATION_AMPLITUDE_THRESHOLD:
                 stagnation_counter += 1
             else:
                 stagnation_counter = 0
-            prev_d_min_for_stagnation = min_dist
-
-        # Вывод только при важных событиях или каждые 100 шагов
-        if step % 100 == 0 or stagnation_counter >= stagnation_threshold or step == 0 or step == max_steps - 1:
-            progress = (step + 1 - start_step) / (max_steps - start_step)
-            bar_length = 20
-            filled = int(progress * bar_length)
-            bar = '█' * filled + '░' * (bar_length - filled)
-            print(f"  [{bar}] Шаг {step+1}/{max_steps} | d={min_dist:.3f} | E={total_energy:.1f} | dE={smooth_delta:.1f} | Стагнация: {stagnation_counter}/{stagnation_threshold}")
+        
+        if step % 100 == 0 or step == 0:
+            step_time = (datetime.now() - start_time).total_seconds()
+            print(f"{step+1:6} | d={min_dist:.3f} | E={total_energy:.1f} | Активны: {evolved_str:>18} | {step_time:7.1f}s")
             sys.stdout.flush()
-
-        # Автоматический останов
-        if stagnation_counter >= stagnation_threshold:
+        
+        if stagnation_counter >= STAGNATION_THRESHOLD:
             print("=" * 60)
-            print(f"[СТАГНАЦИЯ] Система застряла в ступеньке d={min_dist:.3f} на {stagnation_threshold} шагов.")
-            print(f"[СТАГНАЦИЯ] Прерывание расчета на шаге {step}.")
+            print(f"[СТАГНАЦИЯ] Система заснула в d={min_dist:.3f} на {STAGNATION_THRESHOLD} шагов.")
             print("=" * 60)
             break
-        # =======================================================
-
-        # Адаптивная настройка chi (только когда нужно)
-        if enable_tuning and chi_tuner and (step + 1) % tune_interval == 0 and step > 0:
-            all_positions_global, all_charges_global = [], []
-            for data in fields_by_level.values():
-                for c in data['architect'].components:
-                    pos = c['vortex'].position
-                    all_positions_global.append(pos)
-                    charge = c['vortex'].charge if hasattr(c['vortex'], 'charge') else c.get('Z', 1)
-                    all_charges_global.append(charge)
-            for lvl, data in fields_by_level.items():
-                architect = data['architect']
-                for comp in architect.components:
-                    symbol = comp['symbol']
-                    pos = comp['vortex'].position
-                    local_e = chi_tuner.compute_local_energy(pos, all_positions_global, all_charges_global)
-                    chi_tuner.update_local_energy(symbol, local_e)
-            new_chi = chi_tuner.tune_all()
-            chi_history.append({'step': step + 1, 'chi': new_chi.copy()})
-
-        step_time = (datetime.now() - start_time).total_seconds()
-        if (step + 1) % args.checkpoint_interval == 0 or step == max_steps - 1:
+        
+        if (step + 1) % args.checkpoint_interval == 0:
             save_checkpoint(step, step == max_steps - 1)
-
+        
+        if step % 100 == 0:
+            gc.collect()
+    
+    # ========== СОХРАНЕНИЕ 3D-ТРАЕКТОРИЙ ==========
+    traj_path = os.path.join(base_dir, 'feature', 'log_trajectories_3d.json')
+    with open(traj_path, 'w', encoding='utf-8') as f:
+        json.dump(trajectory_data, f, indent=2)
+    print(f"\n[3D] Траектории сохранены: {traj_path} ({len(trajectory_data)} кадров)")
+    
     print("-" * 100)
-    print(f"\n[{'5' if enable_tuning else '4'}/5] Анализ связей...")
-
-    if enable_tuning and chi_tuner:
-        chi_tuner.save_results(os.path.join(results_dir, f'chi_tuned_T{T}_P{P}.json'))
-        chi_tuner.print_summary()
-
-    save_checkpoint(max_steps - 1, is_final=True)
-    print(f"\nГОТОВО. Финальная энергия: {energy_history[-1]:.1f}")
-
-    print("\n[+] Экспорт 3D-грида поля H...")
-    for lvl, data in fields_by_level.items():
-        architect = data['architect']
-        grid_file = os.path.join(results_dir, f'field_H_level_{lvl}_grid.json')
-        architect.export_field_grid(grid_file, resolution=64)
-        print(f"    Уровень {lvl}: {grid_file}")
+    print(f"\n[4/4] Завершено. Финальная энергия: {energy_history[-1]:.1f}")
+    save_checkpoint(step, is_final=True)
 
 if __name__ == "__main__":
     main()

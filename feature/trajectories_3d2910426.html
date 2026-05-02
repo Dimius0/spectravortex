@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpectraVortex — Лифт в кроличью нору</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background-color: #000; }
+    
+    /* ЭКРАН ЗАГРУЗКИ */
+    #loading-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #000; color: #0f0; z-index: 1000;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      font-size: 16px; text-align: center; padding: 20px;
+    }
+    #loading-screen .title {
+      font-size: 24px; margin-bottom: 30px; letter-spacing: 4px;
+      text-shadow: 0 0 10px #0f0;
+    }
+    #loading-screen .line {
+      margin: 4px 0; opacity: 0; animation: fadeIn 0.5s forwards;
+    }
+    #loading-screen .reminder {
+      margin-top: 30px; font-size: 14px; max-width: 600px; line-height: 1.6;
+      opacity: 0; animation: fadeIn 1s 2s forwards;
+    }
+    #loading-screen .skip-btn {
+      margin-top: 40px; background: transparent; color: #0f0; border: 1px solid #0f0;
+      padding: 8px 20px; cursor: pointer; font-family: inherit; font-size: 14px;
+      opacity: 0; animation: fadeIn 1s 5s forwards;
+    }
+    #loading-screen .skip-btn:hover { background: #0f0; color: #000; }
+    
+    @keyframes fadeIn { to { opacity: 1; } }
+    
+    /* ИНФО-ПАНЕЛЬ */
+    #info {
+      position: absolute; top: 20px; left: 20px;
+      color: #0f0; background: rgba(0,0,0,0.7); padding: 10px 15px;
+      border-radius: 5px; pointer-events: none; font-size: 14px;
+      border-left: 3px solid #0f0; z-index: 10;
+    }
+    
+    /* ПРЕДУПРЕЖДЕНИЕ */
+    #warning {
+      position: absolute; bottom: 120px; left: 20px;
+      color: #ff0; background: rgba(0,0,0,0.7); padding: 6px 12px;
+      border-radius: 4px; font-size: 11px; pointer-events: none; z-index: 10;
+      border: 1px solid #ff0; opacity: 0.8;
+    }
+    
+    /* ОРАКУЛ */
+    #oracle-panel {
+      position: absolute; bottom: 100px; right: 20px;
+      width: 320px; height: 200px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #0f0; border-radius: 8px;
+      padding: 12px; color: #0f0;
+      font-family: 'Courier New', monospace; font-size: 13px;
+      overflow: hidden; pointer-events: none; z-index: 10;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+    }
+    #oracle-title {
+      text-align: center; border-bottom: 1px solid #0f0;
+      margin-bottom: 6px; padding-bottom: 4px;
+      font-weight: bold; letter-spacing: 2px; opacity: 0.8; font-size: 15px;
+    }
+    #oracle-log { height: calc(100% - 30px); overflow-y: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+    .oracle-line {
+      margin: 2px 0; opacity: 0; transform: translateY(10px);
+      transition: opacity 0.3s, transform 0.3s;
+      text-shadow: 0 0 5px #0f0; word-break: break-all; line-height: 1.4;
+    }
+    .oracle-line.show { opacity: 1; transform: translateY(0); }
+    .oracle-line.fade { opacity: 0; transition: opacity 2s; }
+    
+    /* ТУЛТИП */
+    #tooltip {
+      position: absolute; background: rgba(0,0,0,0.8); color: #0f0;
+      padding: 4px 8px; border-radius: 4px; font-size: 13px;
+      pointer-events: none; z-index: 100; display: none;
+      border: 1px solid #0f0; font-family: 'Courier New', monospace;
+    }
+    
+    /* КОНТРОЛИ */
+    #controls {
+      position: absolute; bottom: 20px; left: 20px; right: 20px;
+      background: rgba(0,0,0,0.8); padding: 10px 16px;
+      border-radius: 8px; color: #ccc; display: flex;
+      flex-wrap: wrap; align-items: center; gap: 10px;
+      font-size: 13px; border-top: 1px solid #333; z-index: 10;
+    }
+    button {
+      background: #0f0; color: #000; border: none; padding: 6px 14px;
+      border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 15px;
+    }
+    button:hover { background: #4f4; }
+    input[type=range] { flex-grow: 1; cursor: pointer; background: #222; height: 4px; border-radius: 4px; accent-color: #0f0; }
+    select { background: #222; color: #0f0; border: 1px solid #0f0; padding: 4px 8px; border-radius: 4px; }
+    label { color: #ccc; margin-right: 4px; font-size: 12px; }
+    #groupCheckboxes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    #groupCheckboxes label { cursor: pointer; display: flex; align-items: center; gap: 3px; }
+    input[type=checkbox] { accent-color: #0f0; }
+    .circle { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 3px; border: 1px solid #fff; }
+  </style>
+</head>
+<body>
+
+<!-- ЭКРАН ЗАГРУЗКИ -->
+<div id="loading-screen">
+  <div class="title">&lt; ЛИФТ В КРОЛИЧЬЮ НОРУ /&gt;</div>
+  <div class="line" style="animation-delay: 0.2s;">Инициализация поля H...</div>
+  <div class="line" style="animation-delay: 0.5s;">Загрузка конфигурации вихрей: 103 элемента</div>
+  <div class="line" style="animation-delay: 0.8s;">Расчёт ступенек (d_min)...</div>
+  <div class="line" style="animation-delay: 1.1s;">Построение траекторий...</div>
+  <div class="line" style="animation-delay: 1.4s;">Оракул готовится к предсказаниям...</div>
+  <div class="reminder">
+    <b>НАПОМИНАНИЕ:</b><br>
+    Всё, что вы увидите — не анимация. Это результат прямого численного моделирования на основе 
+    <b>Вихревой Модели Материи-Пространства (ВММП)</b> — единого подхода, работающего на всех 
+    фрактальных уровнях реальности: от планковских масштабов до космологии.<br><br>
+    <b>Исходные принципы:</b><br>
+    • Существует только движение.<br>
+    • Пространство — статистика вихревых конфигураций.<br>
+    • Материя — замкнутые топологические дефекты движения.<br>
+    • Время фрактально: каждому масштабу — свой темп эволюции.<br>
+    • Причина и следствие циклически замкнуты через полевую память.<br>
+    • Гравитация есть приталкивание, а не притяжение.<br><br>
+    Из этих принципов, без подгоночных параметров, выводятся все наблюдаемые свойства атомов и молекул.<br>
+    Для наглядности вихри заменены шарами. <b>Помните: шары не существуют. Существуют только вихри.</b>
+  </div>
+  <button class="skip-btn" onclick="skipLoading()">ПРОПУСТИТЬ</button>
+</div>
+
+<div id="info" style="display:none;">
+  <b>SpectraVortex — Лифт в кроличью нору</b><br>
+  Шаг: <span id="stepLabel">0</span> | d_min: <span id="dminLabel">—</span><br>
+  <span style="color:#888;">Активные элементы: <span id="activeCount">0</span></span>
+</div>
+
+<div id="warning" style="display:none;">
+  ⚠ ШАРЫ НЕ СУЩЕСТВУЮТ. Визуализация вихревых структур упрощена.
+</div>
+
+<div id="oracle-panel" style="display:none;">
+  <div id="oracle-title">&lt; ОРАКУЛ СИНТЕЗА /&gt;</div>
+  <div id="oracle-log"></div>
+</div>
+
+<div id="tooltip"></div>
+
+<div id="controls" style="display:none;">
+  <button id="loadBtn">📂 Загрузить JSON</button>
+  <button id="playBtn" disabled>▶ Запустить Цикл</button>
+  <span id="sliderLabel" style="min-width:60px;">-</span>
+  <input type="range" id="slider" min="0" max="0" value="0" step="1" disabled>
+  <label>Скорость:</label>
+  <select id="speedSelect">
+    <option value="600">0.5x</option>
+    <option value="300" selected>1x</option>
+    <option value="150">2x</option>
+    <option value="60">5x</option>
+  </select>
+  <div style="border-left:1px solid #333; height:20px; margin:0 5px;"></div>
+  <div id="groupCheckboxes"><span style="color:#ccc;">Группы:</span></div>
+</div>
+
+<input type="file" id="fileInput" accept=".json" style="display:none;">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+  // ========== ЭКРАН ЗАГРУЗКИ ==========
+  let loadingComplete = false;
+  const MIN_LOADING_TIME = 10000; // 10 секунд ритуала
+  
+  setTimeout(() => {
+    if (!loadingComplete) finishLoading();
+  }, MIN_LOADING_TIME);
+  
+  function skipLoading() {
+    if (!loadingComplete) finishLoading();
+  }
+  
+  function finishLoading() {
+    loadingComplete = true;
+    document.getElementById('loading-screen').style.transition = 'opacity 0.5s';
+    document.getElementById('loading-screen').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('info').style.display = 'block';
+      document.getElementById('warning').style.display = 'block';
+      document.getElementById('oracle-panel').style.display = 'block';
+      document.getElementById('controls').style.display = 'flex';
+    }, 500);
+  }
+  
+  // ========== СЦЕНА ==========
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050510);
+  
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
+  camera.position.set(60, 40, 80);
+  
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(0.8);
+  document.body.appendChild(renderer.domElement);
+  
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.2;
+  
+  const gridHelper = new THREE.GridHelper(100, 20, 0x112233, 0x050510);
+  scene.add(gridHelper);
+  
+  // ========== ДАННЫЕ ==========
+  const colors = ['#ff4444','#44ff44','#4488ff','#ffaa00','#ff44ff','#44ffff','#ffffff'];
+  const groupNames = ['','K','L','M','N','O','P','Q'];
+  
+  const symbols = ['?','H','He','Li','Be','B','C','N','O','F','Ne',
+    'Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co',
+    'Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh',
+    'Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu',
+    'Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl',
+    'Pb','Bi','Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es',
+    'Fm','Md','No','Lr'];
+  
+  const groupRadii = {1:0.5, 2:0.7, 3:0.9, 4:1.1, 5:1.3, 6:1.5, 7:1.7};
+  
+  let groupObjects = {};
+  let quantumLines = [];
+  let activeConnections = new Map();
+  
+  // ========== ОРАКУЛ ==========
+  const oracleLog = document.getElementById('oracle-log');
+  const MAX_ORACLE_LINES = 4;
+  let lastOraclePairs = new Map();
+  
+  function addOracleLine(elA, elB, dist) {
+    const now = new Date().toLocaleTimeString();
+    const symbolA = elA.symbol;
+    const symbolB = elB.symbol;
+    const probability = Math.max(0, Math.round((1 - dist/12) * 100));
+    if (probability < 40) return;
+    const compound = Math.random() > 0.7 ? symbolA+symbolB+symbolA : symbolA+symbolB;
+    const groupDiff = Math.abs(elA.group - elB.group);
+    let stability, tHalf;
+    if (groupDiff === 0) { stability = "СТАБИЛЕН"; tHalf = "> 10⁶ лет"; }
+    else if (groupDiff <= 2) { stability = "МЕТАСТАБИЛЕН"; tHalf = "~ 10² - 10⁴ лет"; }
+    else { stability = "НЕСТАБИЛЕН"; tHalf = "< 1 мс"; }
+    
+    const pairKey = [Math.min(elA.index, elB.index), Math.max(elA.index, elB.index)].join('-');
+    const nowTs = Date.now();
+    if (lastOraclePairs.has(pairKey) && (nowTs - lastOraclePairs.get(pairKey)) < 10000) return;
+    lastOraclePairs.set(pairKey, nowTs);
+    
+    const line = document.createElement('div');
+    line.className = 'oracle-line';
+    line.innerHTML = `<span style="color:#fff;">[${now}]</span> <span style="color:#ff0;">${symbolA}+${symbolB}→${compound}</span> <span style="color:#0ff;">P:${probability}%</span> <span style="color:#f0f;">T½:${tHalf}</span> <span style="color:#0f0;">(${stability})</span>`;
+    oracleLog.appendChild(line);
+    while (oracleLog.children.length > MAX_ORACLE_LINES) {
+      const old = oracleLog.children[0];
+      old.classList.add('fade');
+      setTimeout(() => { if (old.parentNode) old.remove(); }, 2000);
+    }
+    requestAnimationFrame(() => line.classList.add('show'));
+    setTimeout(() => {
+      if (line.parentNode) { line.classList.add('fade'); setTimeout(() => { if (line.parentNode) line.remove(); }, 2000); }
+    }, 8000);
+    for (const [key, ts] of lastOraclePairs.entries()) { if (nowTs - ts > 30000) lastOraclePairs.delete(key); }
+  }
+  
+  // ========== ПОСТРОЕНИЕ ГРУПП ==========
+  function buildCheckboxes() {
+    const container = document.getElementById('groupCheckboxes');
+    container.innerHTML = '<span style="color:#ccc;">Группы:</span>';
+    for (let g = 1; g <= 7; g++) {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = g; cb.checked = true;
+      cb.addEventListener('change', () => loadFrame(currentFrame));
+      const circle = document.createElement('span');
+      circle.className = 'circle'; circle.style.backgroundColor = colors[g-1];
+      label.appendChild(cb); label.appendChild(circle);
+      label.appendChild(document.createTextNode(groupNames[g]));
+      container.appendChild(label);
+    }
+  }
+  
+  function getVisibleGroups() {
+    const cbs = document.querySelectorAll('#groupCheckboxes input[type=checkbox]');
+    return Array.from(cbs).filter(cb => cb.checked).map(cb => cb.value);
+  }
+  
+  function createAllSpheres() {
+    for (let g = 1; g <= 7; g++) {
+      if (groupObjects[g]) groupObjects[g].forEach(obj => { scene.remove(obj.mesh); if (obj.trailLine) scene.remove(obj.trailLine); });
+    }
+    quantumLines.forEach(l => scene.remove(l));
+    quantumLines = [];
+    groupObjects = {};
+    activeConnections = new Map();
+    if (!trajectoryData.length) return;
+    
+    const sampleFrame = trajectoryData[0];
+    let elemCounter = 0;
+    for (let g = 1; g <= 7; g++) {
+      groupObjects[g] = [];
+      if (!sampleFrame.groups[g]) continue;
+      const color = colors[g-1];
+      const count = sampleFrame.groups[g].length;
+      const radius = groupRadii[g] || 0.8;
+      const geo = new THREE.SphereGeometry(radius, 8, 6);
+      const mat = new THREE.MeshBasicMaterial({ color: color });
+      for (let i = 0; i < count; i++) {
+        const sphere = new THREE.Mesh(geo, mat);
+        sphere.visible = true;
+        sphere.userData = { symbol: symbols[elemCounter+1] || '?', group: g, index: elemCounter };
+        scene.add(sphere);
+        groupObjects[g].push({ mesh: sphere, group: g, elementIndex: elemCounter, symbol: sphere.userData.symbol, index: elemCounter, trailPoints: [], trailLine: null });
+        elemCounter++;
+      }
+    }
+  }
+  
+  // ========== ТУЛТИП ==========
+  const tooltip = document.getElementById('tooltip');
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  window.addEventListener('mousemove', (event) => {
+    if (playing) { tooltip.style.display = 'none'; return; }
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const allMeshes = Object.values(groupObjects).flat().map(o => o.mesh);
+    const intersects = raycaster.intersectObjects(allMeshes);
+    if (intersects.length > 0) {
+      const obj = intersects[0].object;
+      const conns = activeConnections.get(obj.userData.index) || [];
+      const connSymbols = conns.map(idx => symbols[idx+1] || '?').join(', ');
+      tooltip.style.display = 'block';
+      tooltip.style.left = (event.clientX+15)+'px';
+      tooltip.style.top = (event.clientY-15)+'px';
+      tooltip.textContent = connSymbols.length > 0 ? `${obj.userData.symbol}: ${conns.length} связей с ${connSymbols} (G${obj.userData.group})` : `${obj.userData.symbol}: свободен (G${obj.userData.group})`;
+    } else { tooltip.style.display = 'none'; }
+  });
+  
+  // ========== ХВОСТЫ ==========
+  function updateTrails() {
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g]) continue;
+      groupObjects[g].forEach(obj => { if (obj.trailLine) { scene.remove(obj.trailLine); obj.trailLine = null; } });
+    }
+    if (playing) return;
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g]) continue;
+      groupObjects[g].forEach(obj => {
+        if (!obj.mesh.visible || obj.trailPoints.length < 2) return;
+        const geo = new THREE.BufferGeometry().setFromPoints(obj.trailPoints);
+        const mat = new THREE.LineBasicMaterial({ color: colors[g-1], transparent: true, opacity: 0.5 });
+        const line = new THREE.Line(geo, mat);
+        scene.add(line);
+        obj.trailLine = line;
+      });
+    }
+  }
+  
+  // ========== КВАНТОРЫ ==========
+  function updateQuantums() {
+    quantumLines.forEach(l => scene.remove(l));
+    quantumLines = [];
+    activeConnections = new Map();
+    if (playing) return;
+    
+    const allObjs = [];
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g]) continue;
+      groupObjects[g].forEach(obj => { if (obj.mesh.visible) allObjs.push(obj); });
+    }
+    const threshold = 12.0, MAX_LINES = 50;
+    let lineCount = 0;
+    const linesPerAtom = new Map();
+    const triggeredPairs = [];
+    for (let i = 0; i < allObjs.length; i++) {
+      for (let j = i+1; j < allObjs.length; j++) {
+        if (lineCount >= MAX_LINES) break;
+        const objA = allObjs[i], objB = allObjs[j];
+        const dist = objA.mesh.position.distanceTo(objB.mesh.position);
+        if (dist < threshold) {
+          const linesA = linesPerAtom.get(objA.index) || 0, linesB = linesPerAtom.get(objB.index) || 0;
+          if (linesA >= 2 || linesB >= 2) continue;
+          const points = [objA.mesh.position.clone(), objB.mesh.position.clone()];
+          const geo = new THREE.BufferGeometry().setFromPoints(points);
+          const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: Math.max(0, 1 - dist/threshold) * 0.7 });
+          const line = new THREE.Line(geo, mat);
+          scene.add(line); quantumLines.push(line); lineCount++;
+          linesPerAtom.set(objA.index, linesA+1); linesPerAtom.set(objB.index, linesB+1);
+          if (!activeConnections.has(objA.index)) activeConnections.set(objA.index, []);
+          if (!activeConnections.has(objB.index)) activeConnections.set(objB.index, []);
+          activeConnections.get(objA.index).push(objB.index);
+          activeConnections.get(objB.index).push(objA.index);
+          if (dist < threshold * 0.5) triggeredPairs.push({ elA: objA, elB: objB, dist });
+        }
+      }
+      if (lineCount >= MAX_LINES) break;
+    }
+    triggeredPairs.forEach(p => addOracleLine(p.elA, p.elB, p.dist));
+  }
+  
+  // ========== ЗАГРУЗКА КАДРА ==========
+  function loadFrame(idx) {
+    if (!trajectoryData.length) return;
+    const frame = trajectoryData[idx];
+    document.getElementById('stepLabel').textContent = frame.step;
+    document.getElementById('dminLabel').textContent = frame.d_min.toFixed(3);
+    document.getElementById('slider').value = idx;
+    document.getElementById('sliderLabel').textContent = `${idx+1} / ${trajectoryData.length}`;
+    currentFrame = idx;
+    const visibleGroups = getVisibleGroups();
+    for (let g = 1; g <= 7; g++) {
+      if (!groupObjects[g]) continue;
+      const isVis = visibleGroups.includes(String(g)) && frame.groups[g];
+      groupObjects[g].forEach((obj, i) => {
+        if (isVis && frame.groups[g] && i < frame.groups[g].length) {
+          const pos = frame.groups[g][i];
+          obj.mesh.position.set(pos[0], pos[1], pos[2]);
+          obj.mesh.visible = true;
+          obj.trailPoints.push(obj.mesh.position.clone());
+          if (obj.trailPoints.length > 20) obj.trailPoints.shift();
+        } else { obj.mesh.visible = false; }
+      });
+    }
+    updateTrails();
+    updateQuantums();
+    document.getElementById('activeCount').textContent = Object.values(groupObjects).flat().filter(o => o.mesh.visible).length;
+  }
+  
+  // ========== ПЕРЕМЕННЫЕ ПЛЕЕРА ==========
+  let trajectoryData = [];
+  let currentFrame = 0, playing = false, playSpeed = 300;
+  
+  // ========== ЗАГРУЗКА JSON ==========
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('loadBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        trajectoryData = data;
+        document.getElementById('slider').max = data.length - 1;
+        document.getElementById('slider').disabled = false;
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('sliderLabel').textContent = `1 / ${data.length}`;
+        buildCheckboxes();
+        createAllSpheres();
+        loadFrame(0);
+      } catch(err) { alert('Ошибка JSON: ' + err.message); }
+    };
+    reader.readAsText(file);
+  });
+  
+  // ========== УПРАВЛЕНИЕ ==========
+  document.getElementById('slider').addEventListener('input', e => {
+    playing = false; document.getElementById('playBtn').textContent = '▶ Запустить Цикл';
+    loadFrame(parseInt(e.target.value));
+  });
+  document.getElementById('playBtn').addEventListener('click', () => {
+    if (playing) {
+      playing = false; document.getElementById('playBtn').textContent = '▶ Запустить Цикл';
+      loadFrame(currentFrame);
+      return;
+    }
+    if (currentFrame >= trajectoryData.length - 1) { currentFrame = 0; loadFrame(0); }
+    playing = true; document.getElementById('playBtn').textContent = '⏸ Стоп';
+    lastTime = performance.now();
+  });
+  document.getElementById('speedSelect').addEventListener('change', e => { playSpeed = parseInt(e.target.value); });
+  
+  // ========== АНИМАЦИЯ ==========
+  let lastTime = 0, frameCounter = 0;
+  function animate(time) {
+    requestAnimationFrame(animate);
+    if (playing && trajectoryData.length && time - lastTime > playSpeed) {
+      lastTime = time;
+      const next = currentFrame + 1;
+      if (next >= trajectoryData.length) {
+        playing = false; document.getElementById('playBtn').textContent = '▶ Запустить Цикл';
+        loadFrame(currentFrame);
+      } else {
+        loadFrame(next);
+        frameCounter++;
+        if (frameCounter % 3 === 0 && window.gc) window.gc();
+      }
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  requestAnimationFrame(animate);
+  console.log('Лифт в кроличью нору готов. Оракул ждёт.');
+</script>
+</body>
+</html>
