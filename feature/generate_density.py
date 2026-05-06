@@ -6,10 +6,10 @@ from datetime import datetime
 # ===== ПАРАМЕТРЫ =====
 GRID_SIZE = 100
 RESOLUTION = 64
-FRAMES_LIMIT = -500  # последние 500 фреймов
+FRAMES_LIMIT = -5000  # все кадры
 
 print("=" * 50)
-print("Генератор карты плотности поля H")
+print("Генератор карты плотности поля H (ПОЛНАЯ ВЕРСИЯ)")
 print("=" * 50)
 
 # Загрузка
@@ -17,8 +17,9 @@ print("\n1. Загружаем траектории...")
 with open('data/log_trajectories_3d.json', 'r') as f:
     data = json.load(f)
 
-print(f"   Фреймов: {len(data)}")
+print(f"   Фреймов в файле: {len(data)}")
 frames = data[FRAMES_LIMIT:]
+print(f"   Используем фреймов: {len(frames)}")
 
 # Создание карты
 print(f"\n2. Строим карту {RESOLUTION}x{RESOLUTION}x{RESOLUTION}...")
@@ -26,7 +27,7 @@ density_map = np.zeros((RESOLUTION, RESOLUTION, RESOLUTION), dtype=np.float32)
 scale = RESOLUTION / GRID_SIZE
 
 for i, frame in enumerate(frames):
-    if i % 100 == 0:
+    if i % 500 == 0:
         print(f"   Фрейм {i}/{len(frames)}")
     for atoms in frame['groups'].values():
         for atom in atoms:
@@ -60,14 +61,20 @@ density_json = {
         "frames_used": len(frames),
         "dtype": "float32",
         "stats": stats,
-        "description": "3D-карта плотности поля H"
+        "description": "3D-карта плотности поля H (ПОЛНАЯ, 5000 кадров)"
     },
     "density_3d": density_map.flatten().tolist()
 }
 
-with open('data/field_h_density_3d.json', 'w') as f:
+with open('data/field_h_density_3d_new.json', 'w') as f:
     json.dump(density_json, f)
 
 size_mb = Path('data/field_h_density_3d.json').stat().st_size / (1024 * 1024)
 print(f"   Готово: {size_mb:.1f} MB")
 print("\n✓ Файл сохранён: data/field_h_density_3d.json")
+print("Переименовываем старый файл...")
+import os
+if os.path.exists('data/field_h_density_3d.json'):
+    os.remove('data/field_h_density_3d.json')
+os.rename('data/field_h_density_3d_new.json', 'data/field_h_density_3d.json')
+print("Готово. Файл заменён.")
