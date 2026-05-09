@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>SpectraVortex — Quantum Reactor v3.6</title>
+  <title>SpectraVortex — Quantum Reactor v3.3</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -29,7 +29,7 @@
     #loading-screen button:hover { background: #0f0; color: #000; box-shadow: 0 0 30px #0f0; }
     .progress-bar { width: 350px; height: 6px; border: 1px solid #0a0; margin-top: 1.5em; background: #111; }
     .progress-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.4s ease; box-shadow: 0 0 8px #0f0; }
-
+    
     #info-panel {
       position: absolute; top: 20px; left: 20px;
       background: rgba(0,0,0,0.75); padding: 12px 16px;
@@ -49,13 +49,13 @@
     button:hover:not(:disabled) { box-shadow: 0 0 15px #0f0; }
     button:disabled { background: #222; color: #555; cursor: not-allowed; }
     input[type=range] { flex-grow: 1; cursor: pointer; background: #222; height: 5px; accent-color: #0f0; min-width: 100px; }
-
+    
     #status-message {
       position: absolute; bottom: 85px; left: 20px;
       color: #ff0; z-index: 10; font-size: 11px;
       background: rgba(0,0,0,0.6); padding: 4px 8px;
     }
-
+    
     #alchemy-panel {
       position: absolute; top: 20px; right: 20px;
       background: rgba(0,0,0,0.85); border: 1px solid #ff0;
@@ -67,7 +67,7 @@
       width: 100%; background: #111; color: #0f0;
       border: 1px solid #0f0; padding: 5px; margin-bottom: 6px; font-family: inherit;
     }
-
+    
     #atom-detail {
       position: absolute; top: 50%; right: 20px; transform: translateY(-50%);
       background: rgba(0,0,0,0.9); border: 1px solid #0ff;
@@ -79,7 +79,7 @@
     #atom-detail .prop { color: #aaa; }
     #atom-detail .val { color: #0f0; }
     #atom-detail .radioactive { color: #f55; font-weight: bold; }
-
+    
     #density-panel {
       position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
       background: rgba(0,0,0,0.85); border: 1px solid #08f;
@@ -87,7 +87,7 @@
       display: none;
     }
     #density-panel h4 { margin: 0 0 8px 0; text-align: center; }
-
+    
     .element-label {
       color: #fff; font-size: 10px;
       font-family: 'Courier New', monospace;
@@ -99,7 +99,7 @@
       color: #f55; font-size: 12px; pointer-events: none; user-select: none;
       text-shadow: 0 0 8px #f00;
     }
-
+    
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: #111; }
     ::-webkit-scrollbar-thumb { background: #0f0; }
@@ -109,7 +109,7 @@
 
 <div id="loading-screen">
   <h1>⚛ SPECTRA VORTEX</h1>
-  <p>Virtual Molecular Modeling System v3.6</p>
+  <p>Virtual Molecular Modeling System v3.3</p>
   <p>Поле H • Плотность • Квантовые связи</p>
   <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
   <button onclick="startApp()">ИНИЦИАЛИЗИРОВАТЬ РЕАКТОР</button>
@@ -127,13 +127,10 @@
 <div id="controls" style="display:none;">
   <button id="loadBtn">📂 JSON</button>
   <button id="playBtn" disabled>▶</button>
-  <button id="stepBackBtn" disabled>⏮</button>
-  <button id="stepFwdBtn" disabled>⏭</button>
   <input type="range" id="slider" min="0" max="0" value="0" step="1" disabled>
   <button id="captureBtn" disabled>📸</button>
   <button id="alchemyToggle">⚗️</button>
   <button id="densityToggle">🔥 Поле: Выкл</button>
-  <button id="projToggle" style="background:#0ff;color:#000;">🎥 Перспектива</button>
   <button id="clearSelectBtn" disabled>✕ Сброс</button>
   <input type="file" id="fileInput" accept=".json" style="display:none;">
 </div>
@@ -163,23 +160,17 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 
 <script>
-  function isRunningOnServer() {
-    return window.location.protocol === 'http:' || window.location.protocol === 'https:';
-  }
-
+  // ==================== ГЛОБАЛЬНОЕ СОСТОЯНИЕ ====================
   let scene, camera, renderer, labelRenderer, controls, raycaster, mouse;
   let trajectoryData = [], currentFrame = 0, playing = false;
   let groupObjects = {}, quantumLines = [], trailLines = [];
   let knownBonds = [], knownIsotopes = [], fieldDensity3D = null, knowledgeLoaded = false;
   let selectedAtoms = [], pulseLine = null, pulsePhase = 0;
-
+  
   let densityMode = 0;
   let densityCloud = null;
-
-  let projectionMode = 0;
-  const projLabels = ['🎥 Перспектива', '📐 Ортогональная', '🔭 Длинный фокус'];
-  const projColors = ['#0ff', '#f0f', '#ff0'];
-
+  
+  // ==================== КОНСТАНТЫ ====================
   const groupColors = ['#ff3333','#ff8800','#ffdd00','#33cc33','#3399ff','#4444cc','#9933ff'];
   const symbols = ['?','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar',
     'K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr',
@@ -188,31 +179,32 @@
     'Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra',
     'Ac','Th','Pa','U','Np','Pu','Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr'];
   const groupRadii = {1:0.4, 2:0.6, 3:0.8, 4:1.0, 5:1.2, 6:1.4, 7:1.6};
-
+  
   const radioactiveElements = new Set([
     'Po','At','Rn','Fr','Ra','Ac','Th','Pa','U','Np','Pu','Am','Cm',
     'Bk','Cf','Es','Fm','Md','No','Lr','Tc','Pm'
   ]);
-
+  
   const pairCache = new Map();
   const BASE_PATH = 'data/';
 
+  // ==================== БАЗЫ ЗНАНИЙ ====================
   async function loadKnowledgeBases() {
     const statusEl = document.getElementById('status-message');
     const progressFill = document.getElementById('progressFill');
     statusEl.textContent = '⏳ Загрузка баз знаний...';
     progressFill.style.width = '5%';
-
+    
     const bases = [
       {name:'bonds', file:'field_H_intermetallides_known.json'},
       {name:'isotopes', file:'field_H_isotopes_perturbations.json'},
       {name:'density', file:'field_h_density_3d.json'}
     ];
-
+    
     const results = await Promise.allSettled(
       bases.map(b => fetch(BASE_PATH + b.file).then(r => r.ok ? r.json() : Promise.reject(r.status)))
     );
-
+    
     results.forEach((res, i) => {
       if (res.status === 'fulfilled') {
         const data = res.value;
@@ -232,23 +224,16 @@
       } else { console.warn(`База ${bases[i].name}: ошибка загрузки`); }
       progressFill.style.width = `${5 + (i+1)*25}%`;
     });
-
+    
     knowledgeLoaded = knownBonds.length > 0 || knownIsotopes.length > 0;
     progressFill.style.width = '85%';
-
+    
     const hasDensity = fieldDensity3D && fieldDensity3D.data.length > 0;
-
-    if (!knowledgeLoaded && !isRunningOnServer()) {
-      statusEl.textContent = '⚠️ 1. В терминале: python -m http.server 8080 | 2. В браузере: http://localhost:8080 | 3. Нажмите 📂 и выберите JSON-файл';
-    } else if (!knowledgeLoaded) {
-      statusEl.textContent = '⚠️ Базы не загружены. Проверьте подключение.';
-    } else {
-      statusEl.textContent = knowledgeLoaded
-        ? `✅ Базы: ${knownBonds.length} связей, ${knownIsotopes.length} изотопов` +
-          (hasDensity ? `, поле H (${fieldDensity3D.metadata.resolution}³)` : '')
-        : '⚠️ Базовый режим. Загрузите JSON с траекториями';
-    }
-
+    statusEl.textContent = knowledgeLoaded
+      ? `✅ Базы: ${knownBonds.length} связей, ${knownIsotopes.length} изотопов` +
+        (hasDensity ? `, поле H (${fieldDensity3D.metadata.resolution}³)` : '')
+      : '⚠️ Базовый режим. Загрузите JSON с траекториями';
+    
     progressFill.style.width = '100%';
     setTimeout(() => {
       document.getElementById('progressBar').style.display = 'none';
@@ -275,41 +260,48 @@
     return result;
   }
 
+  // ==================== СЦЕНА ====================
   function initScene() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x050510);
     scene.fog = new THREE.FogExp2(0x050510, 0.0002);
-
+    
     camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 600);
     camera.position.set(50, 35, 70);
-
+    
     renderer = new THREE.WebGLRenderer({antialias:true, alpha:false, preserveDrawingBuffer:true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
-
+    
     labelRenderer = new THREE.CSS2DRenderer();
     labelRenderer.setSize(window.innerWidth, window.innerHeight);
     labelRenderer.domElement.style.position = 'absolute';
     labelRenderer.domElement.style.top = '0';
     labelRenderer.domElement.style.pointerEvents = 'none';
     document.body.appendChild(labelRenderer.domElement);
-
+    
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.minDistance = 10; controls.maxDistance = 200;
-
+    
     raycaster = new THREE.Raycaster();
     raycaster.params.Points.threshold = 1.5;
     mouse = new THREE.Vector2();
-
+    
     scene.add(new THREE.GridHelper(100, 20, 0x112233, 0x050510));
     scene.add(new THREE.AmbientLight(0x303030));
     const dirLight = new THREE.DirectionalLight(0xcccccc, 0.7);
     dirLight.position.set(1,1,1); scene.add(dirLight);
-
+    
+    const starsGeo = new THREE.BufferGeometry();
+    const stars = new Float32Array(600);
+    for (let i=0;i<600;i++) stars[i] = (Math.random()-0.5)*300;
+    starsGeo.setAttribute('position', new THREE.BufferAttribute(stars, 3));
+    scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({color:0x334466, size:0.3})));
+    
     renderer.domElement.addEventListener('click', onCanvasClick);
-
+    
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
@@ -318,19 +310,20 @@
     });
   }
 
+  // ==================== КЛИК ПО СФЕРЕ ====================
   function onCanvasClick(event) {
     if (!trajectoryData.length) return;
-
+    
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-
+    
     const allMeshes = [];
     for (let g in groupObjects) {
       groupObjects[g].forEach(obj => { if(obj.mesh.visible) allMeshes.push(obj.mesh); });
     }
-
+    
     const intersects = raycaster.intersectObjects(allMeshes);
     if (intersects.length > 0) {
       const mesh = intersects[0].object;
@@ -338,7 +331,7 @@
       if (obj) selectAtom(obj);
     }
   }
-
+  
   function findObjectByMesh(mesh) {
     for (let g in groupObjects) {
       for (let obj of groupObjects[g]) {
@@ -347,10 +340,10 @@
     }
     return null;
   }
-
+  
   function selectAtom(obj) {
     if (selectedAtoms.length >= 2) clearSelection();
-
+    
     const existingIdx = selectedAtoms.findIndex(s => s.obj === obj);
     if (existingIdx >= 0) {
       removeSelectionHighlight(selectedAtoms[existingIdx]);
@@ -359,29 +352,29 @@
       selectedAtoms.push({obj, ring: null});
       addSelectionHighlight(obj);
     }
-
+    
     updateSelectionUI();
-
+    
     if (selectedAtoms.length === 2) {
       drawPulseLine(selectedAtoms[0].obj, selectedAtoms[1].obj);
     } else {
       clearPulseLine();
     }
-
+    
     showAtomDetail(obj);
   }
-
+  
   function addSelectionHighlight(obj) {
     const ringGeo = new THREE.TorusGeometry(groupRadii[obj.data.group]*1.35, 0.08, 8, 16);
     const ringMat = new THREE.MeshBasicMaterial({color: 0xffff00});
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.position.copy(obj.mesh.position);
     scene.add(ring);
-
+    
     const idx = selectedAtoms.findIndex(s => s.obj === obj);
     if (idx >= 0) selectedAtoms[idx].ring = ring;
   }
-
+  
   function removeSelectionHighlight(selection) {
     if (selection.ring) {
       scene.remove(selection.ring);
@@ -389,7 +382,7 @@
       selection.ring.material.dispose();
     }
   }
-
+  
   function clearSelection() {
     selectedAtoms.forEach(s => removeSelectionHighlight(s));
     selectedAtoms = [];
@@ -397,31 +390,31 @@
     document.getElementById('clearSelectBtn').disabled = true;
     document.getElementById('atom-detail').style.display = 'none';
   }
-
+  
   function updateSelectionUI() {
     document.getElementById('clearSelectBtn').disabled = selectedAtoms.length === 0;
   }
-
+  
   function drawPulseLine(objA, objB) {
     clearPulseLine();
     const geo = new THREE.BufferGeometry().setFromPoints([objA.mesh.position, objB.mesh.position]);
     pulseLine = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xffff00, linewidth:1, transparent:true, opacity:0.8}));
     scene.add(pulseLine);
   }
-
+  
   function clearPulseLine() {
     if (pulseLine) { scene.remove(pulseLine); pulseLine.geometry.dispose(); pulseLine.material.dispose(); pulseLine = null; }
   }
-
+  
   document.getElementById('clearSelectBtn').addEventListener('click', clearSelection);
-
+  
   function showAtomDetail(obj) {
     const d = obj.data;
     const pos = obj.mesh.position;
     const radius = groupRadii[d.group];
     const isRadioactive = radioactiveElements.has(d.symbol);
     const isotope = knownIsotopes.find(i => i.parent_element === d.symbol);
-
+    
     let html = `<h4>${isRadioactive ? '☢️ ' : ''}${d.symbol} (Группа ${d.group})</h4>`;
     html += `<span class="prop">Индекс:</span> <span class="val">${d.index}</span><br>`;
     html += `<span class="prop">Радиус оболочки:</span> <span class="val">${radius.toFixed(2)} Å</span><br>`;
@@ -430,19 +423,19 @@
     html += `<span class="val">X: ${pos.x.toFixed(3)}</span><br>`;
     html += `<span class="val">Y: ${pos.y.toFixed(3)}</span><br>`;
     html += `<span class="val">Z: ${pos.z.toFixed(3)}</span><br>`;
-
+    
     if (isRadioactive) {
       html += `<hr style="border-color:#333;">`;
       html += `<span class="radioactive">☢️ РАДИОАКТИВЕН</span><br>`;
     } else {
       html += `<span class="val">✓ Стабилен</span><br>`;
     }
-
+    
     if (isotope) {
       html += `<span class="prop">Изотоп:</span> <span class="val">${isotope.isotope_symbol || '—'}</span><br>`;
       html += `<span class="prop">Период полураспада:</span> <span class="val">${isotope.half_life || '—'}</span><br>`;
     }
-
+    
     if (selectedAtoms.length === 2) {
       const objB = selectedAtoms[0].obj === obj ? selectedAtoms[1].obj : selectedAtoms[0].obj;
       const posB = objB.mesh.position;
@@ -450,25 +443,26 @@
       const rB = groupRadii[objB.data.group];
       const distCenter = pos.distanceTo(posB);
       const distShell = distCenter - rA - rB;
-
+      
       html += `<hr style="border-color:#ff0;">`;
       html += `<span class="prop" style="color:#ff0;">📏 К ${objB.data.symbol} (Группа ${objB.data.group}, R=${rB.toFixed(2)}):</span><br>`;
       html += `<span class="prop">Центр→Центр:</span> <span class="val" style="font-size:14px;color:#ff0;">${distCenter.toFixed(2)} Å</span><br>`;
       html += `<span class="prop">Оболочка→Оболочка:</span> <span class="val" style="font-size:14px;color:#ff0;">${distShell.toFixed(2)} Å</span>`;
       if (distShell < 0) html += ` <span style="color:#f55;">(ПЕРЕКРЫТИЕ!)</span>`;
       html += `<br>`;
-
+      
       const id = identifyPair(selectedAtoms[0].obj, selectedAtoms[1].obj, distCenter);
       if (id.knownBond) {
         html += `<br><span class="val">✅ ${id.knownBond.formula} (${id.knownBond.crystal_structure})</span>`;
         html += `<br><span class="prop">Энтальпия:</span> <span class="val">${id.knownBond.formation_enthalpy_kJ_mol} кДж/моль</span>`;
       }
     }
-
+    
     document.getElementById('atomDetailContent').innerHTML = html;
     document.getElementById('atom-detail').style.display = 'block';
   }
 
+  // ==================== ЗАГРУЗКА ДАННЫХ ====================
   document.getElementById('fileInput').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -483,8 +477,6 @@
         document.getElementById('slider').disabled = false;
         document.getElementById('playBtn').disabled = false;
         document.getElementById('captureBtn').disabled = false;
-        document.getElementById('stepBackBtn').disabled = false;
-        document.getElementById('stepFwdBtn').disabled = false;
         pairCache.clear(); clearSelection();
         document.getElementById('atom-detail').style.display = 'none';
         createAllSpheres(); loadFrame(0);
@@ -496,6 +488,7 @@
   });
   document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
 
+  // ==================== СФЕРЫ (ЧИСТЫЕ ЦВЕТА, БЕЗ ТЕКСТУР) ====================
   function createAllSpheres() {
     Object.values(groupObjects).forEach(objs => objs.forEach(obj => {
       scene.remove(obj.mesh);
@@ -506,19 +499,20 @@
     }));
     groupObjects = {};
     if (!trajectoryData.length) return;
-
+    
     const sample = trajectoryData[0];
     let counter = 0;
-
+    
     for (let g = 1; g <= 7; g++) {
       if (!sample.groups[g]) continue;
       groupObjects[g] = [];
       const radius = groupRadii[g];
       const baseColor = groupColors[g-1];
       const geo = new THREE.SphereGeometry(radius, 32, 24);
-
+      
       sample.groups[g].forEach(() => {
         const sym = symbols[counter + 1] || '?';
+        // Чистый цвет, без текстур
         const mat = new THREE.MeshPhongMaterial({
           color: baseColor,
           shininess: 25,
@@ -528,14 +522,14 @@
         const sphere = new THREE.Mesh(geo, mat);
         sphere.userData = {symbol: sym, group: g, index: counter};
         scene.add(sphere);
-
+        
         const div = document.createElement('div');
         div.className = 'element-label';
         div.textContent = sym;
         const label = new THREE.CSS2DObject(div);
         label.position.set(0, radius * 2.2, 0);
         sphere.add(label);
-
+        
         let radioStar = null;
         if (radioactiveElements.has(sym)) {
           const starDiv = document.createElement('div');
@@ -545,7 +539,7 @@
           radioStar.position.set(radius * 1.2, radius * 1.2, 0);
           sphere.add(radioStar);
         }
-
+        
         groupObjects[g].push({
           mesh: sphere, label: label, radioStar: radioStar,
           data: sphere.userData, trail: []
@@ -555,6 +549,7 @@
     }
   }
 
+  // ==================== ОЧИСТКА ЛИНИЙ ====================
   function clearLines() {
     quantumLines.forEach(l => { l.geometry.dispose(); l.material.dispose(); scene.remove(l); });
     quantumLines = [];
@@ -562,6 +557,7 @@
     trailLines = [];
   }
 
+  // ==================== ОТРИСОВКА КАДРА ====================
   function loadFrame(idx) {
     if (!trajectoryData.length || idx >= trajectoryData.length) return;
     const frame = trajectoryData[idx];
@@ -570,7 +566,7 @@
     document.getElementById('slider').value = idx;
     currentFrame = idx;
     clearLines();
-
+    
     for (let g = 1; g <= 7; g++) {
       if (!groupObjects[g] || !frame.groups?.[g]) continue;
       groupObjects[g].forEach((obj, i) => {
@@ -591,7 +587,7 @@
         }
       });
     }
-
+    
     selectedAtoms.forEach(s => { if (s.ring) s.ring.position.copy(s.obj.mesh.position); });
     if (pulseLine && selectedAtoms.length === 2) {
       pulseLine.geometry.dispose();
@@ -599,13 +595,13 @@
         selectedAtoms[0].obj.mesh.position, selectedAtoms[1].obj.mesh.position
       ]);
     }
-
+    
     if (!playing) {
       drawTrails();
       drawQuantumLines();
       updateDensityDisplay();
     }
-
+    
     document.getElementById('bondsLabel').textContent = quantumLines.length;
   }
 
@@ -633,7 +629,7 @@
     }
     const connections = {};
     allObjs.forEach(o => connections[o.data.index] = new Set());
-
+    
     for (let i = 0; i < allObjs.length; i++) {
       for (let j = i + 1; j < allObjs.length; j++) {
         const a = allObjs[i].mesh.position, b = allObjs[j].mesh.position;
@@ -655,6 +651,7 @@
     window.lastAllObjs = allObjs;
   }
 
+  // ==================== УПРАВЛЕНИЕ ====================
   document.getElementById('playBtn').addEventListener('click', () => {
     playing = !playing;
     document.getElementById('playBtn').textContent = playing ? '⏸' : '▶';
@@ -665,67 +662,25 @@
     document.getElementById('playBtn').textContent = '▶';
     loadFrame(parseInt(e.target.value));
   });
-  document.getElementById('stepBackBtn').addEventListener('click', () => {
-    if (!trajectoryData.length) return;
-    playing = false;
-    document.getElementById('playBtn').textContent = '▶';
-    loadFrame(Math.max(0, currentFrame - 1));
-  });
-  document.getElementById('stepFwdBtn').addEventListener('click', () => {
-    if (!trajectoryData.length) return;
-    playing = false;
-    document.getElementById('playBtn').textContent = '▶';
-    loadFrame(Math.min(trajectoryData.length - 1, currentFrame + 1));
-  });
 
-  document.getElementById('projToggle').addEventListener('click', () => {
-    projectionMode = (projectionMode + 1) % 3;
-    const btn = document.getElementById('projToggle');
-    btn.textContent = projLabels[projectionMode];
-    btn.style.background = projColors[projectionMode];
-
-    const target = controls.target.clone();
-
-    switch(projectionMode) {
-      case 0:
-        camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 600);
-        camera.position.copy(target.clone().add(new THREE.Vector3(50, 35, 70)));
-        break;
-      case 1:
-        const frustumSize = 40;
-        const aspect = window.innerWidth / window.innerHeight;
-        camera = new THREE.OrthographicCamera(
-          frustumSize * aspect / -2, frustumSize * aspect / 2,
-          frustumSize / 2, frustumSize / -2, 0.1, 600
-        );
-        camera.position.copy(target.clone().add(new THREE.Vector3(50, 50, 50)));
-        break;
-      case 2:
-        camera = new THREE.PerspectiveCamera(12, window.innerWidth/window.innerHeight, 0.1, 600);
-        camera.position.copy(target.clone().add(new THREE.Vector3(0, 0, 80)));
-        break;
-    }
-    controls.object = camera;
-    controls.update();
-  });
-
+  // ==================== ЗАХВАТ КАДРА И ОТЧЁТА ====================
   document.getElementById('captureBtn').addEventListener('click', () => {
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
-
+    
     const a = document.createElement('a');
     a.href = renderer.domElement.toDataURL('image/png');
     a.download = `frame_${currentFrame}.png`;
     a.click();
-
+    
     const frame = trajectoryData?.[currentFrame];
     if (!frame) return;
-
+    
     const connections = window.lastConnections || {};
     const allObjs = window.lastAllObjs || [];
-
+    
     let report = `=== ОТЧЁТ ОРАКУЛА ===\nSpectraVortex VMMS v3.3\nШаг: ${frame.step} | d_min: ${frame.d_min?.toFixed(3)||'N/A'}\nБазы: ${knownBonds.length} связей, ${knownIsotopes.length} изотопов\n\n--- Связи (d < 12.0) ---\n`;
-
+    
     let pairFound = false;
     const processed = new Set();
     for (let i = 0; i < allObjs.length; i++) {
@@ -747,7 +702,7 @@
       }
     }
     if (!pairFound) report += 'Связей не обнаружено\n';
-
+    
     report += '\n--- Комплексы (≥3 атомов) ---\n';
     const visited = new Set(); let complexFound = false;
     allObjs.forEach(obj => {
@@ -766,7 +721,7 @@
       }
     });
     if (!complexFound) report += 'Комплексов не обнаружено\n';
-
+    
     const blob = new Blob([report], {type:'text/plain;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const bLink = document.createElement('a');
@@ -774,12 +729,13 @@
     URL.revokeObjectURL(url);
   });
 
+  // ==================== АЛХИМИЧЕСКИЙ РЕАКТОР ====================
   document.getElementById('alchemyToggle').addEventListener('click', () => {
     const panel = document.getElementById('alchemy-panel');
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     if (panel.style.display === 'block') populateSelects();
   });
-
+  
   function populateSelects() {
     const allSyms = symbols.filter(s => s !== '?');
     [document.getElementById('el1'), document.getElementById('el2')].forEach(sel => {
@@ -791,7 +747,7 @@
       }
     });
   }
-
+  
   window.runReactor = function() {
     const s1 = document.getElementById('el1').value;
     const s2 = document.getElementById('el2').value;
@@ -802,46 +758,47 @@
     });
     const div = document.getElementById('reactorResult');
     if (!obj1 || !obj2) { div.innerHTML = '❌ Элементы не на сцене'; return; }
-
+    
     const dist = obj1.mesh.position.distanceTo(obj2.mesh.position);
     const r1 = groupRadii[obj1.data.group];
     const r2 = groupRadii[obj2.data.group];
     const distShell = dist - r1 - r2;
     const grpDiff = Math.abs(obj1.data.group - obj2.data.group);
-
+    
     let prob = 0, stab = 'НЕСТАБИЛЕН', color = '#f00';
     if (dist < 8) prob = 90;
     else if (dist < 15) prob = 60;
     else prob = Math.max(5, 30 - grpDiff * 8);
-
+    
     if (prob > 70) { stab = 'СТАБИЛЕН'; color = '#0f0'; }
     else if (prob > 40) { stab = 'МЕТАСТАБИЛЕН'; color = '#ff0'; }
-
+    
     let extra = '';
     if (knowledgeLoaded) {
       const id = identifyPair(obj1, obj2, dist);
       if (id.knownBond) extra = `<br>✅ ${id.knownBond.formula} (${id.knownBond.crystal_structure})`;
     }
-
+    
     div.innerHTML = `<b style="color:${color}">${s1}${s2}</b> | P:${prob}%<br>${stab}<br>Центр→Центр: ${dist.toFixed(2)} Å<br>Оболочка→Оболочка: ${distShell.toFixed(2)} Å${distShell < 0 ? ' <span style="color:#f55;">(ПЕРЕКРЫТИЕ)</span>' : ''}${extra}`;
   };
 
+  // ==================== ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ ВИЗУАЛИЗАЦИИ ПОЛЯ ====================
   function cycleDensityMode() {
     densityMode = (densityMode + 1) % 3;
-
+    
     const btn = document.getElementById('densityToggle');
     const panel2D = document.getElementById('density-panel');
-
+    
     panel2D.style.display = 'none';
     clearDensityCloud();
-
+    
     switch (densityMode) {
       case 0:
         btn.textContent = '🔥 Поле: Выкл';
         btn.style.background = '#0f0';
         document.getElementById('status-message').textContent = '';
         break;
-
+        
       case 1:
         btn.textContent = '🔥 Поле: 2D-слайс';
         btn.style.background = '#08f';
@@ -857,7 +814,7 @@
           btn.style.background = '#0f0';
         }
         break;
-
+        
       case 2:
         btn.textContent = '🔥 Поле: 3D-облако';
         btn.style.background = '#80f';
@@ -877,33 +834,34 @@
         break;
     }
   }
-
+  
   document.getElementById('densityToggle').addEventListener('click', cycleDensityMode);
-
+  
+  // ==================== 2D-СЛАЙС ПЛОТНОСТИ ====================
   document.getElementById('densitySliceZ').addEventListener('input', updateDensitySlice);
-
+  
   function updateDensitySlice() {
     if (densityMode !== 1) return;
     if (!fieldDensity3D || !fieldDensity3D.data || !fieldDensity3D.data.length) return;
-
+    
     const res = fieldDensity3D.metadata.resolution || 64;
     const canvas = document.getElementById('densityCanvas');
     const ctx = canvas.getContext('2d');
     const z = parseInt(document.getElementById('densitySliceZ').value) || 0;
-
+    
     document.getElementById('densitySliceZ').max = res - 1;
     canvas.width = res; canvas.height = res;
-
+    
     const imageData = ctx.createImageData(res, res);
     const maxVal = fieldDensity3D.metadata.stats?.max || 1;
     if (maxVal <= 0) return;
-
+    
     for (let y = 0; y < res; y++) {
       for (let x = 0; x < res; x++) {
         const val = fieldDensity3D.getValue(x, y, z);
         const norm = Math.min(1, val / (maxVal * 0.7));
         const idx = (y * res + x) * 4;
-
+        
         if (norm < 0.25) {
           imageData.data[idx] = 0;
           imageData.data[idx+1] = 0;
@@ -924,31 +882,32 @@
         imageData.data[idx+3] = Math.floor(norm * 255);
       }
     }
-
+    
     ctx.putImageData(imageData, 0, 0);
-    document.getElementById('densityInfo').textContent =
+    document.getElementById('densityInfo').textContent = 
       `Слой ${z}/${res-1} | Макс плотность: ${maxVal.toFixed(1)}`;
   }
-
+  
   function updateDensityDisplay() {
     if (densityMode === 1) updateDensitySlice();
   }
 
+  // ==================== 3D-ОБЛАКО ТОЧЕК ПЛОТНОСТИ ====================
   function buildDensityCloud() {
     clearDensityCloud();
-
+    
     if (!fieldDensity3D || !fieldDensity3D.data || !fieldDensity3D.data.length) return;
-
+    
     const res = fieldDensity3D.metadata.resolution || 64;
     const gridSize = fieldDensity3D.metadata.grid_size || 100;
     const maxDensity = fieldDensity3D.metadata.stats?.max || 1;
-
+    
     const step = Math.max(1, Math.floor(res / 20));
     const threshold = maxDensity * 0.08;
-
+    
     const positions = [];
     const colorArr = [];
-
+    
     for (let ix = 0; ix < res; ix += step) {
       for (let iy = 0; iy < res; iy += step) {
         for (let iz = 0; iz < res; iz += step) {
@@ -958,7 +917,7 @@
             const y = (iy / res) * gridSize;
             const z = (iz / res) * gridSize;
             positions.push(x, y, z);
-
+            
             const norm = Math.min(1, val / maxDensity);
             let r, g, b;
             if (norm < 0.33) { r = 0; g = norm * 3; b = 1; }
@@ -969,18 +928,18 @@
         }
       }
     }
-
+    
     if (positions.length === 0) return;
-
+    
     const pointCount = positions.length / 3;
     document.getElementById('status-message').textContent = `🌐 ${pointCount.toLocaleString()} точек`;
-
+    
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colorArr), 3));
-
+    
     const pointSize = Math.max(0.8, Math.min(2.5, gridSize / Math.cbrt(pointCount) * 1.2));
-
+    
     const mat = new THREE.PointsMaterial({
       size: pointSize,
       vertexColors: true,
@@ -990,12 +949,12 @@
       depthWrite: false,
       sizeAttenuation: true
     });
-
+    
     densityCloud = new THREE.Points(geo, mat);
     densityCloud.name = 'DensityCloud';
     scene.add(densityCloud);
   }
-
+  
   function clearDensityCloud() {
     if (densityCloud) {
       scene.remove(densityCloud);
@@ -1005,33 +964,35 @@
     }
   }
 
+  // ==================== АНИМАЦИЯ ====================
   function animate() {
     requestAnimationFrame(animate);
-
+    
     if (playing && trajectoryData.length) {
       const next = (currentFrame + 1) % trajectoryData.length;
       loadFrame(next);
     }
-
+    
     if (pulseLine && selectedAtoms.length === 2) {
       pulsePhase += 0.05;
       const alpha = 0.5 + 0.5 * Math.sin(pulsePhase * 3);
       pulseLine.material.opacity = alpha;
       pulseLine.material.color.setHex(alpha > 0.7 ? 0xffaa00 : 0xffff00);
     }
-
+    
     selectedAtoms.forEach(s => {
       if (s.ring) {
         const scale = 1 + 0.1 * Math.sin(pulsePhase * 2);
         s.ring.scale.setScalar(scale);
       }
     });
-
+    
     controls.update();
     renderer.render(scene, camera);
     labelRenderer.render(scene, camera);
   }
 
+  // ==================== СТАРТ ====================
   window.startApp = async function() {
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('info-panel').style.display = 'block';
