@@ -283,7 +283,7 @@ def main():
                             min_dist = d
         
         # ========== 3D-ТРАЕКТОРИИ: сбор каждые 100 шагов ==========
-        if step % 100 == 0 or step == 0:
+        if step % 1 == 0 or step == 0:
             frame = {'step': step+1, 'd_min': float(min_dist), 'groups': {}}
             for lvl, data in fields_by_level.items():
                 centers = []
@@ -301,7 +301,7 @@ def main():
             else:
                 stagnation_counter = 0
         
-        if step % 100 == 0 or step == 0:
+        if step % 1 == 0 or step == 0:
             step_time = (datetime.now() - start_time).total_seconds()
             print(f"{step+1:6} | d={min_dist:.3f} | E={total_energy:.1f} | Активны: {evolved_str:>18} | {step_time:7.1f}s")
             sys.stdout.flush()
@@ -315,7 +315,7 @@ def main():
         if (step + 1) % args.checkpoint_interval == 0:
             save_checkpoint(step, step == max_steps - 1)
         
-        if step % 100 == 0:
+        if step % 1 == 0:
             gc.collect()
     
     # ========== СОХРАНЕНИЕ 3D-ТРАЕКТОРИЙ ==========

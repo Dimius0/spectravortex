@@ -1,22 +1,22 @@
 import json
 import numpy as np
 from pathlib import Path
-from datetime import datetime
 
 # ===== ПАРАМЕТРЫ =====
 GRID_SIZE = 100
 RESOLUTION = 64
-FRAMES_LIMIT = -5000  # все кадры
+INPUT_FILE = 'data/log_trajectories_3d.json'  # Тот самый, 55 МБ
+OUTPUT_FILE = 'data/field_h_density_3d.json'
+FRAMES_LIMIT = -500000  # Последние 5000 кадров для глубокого аттрактора
 
 print("=" * 50)
-print("Генератор карты плотности поля H (ПОЛНАЯ ВЕРСИЯ)")
+print("Генератор карты плотности поля H (ПОЛНЫЙ JSON)")
 print("=" * 50)
 
 # Загрузка
 print("\n1. Загружаем траектории...")
-with open('data/log_trajectories_3d.json', 'r') as f:
+with open(INPUT_FILE, 'r') as f:
     data = json.load(f)
-
 print(f"   Фреймов в файле: {len(data)}")
 frames = data[FRAMES_LIMIT:]
 print(f"   Используем фреймов: {len(frames)}")
@@ -27,7 +27,7 @@ density_map = np.zeros((RESOLUTION, RESOLUTION, RESOLUTION), dtype=np.float32)
 scale = RESOLUTION / GRID_SIZE
 
 for i, frame in enumerate(frames):
-    if i % 500 == 0:
+    if i % 100 == 0:
         print(f"   Фрейм {i}/{len(frames)}")
     for atoms in frame['groups'].values():
         for atom in atoms:
@@ -47,7 +47,6 @@ stats = {
     "total_cells": RESOLUTION ** 3,
     "fill_ratio": round(len(nonzero) / (RESOLUTION ** 3) * 100, 2)
 }
-
 print(f"\n3. Статистика:")
 print(f"   Максимум: {stats['max']}")
 print(f"   Заполнено: {stats['fill_ratio']}%")
@@ -61,20 +60,14 @@ density_json = {
         "frames_used": len(frames),
         "dtype": "float32",
         "stats": stats,
-        "description": "3D-карта плотности поля H (ПОЛНАЯ, 5000 кадров)"
+        "description": "3D-карта плотности поля H (из полного JSON)"
     },
     "density_3d": density_map.flatten().tolist()
 }
 
-with open('data/field_h_density_3d_new.json', 'w') as f:
+with open(OUTPUT_FILE, 'w') as f:
     json.dump(density_json, f)
 
-size_mb = Path('data/field_h_density_3d.json').stat().st_size / (1024 * 1024)
+size_mb = Path(OUTPUT_FILE).stat().st_size / (1024 * 1024)
 print(f"   Готово: {size_mb:.1f} MB")
-print("\n✓ Файл сохранён: data/field_h_density_3d.json")
-print("Переименовываем старый файл...")
-import os
-if os.path.exists('data/field_h_density_3d.json'):
-    os.remove('data/field_h_density_3d.json')
-os.rename('data/field_h_density_3d_new.json', 'data/field_h_density_3d.json')
-print("Готово. Файл заменён.")
+print(f"\n✓ Файл сохранён: {OUTPUT_FILE}")

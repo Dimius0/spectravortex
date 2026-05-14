@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>SpectraVortex — 3D Визуализатор | Триада + Error Hunter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
+        
+        #controls {
+            position: absolute; bottom: 20px; left: 20px; right: 20px;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            padding: 12px 20px; border-radius: 12px;
+            display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+            z-index: 100; border-top: 1px solid #333;
+        }
+        button {
+            background: #1a1a2e; color: #0ff; border: 1px solid #0ff;
+            padding: 8px 16px; cursor: pointer; font-family: monospace;
+            font-size: 12px; transition: all 0.2s; border-radius: 6px;
+        }
+        button:hover { background: #0ff; color: #000; box-shadow: 0 0 10px #0ff; }
+        button.active { background: #ff3366; border-color: #ff3366; color: #fff; }
+        .slider-container {
+            display: flex; align-items: center; gap: 8px;
+            background: #111; padding: 4px 12px; border-radius: 20px;
+        }
+        input[type="range"] { width: 130px; height: 3px; accent-color: #ffaa44; }
+        
+        .status-panel {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            padding: 12px 18px; border-radius: 12px;
+            border-right: 3px solid #ffaa44; text-align: right;
+            font-family: monospace; font-size: 11px; z-index: 100;
+            min-width: 200px; pointer-events: none;
+        }
+        .status-panel .value { color: #ffaa44; font-size: 18px; font-weight: bold; }
+        
+        .error-hunter {
+            position: absolute; top: 90px; left: 20px;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            border-radius: 12px; padding: 10px 16px;
+            display: flex; gap: 15px; flex-wrap: wrap;
+            z-index: 100; border-left: 3px solid #ff3366;
+            font-size: 11px;
+        }
+        .param-group { display: flex; gap: 8px; align-items: center; }
+        
+        .legend {
+            position: absolute; bottom: 100px; left: 20px;
+            background: rgba(0,0,0,0.5); padding: 4px 10px;
+            border-radius: 8px; font-size: 9px; color: #888;
+            pointer-events: none;
+        }
+        #energy-fill {
+            position: fixed; bottom: 100px; left: 20px;
+            width: 180px; height: 4px; background: #333;
+            border-radius: 2px; overflow: hidden; z-index: 101;
+        }
+        #energy-fill::after {
+            content: ''; display: block; height: 100%;
+            width: var(--energy, 0%); background: linear-gradient(90deg, #ff3366, #ffaa44, #44ffaa);
+            transition: width 0.1s;
+        }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="loadBtn">📂 Загрузить JSON</button>
+        <button id="playBtn" disabled>▶ Пуск</button>
+        <button id="resetViewBtn">🎥 Сброс</button>
+        <button id="toggleCocoonBtn" class="active">🌀 Коконы: Вкл</button>
+        <button id="toggleFieldBtn" class="active">🌊 Поле: Вкл</button>
+        <button id="toggleTauBtn">⚡ τ-жилы: Вкл</button>
+        <div class="slider-container">
+            <span>🎞️ Кадр</span>
+            <input type="range" id="frameSlider" min="0" max="0" value="0" step="1" disabled>
+        </div>
+        <input type="file" id="fileInput" accept=".json">
+    </div>
+
+    <div class="error-hunter">
+        <div class="param-group">🌡️ <input type="range" id="tempSlider" min="0" max="2000" value="300" step="10"><span id="tempVal">300K</span></div>
+        <div class="param-group">💥 <input type="range" id="pressureSlider" min="0.1" max="10" value="1" step="0.1"><span id="pressureVal">1.0</span></div>
+        <div class="param-group">⚡ <input type="range" id="fieldSlider" min="0" max="1.5" value="0.5" step="0.01"><span id="fieldVal">0.50</span></div>
+        <div class="param-group">🧪 <input type="range" id="puritySlider" min="0" max="1" value="0.9" step="0.01"><span id="purityVal">0.90</span></div>
+    </div>
+
+    <div class="status-panel">
+        <div>🌀 Суммарный τ</div>
+        <div class="value" id="totalTau">0.00</div>
+        <div style="margin-top:8px;">💚 Энергия коконов</div>
+        <div class="value" id="cocoonEnergy">0.00</div>
+        <div style="margin-top:8px;">📡 Излучение поля</div>
+        <div class="value" id="fieldRadiation">0.00</div>
+        <div style="margin-top:8px;">⚠️ Риск</div>
+        <div class="value" id="riskLevel" style="color:#ffaa44;">Низкий</div>
+    </div>
+
+    <div id="energy-fill"></div>
+    <div class="legend">🌑 Ядро (τ-жила) | 🌀 Кокон (обмен) | ✨ Поле (излучение) | 🔗 Линии тока = роутинг</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ============ ИНИЦИАЛИЗАЦИЯ THREE.JS ============
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030318);
+        scene.fog = new THREE.FogExp2(0x030318, 0.004);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
+        camera.position.set(14, 10, 18);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.zoomSpeed = 1.2;
+        
+        // ============ ГЛОБАЛЬНЫЕ ДАННЫЕ ============
+        let trajectoryData = [];
+        let currentFrame = 0;
+        let playing = false;
+        let time = 0;
+        
+        let vortexGroup = new THREE.Group();
+        let interfaceGroup = new THREE.Group();
+        let fieldGroup = new THREE.Group();
+        let flowLinesGroup = new THREE.Group();
+        
+        scene.add(vortexGroup);
+        scene.add(interfaceGroup);
+        scene.add(fieldGroup);
+        scene.add(flowLinesGroup);
+        
+        let showCocoon = true;
+        let showField = true;
+        let showTau = true;
+        
+        let totalTau = 0, cocoonEnergy = 0.5, fieldRadiation = 0.3;
+        let vortices = [];
+        let fieldParticles = null;
+        
+        let temperature = 300, pressure = 1.0, externalField = 0.5, purity = 0.9;
+        
+        const groupColors = ['#ff3366', '#ff8844', '#ffdd44', '#44cc44', '#44aaff', '#aa66ff', '#ff66cc'];
+        const groupRadii = {1:0.5, 2:0.7, 3:0.9, 4:1.1, 5:1.3, 6:1.5, 7:1.7};
+        
+        function getTauColor(tau) {
+            const hue = 0.55 + (tau || 0) * 0.1;
+            return new THREE.Color().setHSL(hue, 1.0, 0.6);
+        }
+        
+        function createVortex(x, y, z, group, tau) {
+            const groupObj = new THREE.Group();
+            const radius = groupRadii[group] * 0.55;
+            const coreMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x220000, roughness: 0.3, metalness: 0.8 });
+            const core = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), coreMat);
+            groupObj.add(core);
+            
+            const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.7 });
+            const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), filamentMat);
+            groupObj.add(filament);
+            groupObj.position.set(x, y, z);
+            return { groupObj, core, filament, tau };
+        }
+        
+        function createCocoon(x, y, z, group) {
+            const radius = groupRadii[group] * 1.6;
+            const mat = new THREE.MeshPhongMaterial({
+                color: new THREE.Color(groupColors[group-1]),
+                emissive: 0x2266aa,
+                transparent: true, opacity: 0.35,
+                side: THREE.DoubleSide, shininess: 90
+            });
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), mat);
+            sphere.scale.set(radius, radius, radius);
+            sphere.position.set(x, y, z);
+            return sphere;
+        }
+        
+        function createField(atomCount) {
+            const count = Math.min(2000, 600 + atomCount * 30);
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                const r = 9 + Math.random() * 12;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
+                positions[i*3+2] = r * Math.cos(phi);
+                const intensity = 0.3 + Math.random() * 0.5;
+                const color = new THREE.Color().setHSL(0.6, 0.7, 0.4 + intensity * 0.2);
+                colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending });
+            return new THREE.Points(geom, material);
+        }
+        
+        function buildFlowLines() {
+            while(flowLinesGroup.children.length) flowLinesGroup.remove(flowLinesGroup.children[0]);
+            for (let i = 0; i < vortices.length; i++) {
+                for (let j = i+1; j < vortices.length; j++) {
+                    const p1 = vortices[i].groupObj.position;
+                    const p2 = vortices[j].groupObj.position;
+                    if (p1.distanceTo(p2) < 4.5) {
+                        const geom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
+                        const mat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.4 });
+                        flowLinesGroup.add(new THREE.Line(geom, mat));
+                    }
+                }
+            }
+        }
+        
+        function buildFromFrame(frame) {
+            while(vortexGroup.children.length) vortexGroup.remove(vortexGroup.children[0]);
+            while(interfaceGroup.children.length) interfaceGroup.remove(interfaceGroup.children[0]);
+            vortices = [];
+            
+            let totalAtoms = 0;
+            for (let g = 1; g <= 7; g++) if (frame.groups && frame.groups[g]) totalAtoms += frame.groups[g].length;
+            
+            if (showField && fieldParticles) fieldGroup.remove(fieldParticles);
+            if (showField) { fieldParticles = createField(totalAtoms); fieldGroup.add(fieldParticles); }
+            
+            let counter = 0;
+            for (let g = 1; g <= 7; g++) {
+                if (!frame.groups || !frame.groups[g]) continue;
+                frame.groups[g].forEach(pos => {
+                    const [x, y, z] = pos;
+                    const tau = (g % 2 === 0) ? 1 : -1;
+                    const vortex = createVortex(x, y, z, g, tau);
+                    vortexGroup.add(vortex.groupObj);
+                    let cocoon = null;
+                    if (showCocoon) { cocoon = createCocoon(x, y, z, g); interfaceGroup.add(cocoon); }
+                    vortices.push({ ...vortex, cocoon, group: g, tau });
+                    counter++;
+                });
+            }
+            buildFlowLines();
+            updateDynamics();
+        }
+        
+        function loadFrame(frameIdx) {
+            if (!trajectoryData.length || frameIdx >= trajectoryData.length) return;
+            const frame = trajectoryData[frameIdx];
+            currentFrame = frameIdx;
+            document.getElementById('frameSlider').value = frameIdx;
+            
+            let idx = 0;
+            for (let g = 1; g <= 7; g++) {
+                if (!frame.groups || !frame.groups[g]) continue;
+                frame.groups[g].forEach(pos => {
+                    if (idx < vortices.length) {
+                        const [x, y, z] = pos;
+                        vortices[idx].groupObj.position.set(x, y, z);
+                        if (vortices[idx].cocoon) vortices[idx].cocoon.position.set(x, y, z);
+                    }
+                    idx++;
+                });
+            }
+            buildFlowLines();
+            updateDynamics();
+        }
+        
+        function updateDynamics() {
+            if (!vortices.length) return;
+            totalTau = vortices.reduce((sum, v) => sum + (v.tau || 0), 0);
+            const envFactor = (temperature / 500) * pressure * externalField * (1 - purity * 0.2);
+            cocoonEnergy = Math.min(1.5, 0.5 + envFactor * 0.6);
+            fieldRadiation = Math.min(1.2, cocoonEnergy * 0.8 + Math.sin(time * 1.2) * 0.1);
+            
+            let risk = "Низкий";
+            if (totalTau !== 0 && Math.abs(totalTau) > 0.5) risk = "Высокий (τ≠0)";
+            else if (cocoonEnergy > 1.2) risk = "Средний (перегрев)";
+            else if (purity < 0.3) risk = "Критический";
+            
+            document.getElementById('totalTau').innerHTML = totalTau.toFixed(2);
+            document.getElementById('cocoonEnergy').innerHTML = cocoonEnergy.toFixed(2);
+            document.getElementById('fieldRadiation').innerHTML = fieldRadiation.toFixed(2);
+            document.getElementById('riskLevel').innerHTML = risk;
+            document.getElementById('riskLevel').style.color = risk === "Низкий" ? "#88ff88" : "#ff6666";
+            document.getElementById('energy-fill').style.setProperty('--energy', (cocoonEnergy * 70) + '%');
+            
+            vortices.forEach(v => {
+                if (v.filament && showTau) {
+                    v.filament.material.emissiveIntensity = 0.4 + cocoonEnergy * 0.8;
+                    v.filament.material.color = getTauColor(v.tau);
+                }
+                if (v.cocoon && v.cocoon.material) {
+                    v.cocoon.material.opacity = 0.3 + cocoonEnergy * 0.4;
+                    v.cocoon.material.emissiveIntensity = 0.2 + fieldRadiation * 0.6;
+                }
+            });
+            if (fieldParticles) fieldParticles.material.opacity = 0.35 + fieldRadiation * 0.5;
+        }
+        
+        // ============ ЗАГРУЗКА JSON ============
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат");
+                    trajectoryData = data;
+                    document.getElementById('frameSlider').max = trajectoryData.length - 1;
+                    document.getElementById('frameSlider').disabled = false;
+                    document.getElementById('playBtn').disabled = false;
+                    buildFromFrame(trajectoryData[0]);
+                    loadFrame(0);
+                } catch(err) { alert("Ошибка: " + err.message); }
+            };
+            reader.readAsText(file);
+        });
+        document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+        
+        // ============ УПРАВЛЕНИЕ ============
+        document.getElementById('playBtn').addEventListener('click', () => {
+            playing = !playing;
+            document.getElementById('playBtn').textContent = playing ? "⏸ Пауза" : "▶ Пуск";
+        });
+        document.getElementById('resetViewBtn').addEventListener('click', () => {
+            camera.position.set(14, 10, 18);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+        document.getElementById('toggleCocoonBtn').addEventListener('click', () => {
+            showCocoon = !showCocoon;
+            interfaceGroup.visible = showCocoon;
+            document.getElementById('toggleCocoonBtn').classList.toggle('active', showCocoon);
+        });
+        document.getElementById('toggleFieldBtn').addEventListener('click', () => {
+            showField = !showField;
+            fieldGroup.visible = showField;
+            document.getElementById('toggleFieldBtn').classList.toggle('active', showField);
+        });
+        document.getElementById('toggleTauBtn').addEventListener('click', () => {
+            showTau = !showTau;
+            vortices.forEach(v => { if(v.filament) v.filament.visible = showTau; });
+            document.getElementById('toggleTauBtn').classList.toggle('active', showTau);
+        });
+        document.getElementById('frameSlider').addEventListener('input', (e) => {
+            playing = false;
+            document.getElementById('playBtn').textContent = "▶ Пуск";
+            loadFrame(parseInt(e.target.value));
+        });
+        
+        // Error Hunter
+        const updateErrorHunter = () => {
+            temperature = parseFloat(document.getElementById('tempSlider').value);
+            pressure = parseFloat(document.getElementById('pressureSlider').value);
+            externalField = parseFloat(document.getElementById('fieldSlider').value);
+            purity = parseFloat(document.getElementById('puritySlider').value);
+            document.getElementById('tempVal').innerText = temperature + "K";
+            document.getElementById('pressureVal').innerText = pressure.toFixed(1);
+            document.getElementById('fieldVal').innerText = externalField.toFixed(2);
+            document.getElementById('purityVal').innerText = purity.toFixed(2);
+            updateDynamics();
+        };
+        document.getElementById('tempSlider').addEventListener('input', updateErrorHunter);
+        document.getElementById('pressureSlider').addEventListener('input', updateErrorHunter);
+        document.getElementById('fieldSlider').addEventListener('input', updateErrorHunter);
+        document.getElementById('puritySlider').addEventListener('input', updateErrorHunter);
+        
+        // ============ ДЕМО-ДАННЫЕ ИЗ LOCALSTORAGE ============
+        const demo = localStorage.getItem('spectravortex_demo_data');
+        if (demo) {
+            localStorage.removeItem('spectravortex_demo_data');
+            try {
+                trajectoryData = JSON.parse(demo);
+                document.getElementById('frameSlider').max = trajectoryData.length - 1;
+                document.getElementById('frameSlider').disabled = false;
+                document.getElementById('playBtn').disabled = false;
+                buildFromFrame(trajectoryData[0]);
+                loadFrame(0);
+            } catch(e) { console.warn(e); }
+        }
+        
+        // ============ ОСВЕЩЕНИЕ И АНИМАЦИЯ ============
+        const ambient = new THREE.AmbientLight(0x222222);
+        scene.add(ambient);
+        const light = new THREE.DirectionalLight(0xffffff, 0.8);
+        light.position.set(5, 12, 6);
+        scene.add(light);
+        const backLight = new THREE.PointLight(0x4466ff, 0.4);
+        backLight.position.set(-3, 2, -5);
+        scene.add(backLight);
+        
+        let lastTime = performance.now();
+        function animate() {
+            const now = performance.now();
+            let delta = Math.min(0.033, (now - lastTime) / 1000);
+            lastTime = now;
+            time += delta;
+            
+            if (playing && trajectoryData.length) {
+                const next = (currentFrame + 1) % trajectoryData.length;
+                loadFrame(next);
+            }
+            updateDynamics();
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        console.log("SpectraVortex Viewer — запущен. Загрузите JSON или используйте демо.");
+    </script>
+</body>
+</html>
