@@ -50,9 +50,10 @@
         
         .legend {
             position: absolute; bottom: 100px; left: 20px;
-            background: rgba(0,0,0,0.5); padding: 4px 10px;
-            border-radius: 8px; font-size: 9px; color: #888;
+            background: rgba(0,0,0,0.6); padding: 6px 12px;
+            border-radius: 8px; font-size: 9px; color: #ccc;
             pointer-events: none;
+            font-family: monospace;
         }
         #energy-fill {
             position: fixed; bottom: 100px; left: 20px;
@@ -65,6 +66,17 @@
             transition: width 0.1s;
         }
         input[type="file"] { display: none; }
+
+        /* Демо-баннер */
+        .demo-banner {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            padding: 8px 16px; border-radius: 20px;
+            font-size: 10px; color: #ffaa44; z-index: 100;
+            font-family: monospace; pointer-events: none;
+            border-right: 2px solid #ffaa44;
+        }
+        .demo-banner a { color: #44ffaa; pointer-events: auto; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -77,7 +89,7 @@
         <button id="toggleTauBtn">⚡ τ-жилы: Вкл</button>
         <div class="slider-container">
             <span>🎞️ Кадр</span>
-            <input type="range" id="frameSlider" min="0" max="0" value="0" step="1" disabled>
+            <input type="radio" name="frameSlider" id="frameSlider" min="0" max="0" value="0" step="1" disabled>
         </div>
         <input type="file" id="fileInput" accept=".json">
     </div>
@@ -101,7 +113,13 @@
     </div>
 
     <div id="energy-fill"></div>
-    <div class="legend">🌑 Ядро (τ-жила) | 🌀 Кокон (обмен) | ✨ Поле (излучение) | 🔗 Линии тока = роутинг</div>
+    <div class="legend">
+        🌑 Ядро (τ-жила) | 🌀 Кокон | ✨ Поле | 🔗 Линии тока
+    </div>
+    <div class="demo-banner" id="demoBanner">
+        📢 ДЕМО-РЕЖИМ: <span id="demoStatus">активна демо-сцена</span><br>
+        📂 <a id="loadDemoLink">Загрузить свои данные (JSON)</a> или нажмите кнопку ниже
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -110,20 +128,60 @@
         // ============ ИНИЦИАЛИЗАЦИЯ THREE.JS ============
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x030318);
-        scene.fog = new THREE.FogExp2(0x030318, 0.004);
+        scene.fog = new THREE.FogExp2(0x030318, 0.003);
         
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
-        camera.position.set(14, 10, 18);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.set(16, 12, 20);
         
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.06;
         controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+        
+        // ============ МОЩНОЕ ОСВЕЩЕНИЕ ============
+        // Ambient — базовый свет
+        const ambientLight = new THREE.AmbientLight(0x404060, 0.85);
+        scene.add(ambientLight);
+        
+        // Главный направленный свет (солнце)
+        const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.4);
+        mainLight.position.set(8, 15, 5);
+        mainLight.castShadow = true;
+        mainLight.receiveShadow = false;
+        mainLight.shadow.mapSize.width = 1024;
+        mainLight.shadow.mapSize.height = 1024;
+        scene.add(mainLight);
+        
+        // Заполняющий свет (холодный)
+        const fillLight = new THREE.PointLight(0x4488ff, 0.7);
+        fillLight.position.set(-4, 3, 6);
+        scene.add(fillLight);
+        
+        // Тёплый контровой свет
+        const backLight = new THREE.PointLight(0xffaa66, 0.6);
+        backLight.position.set(0, 2, -10);
+        scene.add(backLight);
+        
+        // Подсветка снизу (римлайт)
+        const rimLight = new THREE.PointLight(0x88aaff, 0.5);
+        rimLight.position.set(0, -6, 0);
+        scene.add(rimLight);
+        
+        // Динамический свет от камеры (для яркости при приближении)
+        const cameraLight = new THREE.PointLight(0xffaa88, 0.5);
+        scene.add(cameraLight);
+        
+        // Декоративная сфера-отражатель (невидимая, но даёт мягкий свет)
+        const helperLight = new THREE.PointLight(0x3366aa, 0.4);
+        helperLight.position.set(3, 1, 2);
+        scene.add(helperLight);
         
         // ============ ГЛОБАЛЬНЫЕ ДАННЫЕ ============
         let trajectoryData = [];
@@ -152,22 +210,22 @@
         let temperature = 300, pressure = 1.0, externalField = 0.5, purity = 0.9;
         
         const groupColors = ['#ff3366', '#ff8844', '#ffdd44', '#44cc44', '#44aaff', '#aa66ff', '#ff66cc'];
-        const groupRadii = {1:0.5, 2:0.7, 3:0.9, 4:1.1, 5:1.3, 6:1.5, 7:1.7};
+        const groupRadii = {1:0.55, 2:0.75, 3:0.95, 4:1.15, 5:1.35, 6:1.55, 7:1.75};
         
         function getTauColor(tau) {
             const hue = 0.55 + (tau || 0) * 0.1;
-            return new THREE.Color().setHSL(hue, 1.0, 0.6);
+            return new THREE.Color().setHSL(Math.min(0.85, Math.max(0.3, hue)), 1.0, 0.65);
         }
         
         function createVortex(x, y, z, group, tau) {
             const groupObj = new THREE.Group();
-            const radius = groupRadii[group] * 0.55;
-            const coreMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x220000, roughness: 0.3, metalness: 0.8 });
+            const radius = groupRadii[group] * 0.5;
+            const coreMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x331100, roughness: 0.4, metalness: 0.7 });
             const core = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), coreMat);
             groupObj.add(core);
             
-            const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.7 });
-            const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), filamentMat);
+            const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.85 });
+            const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.25, 32, 32), filamentMat);
             groupObj.add(filament);
             groupObj.position.set(x, y, z);
             return { groupObj, core, filament, tau };
@@ -178,8 +236,8 @@
             const mat = new THREE.MeshPhongMaterial({
                 color: new THREE.Color(groupColors[group-1]),
                 emissive: 0x2266aa,
-                transparent: true, opacity: 0.35,
-                side: THREE.DoubleSide, shininess: 90
+                transparent: true, opacity: 0.4,
+                side: THREE.DoubleSide, shininess: 85
             });
             const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), mat);
             sphere.scale.set(radius, radius, radius);
@@ -188,24 +246,24 @@
         }
         
         function createField(atomCount) {
-            const count = Math.min(2000, 600 + atomCount * 30);
+            const count = Math.min(2000, 600 + atomCount * 25);
             const positions = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
             for (let i = 0; i < count; i++) {
-                const r = 9 + Math.random() * 12;
+                const r = 10 + Math.random() * 14;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(2 * Math.random() - 1);
                 positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
                 positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
                 positions[i*3+2] = r * Math.cos(phi);
                 const intensity = 0.3 + Math.random() * 0.5;
-                const color = new THREE.Color().setHSL(0.6, 0.7, 0.4 + intensity * 0.2);
+                const color = new THREE.Color().setHSL(0.6, 0.7, 0.4 + intensity * 0.25);
                 colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
             }
             const geom = new THREE.BufferGeometry();
             geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
             geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending });
+            const material = new THREE.PointsMaterial({ size: 0.13, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending });
             return new THREE.Points(geom, material);
         }
         
@@ -215,9 +273,9 @@
                 for (let j = i+1; j < vortices.length; j++) {
                     const p1 = vortices[i].groupObj.position;
                     const p2 = vortices[j].groupObj.position;
-                    if (p1.distanceTo(p2) < 4.5) {
+                    if (p1.distanceTo(p2) < 5.0) {
                         const geom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
-                        const mat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.4 });
+                        const mat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.45 });
                         flowLinesGroup.add(new THREE.Line(geom, mat));
                     }
                 }
@@ -258,6 +316,7 @@
             const frame = trajectoryData[frameIdx];
             currentFrame = frameIdx;
             document.getElementById('frameSlider').value = frameIdx;
+            document.getElementById('demoStatus').innerHTML = `кадр ${frameIdx+1}/${trajectoryData.length}`;
             
             let idx = 0;
             for (let g = 1; g <= 7; g++) {
@@ -279,7 +338,7 @@
             if (!vortices.length) return;
             totalTau = vortices.reduce((sum, v) => sum + (v.tau || 0), 0);
             const envFactor = (temperature / 500) * pressure * externalField * (1 - purity * 0.2);
-            cocoonEnergy = Math.min(1.5, 0.5 + envFactor * 0.6);
+            cocoonEnergy = Math.min(1.5, 0.5 + envFactor * 0.65);
             fieldRadiation = Math.min(1.2, cocoonEnergy * 0.8 + Math.sin(time * 1.2) * 0.1);
             
             let risk = "Низкий";
@@ -296,15 +355,19 @@
             
             vortices.forEach(v => {
                 if (v.filament && showTau) {
-                    v.filament.material.emissiveIntensity = 0.4 + cocoonEnergy * 0.8;
+                    v.filament.material.emissiveIntensity = 0.5 + cocoonEnergy * 0.9;
                     v.filament.material.color = getTauColor(v.tau);
                 }
                 if (v.cocoon && v.cocoon.material) {
-                    v.cocoon.material.opacity = 0.3 + cocoonEnergy * 0.4;
-                    v.cocoon.material.emissiveIntensity = 0.2 + fieldRadiation * 0.6;
+                    v.cocoon.material.opacity = 0.35 + cocoonEnergy * 0.45;
+                    v.cocoon.material.emissiveIntensity = 0.25 + fieldRadiation * 0.7;
                 }
             });
-            if (fieldParticles) fieldParticles.material.opacity = 0.35 + fieldRadiation * 0.5;
+            if (fieldParticles) fieldParticles.material.opacity = 0.4 + fieldRadiation * 0.55;
+            
+            // Динамический свет от камеры
+            cameraLight.position.copy(camera.position);
+            cameraLight.intensity = 0.4 + fieldRadiation * 0.5;
         }
         
         // ============ ЗАГРУЗКА JSON ============
@@ -315,18 +378,22 @@
             reader.onload = ev => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат");
+                    if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат JSON");
                     trajectoryData = data;
                     document.getElementById('frameSlider').max = trajectoryData.length - 1;
                     document.getElementById('frameSlider').disabled = false;
                     document.getElementById('playBtn').disabled = false;
                     buildFromFrame(trajectoryData[0]);
                     loadFrame(0);
+                    document.getElementById('demoStatus').innerHTML = `загружено ${trajectoryData.length} кадров`;
+                    document.getElementById('demoBanner').style.background = "rgba(0,30,0,0.8)";
+                    document.getElementById('demoBanner').style.borderRight = "2px solid #44ffaa";
                 } catch(err) { alert("Ошибка: " + err.message); }
             };
             reader.readAsText(file);
         });
         document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+        document.getElementById('loadDemoLink').addEventListener('click', () => document.getElementById('fileInput').click());
         
         // ============ УПРАВЛЕНИЕ ============
         document.getElementById('playBtn').addEventListener('click', () => {
@@ -334,7 +401,7 @@
             document.getElementById('playBtn').textContent = playing ? "⏸ Пауза" : "▶ Пуск";
         });
         document.getElementById('resetViewBtn').addEventListener('click', () => {
-            camera.position.set(14, 10, 18);
+            camera.position.set(16, 12, 20);
             controls.target.set(0, 0, 0);
             controls.update();
         });
@@ -376,30 +443,49 @@
         document.getElementById('fieldSlider').addEventListener('input', updateErrorHunter);
         document.getElementById('puritySlider').addEventListener('input', updateErrorHunter);
         
-        // ============ ДЕМО-ДАННЫЕ ИЗ LOCALSTORAGE ============
-        const demo = localStorage.getItem('spectravortex_demo_data');
-        if (demo) {
+        // ============ ДЕМО-ДАННЫЕ (встроенные, на случай если нет demo в localStorage) ============
+        const embeddedDemo = [{
+            "step": 0,
+            "d_min": 2.45,
+            "groups": {
+                "1": [[0,0,0], [2.8,1.2,0.8]],
+                "2": [[-2.0, -0.8, 1.2], [1.2, -2.0, -0.8]],
+                "3": [[0, 2.5, -1.8], [-2.2, 0, 2.0], [1.8, 1.8, 1.8]],
+                "4": [[-1.8, -1.8, -1.8], [2.2, -2.2, 0], [0, -2.2, 2.2]],
+                "5": [[-2.8, 2.2, -1.2], [1.2, -2.8, 2.2]],
+                "6": [[3.2, 0, 0], [-3.2, 0, 0], [0, 3.2, 0]],
+                "7": [[0, -3.2, 0], [0, 0, 3.2], [0, 0, -3.2]]
+            }
+        }];
+        
+        // Проверяем localStorage и загружаем демо, если нет данных
+        const storedDemo = localStorage.getItem('spectravortex_demo_data');
+        if (storedDemo) {
             localStorage.removeItem('spectravortex_demo_data');
             try {
-                trajectoryData = JSON.parse(demo);
+                trajectoryData = JSON.parse(storedDemo);
                 document.getElementById('frameSlider').max = trajectoryData.length - 1;
                 document.getElementById('frameSlider').disabled = false;
                 document.getElementById('playBtn').disabled = false;
                 buildFromFrame(trajectoryData[0]);
                 loadFrame(0);
-            } catch(e) { console.warn(e); }
+                document.getElementById('demoStatus').innerHTML = `демо-сцена (${trajectoryData.length} кадров)`;
+            } catch(e) { console.warn(e); loadEmbeddedDemo(); }
+        } else {
+            loadEmbeddedDemo();
         }
         
-        // ============ ОСВЕЩЕНИЕ И АНИМАЦИЯ ============
-        const ambient = new THREE.AmbientLight(0x222222);
-        scene.add(ambient);
-        const light = new THREE.DirectionalLight(0xffffff, 0.8);
-        light.position.set(5, 12, 6);
-        scene.add(light);
-        const backLight = new THREE.PointLight(0x4466ff, 0.4);
-        backLight.position.set(-3, 2, -5);
-        scene.add(backLight);
+        function loadEmbeddedDemo() {
+            trajectoryData = embeddedDemo;
+            document.getElementById('frameSlider').max = trajectoryData.length - 1;
+            document.getElementById('frameSlider').disabled = false;
+            document.getElementById('playBtn').disabled = false;
+            buildFromFrame(trajectoryData[0]);
+            loadFrame(0);
+            document.getElementById('demoStatus').innerHTML = `активна демо-сцена (${trajectoryData.length} кадров)`;
+        }
         
+        // ============ АНИМАЦИЯ ============
         let lastTime = performance.now();
         function animate() {
             const now = performance.now();
@@ -424,7 +510,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
         
-        console.log("SpectraVortex Viewer — запущен. Загрузите JSON или используйте демо.");
+        console.log("💡 SpectraVortex Viewer — освещение усилено! Загружайте JSON и крутите ползунки.");
     </script>
 </body>
 </html>
