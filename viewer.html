@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.9 — Научная визуализация ВММП</title>
+    <title>SpectraVortex v3.9.1 — Научная визуализация ВММП</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
@@ -38,9 +38,11 @@
             padding: 8px 14px; border-radius: 12px;
             border-right: 3px solid #ffaa44; text-align: right;
             font-family: monospace; font-size: 9px; z-index: 100;
-            min-width: 180px; pointer-events: none;
+            min-width: 200px; pointer-events: auto;
         }
         .status-panel .value { color: #ffaa44; font-size: 14px; font-weight: bold; }
+        .status-row { cursor: help; padding: 1px 0; }
+        .status-row:hover { background: rgba(255,170,68,0.1); border-radius: 3px; }
         
         .error-hunter {
             position: absolute; top: 80px; left: 20px;
@@ -50,7 +52,8 @@
             z-index: 100; border-left: 3px solid #ff3366;
             font-size: 9px;
         }
-        .param-group { display: flex; gap: 5px; align-items: center; }
+        .param-group { display: flex; gap: 5px; align-items: center; cursor: help; }
+        .param-group span:first-child { min-width: 45px; }
         
         .measure-panel {
             position: absolute; bottom: 100px; right: 20px;
@@ -64,7 +67,6 @@
         .measure-panel .title { color: #44ffaa; margin-bottom: 6px; font-size: 11px; }
         .measure-panel .close-btn { float: right; cursor: pointer; color: #ff6666; margin-left: 10px; }
         
-        /* НОВОЕ: панель мини-графика */
         .graph-panel {
             position: absolute; bottom: 100px; left: 20px;
             background: rgba(0,0,0,0.95); backdrop-filter: blur(8px);
@@ -138,14 +140,11 @@
     <div id="controls">
         <button id="loadBtn">📂 JSON</button>
         <button id="playBtn" disabled>▶</button>
-        <!-- НОВОЕ: покадровый просмотр -->
         <button id="prevFrameBtn" disabled>◀</button>
         <input type="number" id="frameInput" value="0" min="0" max="0" disabled style="width:55px;">
         <button id="nextFrameBtn" disabled>▶</button>
         <button id="resetViewBtn">🎥 Сброс</button>
-        <!-- НОВОЕ: переключатель проекции -->
         <button id="toggleProjectionBtn">📐 Перспектива</button>
-        <!-- НОВОЕ: переключатель режима -->
         <button id="toggleModeBtn" class="active">📚 Демо</button>
         <button id="toggleCocoonBtn" class="active">🌀 Коконы</button>
         <button id="toggleFieldBtn" class="active">🌊 Поле</button>
@@ -155,24 +154,23 @@
         <div class="slider-container"><span>💡 Яркость</span><input type="range" id="brightnessSlider" min="0.3" max="1.5" step="0.01" value="1.0"></div>
         <div class="slider-container"><span>🎞️ Кадр</span><input type="range" id="frameSlider" min="0" max="0" value="0" step="1" disabled></div>
         <input type="file" id="fileInput" accept=".json">
-        <!-- НОВОЕ: экспорт CSV -->
         <button id="exportCsvBtn" disabled>📥 CSV</button>
     </div>
 
     <div class="mode-banner demo" id="modeBanner">📚 ДЕМО-РЕЖИМ: обучение и формирование интуиции</div>
 
-    <div class="error-hunter">
-        <div class="param-group">🌡️ <span style="width:45px;">Темп.</span><input type="range" id="tempSlider" min="0" max="2000" value="300" step="10"><span id="tempVal">300K</span></div>
-        <div class="param-group">💥 <span style="width:45px;">Давл.</span><input type="range" id="pressureSlider" min="0.1" max="10" value="1" step="0.1"><span id="pressureVal">1.0</span></div>
-        <div class="param-group">⚡ <span style="width:45px;">Поле H</span><input type="range" id="fieldSlider" min="0" max="1.5" value="0.5" step="0.01"><span id="fieldVal">0.50</span></div>
-        <div class="param-group">🧪 <span style="width:45px;">Чистота</span><input type="range" id="puritySlider" min="0" max="1" value="0.9" step="0.01"><span id="purityVal">0.90</span></div>
+    <div class="error-hunter" id="errorHunter">
+        <div class="param-group" title="Температура среды. В ВММП — интенсивность флуктуаций вихревого поля. Влияет на энергию системы.">🌡️ <span>Темп.</span><input type="range" id="tempSlider" min="0" max="2000" value="300" step="10"><span id="tempVal">300K</span></div>
+        <div class="param-group" title="Внешнее давление. В ВММП — градиент плотности вихревого поля. Модулирует сжатие коконов.">💥 <span>Давл.</span><input type="range" id="pressureSlider" min="0.1" max="10" value="1" step="0.1"><span id="pressureVal">1.0</span></div>
+        <div class="param-group" title="Напряжённость внешнего поля H. В ВММП — градиент циркуляции. Влияет на ориентацию τ-жил.">⚡ <span>Поле H</span><input type="range" id="fieldSlider" min="0" max="1.5" value="0.5" step="0.01"><span id="fieldVal">0.50</span></div>
+        <div class="param-group" title="Чистота системы. 1 = идеальная, без примесных вихрей. <0.3 = критический риск разрушения конфигурации.">🧪 <span>Чистота</span><input type="range" id="puritySlider" min="0" max="1" value="0.9" step="0.01"><span id="purityVal">0.90</span></div>
     </div>
 
-    <div class="status-panel">
-        <div>🌀 Στ: <span id="totalTau" class="value">0.00</span></div>
-        <div>💚 Энергия: <span id="cocoonEnergy" class="value">0.00</span></div>
-        <div>📡 Излучение: <span id="fieldRadiation" class="value">0.00</span></div>
-        <div>⚠️ Риск: <span id="riskLevel">Низкий</span></div>
+    <div class="status-panel" id="statusPanel">
+        <div class="status-row" title="Στ — сумма топологических зарядов всех вихрей. 0 = идеальный баланс. Отклонение от нуля = дисбаланс системы.">🌀 Στ: <span id="totalTau" class="value">0.00</span></div>
+        <div class="status-row" title="Энергия парных взаимодействий: Σ(τᵢ·τⱼ / rᵢⱼ), нормированная 0–1.5. Растёт при сближении разноимённых τ.">💚 Энергия: <span id="cocoonEnergy" class="value">0.00</span></div>
+        <div class="status-row" title="Расчётное излучение поля: энергия × 0.8 + осцилляция. Индикатор активности вихревого поля.">📡 Излучение: <span id="fieldRadiation" class="value">0.00</span></div>
+        <div class="status-row" title="Эвристическая оценка риска: Низкий / Средний (перегрев) / Высокий (τ дисбаланс) / Критический (примеси).">⚠️ Риск: <span id="riskLevel">Низкий</span></div>
         <div>📊 Кадр: <span id="frameLabel">—</span>/<span id="totalFrames">—</span></div>
     </div>
 
@@ -182,7 +180,6 @@
         <div class="formula">d_оболочка = d_центр - R₁ - R₂</div>
     </div>
 
-    <!-- НОВОЕ: панель мини-графика -->
     <div class="graph-panel" id="graphPanel">
         <div class="title">📈 ЭНЕРГИЯ ПО КАДРАМ <span class="close-btn" id="closeGraphBtn">✕</span></div>
         <canvas id="graphCanvas" width="280" height="140"></canvas>
@@ -201,8 +198,15 @@
         scene.background = new THREE.Color(0x030318);
         scene.fog = new THREE.FogExp2(0x030318, 0.002);
         
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
-        camera.position.set(18, 14, 22);
+        // ИСПРАВЛЕНО №2,3: две камеры для надёжного переключения проекции
+        const aspect = window.innerWidth / window.innerHeight;
+        const perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 500);
+        perspCamera.position.set(18, 14, 22);
+        const orthoCamera = new THREE.OrthographicCamera(-10 * aspect, 10 * aspect, 10, -10, 0.1, 500);
+        orthoCamera.position.set(18, 14, 22);
+        
+        let camera = perspCamera;
+        let isOrthographic = false;
         
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -250,17 +254,15 @@
         let interfaceGroup = new THREE.Group();
         let fieldGroup = new THREE.Group();
         let flowLinesGroup = new THREE.Group();
-        let labelsGroup = new THREE.Group();
+        let highlightGroup = new THREE.Group(); // ИСПРАВЛЕНО №6: группа для подсветки
         
         scene.add(vortexGroup);
         scene.add(interfaceGroup);
         scene.add(fieldGroup);
         scene.add(flowLinesGroup);
+        scene.add(highlightGroup);
         
-        // НОВОЕ: режимы
-        let analysisMode = false; // false = Демо, true = Анализ
-        let isOrthographic = false; // false = Перспектива, true = Ортогональная
-        
+        let analysisMode = false;
         let showCocoon = true;
         let showField = true;
         let showTau = true;
@@ -275,7 +277,6 @@
         let graphCanvas = document.getElementById('graphCanvas');
         let graphCtx = graphCanvas.getContext('2d');
         
-        // НОВОЕ: история энергии для графика
         let energyHistory = [];
         const MAX_HISTORY = 200;
         
@@ -296,26 +297,24 @@
             updateTimeout = setTimeout(() => updateDynamics(), 30);
         }
         
-        // НОВОЕ: переключение проекции камеры
+        // ИСПРАВЛЕНО №2,3: переключение проекции через смену камеры
         function setProjection(ortho) {
-            const aspect = window.innerWidth / window.innerHeight;
-            const pos = camera.position.clone();
-            const target = controls.target.clone();
+            if (ortho === isOrthographic) return;
+            isOrthographic = ortho;
+            
+            const oldPos = camera.position.clone();
+            const oldTarget = controls.target.clone();
             
             if (ortho) {
-                const frustumSize = 20;
-                camera.copy(new THREE.OrthographicCamera(
-                    frustumSize * aspect / -2, frustumSize * aspect / 2,
-                    frustumSize / 2, frustumSize / -2, 0.1, 500
-                ));
-                camera.position.copy(pos);
-                controls.target.copy(target);
+                orthoCamera.position.copy(oldPos);
+                camera = orthoCamera;
             } else {
-                camera.copy(new THREE.PerspectiveCamera(45, aspect, 0.1, 500));
-                camera.position.copy(pos);
-                controls.target.copy(target);
+                perspCamera.position.copy(oldPos);
+                camera = perspCamera;
             }
-            isOrthographic = ortho;
+            
+            controls.object = camera;
+            controls.target.copy(oldTarget);
             controls.update();
         }
         
@@ -324,10 +323,12 @@
             const radius = groupRadii[group] * 0.5;
             const coreMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(groupColors[group-1]), emissive: new THREE.Color(groupColors[group-1]), emissiveIntensity: 0.2 });
             const core = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), coreMat);
+            core.name = 'core';
             groupObj.add(core);
             
             const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.7 });
             const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), filamentMat);
+            filament.name = 'filament';
             groupObj.add(filament);
             groupObj.position.set(x, y, z);
             
@@ -344,6 +345,7 @@
             div.style.border = `1px solid ${groupColors[group-1]}`;
             const label = new THREE.CSS2DObject(div);
             label.position.set(0, radius * 1.3, 0);
+            label.name = 'label';
             groupObj.add(label);
             
             return { groupObj, core, filament, tau, label, index, x, y, z, group };
@@ -360,6 +362,7 @@
             const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), mat);
             sphere.scale.set(radius, radius, radius);
             sphere.position.set(x, y, z);
+            sphere.name = 'cocoon';
             return sphere;
         }
         
@@ -387,7 +390,6 @@
                 if (child.material) child.material.dispose();
                 flowLinesGroup.remove(child);
             }
-            // НОВОЕ: в режиме анализа линии тока отключены для производительности
             if (analysisMode) return;
             
             for (let i = 0; i < vortices.length; i++) {
@@ -418,7 +420,16 @@
             return { x: sumX/count, y: sumY/count, z: sumZ/count };
         }
         
+        // ИСПРАВЛЕНО №1: очистка CSS2DObject лейблов из DOM
+        function clearAllLabels() {
+            const domElements = labelRenderer.domElement.querySelectorAll('div');
+            domElements.forEach(el => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            });
+        }
+        
         function buildFromFrame(frame) {
+            // Очистка старых вихрей
             while(vortexGroup.children.length) {
                 const child = vortexGroup.children[0];
                 child.traverse(c => {
@@ -430,6 +441,9 @@
                 });
                 vortexGroup.remove(child);
             }
+            // ИСПРАВЛЕНО №1: явная очистка DOM-лейблов
+            clearAllLabels();
+            
             while(interfaceGroup.children.length) {
                 const child = interfaceGroup.children[0];
                 if (child.geometry) child.geometry.dispose();
@@ -438,11 +452,20 @@
             }
             vortices = [];
             
+            // Очистка подсветки
+            while(highlightGroup.children.length) {
+                const child = highlightGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                highlightGroup.remove(child);
+            }
+            selectedForMeasure = [];
+            
             if (!fieldParticles) {
                 fieldParticles = createField();
                 fieldGroup.add(fieldParticles);
             }
-            fieldParticles.visible = showField;
+            fieldParticles.visible = showField && !analysisMode;
             
             const center = getSystemCenter(frame);
             fieldGroup.position.set(-center.x, -center.y, -center.z);
@@ -457,7 +480,6 @@
                     const vortex = createVortex(x, y, z, g, tau, counter);
                     vortexGroup.add(vortex.groupObj);
                     let cocoon = null;
-                    // НОВОЕ: в режиме анализа коконы не создаются
                     if (showCocoon && !analysisMode) { 
                         cocoon = createCocoon(x, y, z, g); 
                         interfaceGroup.add(cocoon); 
@@ -516,18 +538,22 @@
             }
             buildFlowLines();
             updateDynamics();
-            // НОВОЕ: обновление графика
-            updateGraph();
+            // ИСПРАВЛЕНО №4: вызов updateGraph при смене кадра
+            if (analysisMode) updateGraph();
         }
         
-        // НОВОЕ: отрисовка мини-графика
+        // ИСПРАВЛЕНО №4: график теперь реально обновляется
         function updateGraph() {
             if (!analysisMode) return;
-            energyHistory.push(cocoonEnergyVal);
+            // Добавляем текущую энергию в историю при каждом вызове
+            if (energyHistory.length === 0 || energyHistory[energyHistory.length-1] !== cocoonEnergyVal) {
+                energyHistory.push(cocoonEnergyVal);
+            }
             if (energyHistory.length > MAX_HISTORY) energyHistory.shift();
             
             const w = graphCanvas.width;
             const h = graphCanvas.height;
+            graphCtx.clearRect(0, 0, w, h);
             graphCtx.fillStyle = 'rgba(0,0,0,0.85)';
             graphCtx.fillRect(0, 0, w, h);
             
@@ -543,26 +569,36 @@
             }
             
             // Данные
-            if (energyHistory.length < 2) return;
-            graphCtx.strokeStyle = '#ffaa44';
-            graphCtx.lineWidth = 2;
-            graphCtx.beginPath();
-            const stepX = w / (energyHistory.length - 1);
-            for (let i = 0; i < energyHistory.length; i++) {
-                const x = i * stepX;
-                const y = h - (energyHistory[i] / 1.5) * h;
-                if (i === 0) graphCtx.moveTo(x, y);
-                else graphCtx.lineTo(x, y);
+            if (energyHistory.length < 2) {
+                // Одна точка — рисуем горизонтальную линию
+                graphCtx.strokeStyle = '#ffaa44';
+                graphCtx.lineWidth = 2;
+                const y = h - (energyHistory[0] / 1.5) * h;
+                graphCtx.beginPath();
+                graphCtx.moveTo(0, y);
+                graphCtx.lineTo(w, y);
+                graphCtx.stroke();
+            } else {
+                graphCtx.strokeStyle = '#ffaa44';
+                graphCtx.lineWidth = 2;
+                graphCtx.beginPath();
+                const stepX = w / (energyHistory.length - 1);
+                for (let i = 0; i < energyHistory.length; i++) {
+                    const x = i * stepX;
+                    const y = h - (energyHistory[i] / 1.5) * h;
+                    if (i === 0) graphCtx.moveTo(x, y);
+                    else graphCtx.lineTo(x, y);
+                }
+                graphCtx.stroke();
             }
-            graphCtx.stroke();
             
             // Метка текущего значения
             graphCtx.fillStyle = '#ffaa44';
             graphCtx.font = '9px monospace';
-            graphCtx.fillText(`E=${cocoonEnergyVal.toFixed(2)}`, 6, 14);
+            graphCtx.fillText(`E=${cocoonEnergyVal.toFixed(3)}`, 6, 14);
+            graphCtx.fillText(`кадр ${currentFrame}`, 6, 28);
         }
         
-        // НОВОЕ: экспорт CSV
         function exportCSV() {
             if (!vortices.length) return;
             let csv = 'index,group,tau,x,y,z,energy\n';
@@ -616,6 +652,37 @@
             cameraLight.position.copy(camera.position);
         }
         
+        // ИСПРАВЛЕНО №6: подсветка выбранных атомов и линия связи
+        function highlightSelected() {
+            // Очистка старой подсветки
+            while(highlightGroup.children.length) {
+                const child = highlightGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                highlightGroup.remove(child);
+            }
+            
+            if (selectedForMeasure.length === 0) return;
+            
+            selectedForMeasure.forEach(v => {
+                // Кольцо подсветки вокруг ядра
+                const ringGeom = new THREE.TorusGeometry(groupRadii[v.group] * 0.6, 0.06, 8, 16);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.9 });
+                const ring = new THREE.Mesh(ringGeom, ringMat);
+                ring.position.copy(v.groupObj.position);
+                highlightGroup.add(ring);
+            });
+            
+            // Линия связи между двумя выбранными
+            if (selectedForMeasure.length === 2) {
+                const p1 = selectedForMeasure[0].groupObj.position;
+                const p2 = selectedForMeasure[1].groupObj.position;
+                const lineGeom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
+                const lineMat = new THREE.LineBasicMaterial({ color: 0x44ffaa, linewidth: 1, transparent: true, opacity: 0.8 });
+                highlightGroup.add(new THREE.Line(lineGeom, lineMat));
+            }
+        }
+        
         function showMeasurement(atom1, atom2, frameIdx) {
             const dCenter = Math.hypot(atom1.x-atom2.x, atom1.y-atom2.y, atom1.z-atom2.z);
             const r1 = groupRadii[atom1.group];
@@ -634,6 +701,7 @@
                 <div>📊 Кадр: ${frameIdx} | Энергия: ${cocoonEnergyVal.toFixed(3)}</div>
             `;
             measurePanel.style.display = 'block';
+            highlightSelected();
         }
         
         // Клик по атомам
@@ -677,14 +745,17 @@
                     } else {
                         measurePanel.style.display = 'block';
                         document.getElementById('measureContent').innerHTML = `Выбран: ${symbolsList[vortex.index+1] || '?'} (τ=${vortex.tau})<br>Кликните второй атом`;
+                        highlightSelected();
                         measureResetTimeout = setTimeout(() => {
                             selectedForMeasure = [];
+                            highlightSelected();
                             document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами';
                         }, 5000);
                     }
                 }
             } else {
                 selectedForMeasure = [];
+                highlightSelected();
                 if (measureResetTimeout) clearTimeout(measureResetTimeout);
                 document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами';
             }
@@ -693,6 +764,7 @@
         document.getElementById('closeMeasureBtn').addEventListener('click', () => { 
             measurePanel.style.display = 'none'; 
             selectedForMeasure = []; 
+            highlightSelected();
             if (measureResetTimeout) clearTimeout(measureResetTimeout);
         });
         
@@ -752,7 +824,6 @@
             lastFrameTime = performance.now();
         });
         
-        // НОВОЕ: покадровый просмотр
         document.getElementById('prevFrameBtn').addEventListener('click', () => {
             playing = false;
             document.getElementById('playBtn').textContent = "▶";
@@ -776,13 +847,13 @@
             controls.update();
         });
         
-        // НОВОЕ: переключатель проекции
+        // ИСПРАВЛЕНО №2: переключатель проекции
         document.getElementById('toggleProjectionBtn').addEventListener('click', () => {
             setProjection(!isOrthographic);
             document.getElementById('toggleProjectionBtn').textContent = isOrthographic ? '📐 Орто' : '📐 Перспектива';
         });
         
-        // НОВОЕ: переключатель режима Демо/Анализ
+        // Переключатель режима Демо/Анализ
         document.getElementById('toggleModeBtn').addEventListener('click', () => {
             analysisMode = !analysisMode;
             const banner = document.getElementById('modeBanner');
@@ -795,7 +866,6 @@
                 banner.textContent = '📊 АНАЛИЗ: производительность > красота. Данные честны.';
                 banner.className = 'mode-banner analysis';
                 legend.innerHTML = '🌑 Ядро | ⚡ τ-жилы | 📏 Клик для измерения | 📈 График энергии | 📥 CSV';
-                // Скрыть коконы, поле, туман, обучение
                 showCocoon = false;
                 showField = false;
                 interfaceGroup.visible = false;
@@ -808,11 +878,12 @@
                 document.getElementById('toggleTauBtn').classList.add('active');
                 showTau = true;
                 vortices.forEach(v => { if(v.filament) v.filament.visible = true; });
-                // Показать панель графика
                 graphPanel.style.display = 'block';
                 energyHistory = [];
-                // Перестроить без коконов
-                if (trajectoryData.length) buildFromFrame(trajectoryData[currentFrame]);
+                if (trajectoryData.length) {
+                    buildFromFrame(trajectoryData[currentFrame]);
+                    updateGraph();
+                }
             } else {
                 btn.textContent = '📚 Демо';
                 btn.classList.add('active');
@@ -826,6 +897,7 @@
                 document.getElementById('toggleCocoonBtn').classList.add('active');
                 document.getElementById('toggleFieldBtn').classList.add('active');
                 graphPanel.style.display = 'none';
+                energyHistory = [];
                 if (trajectoryData.length) buildFromFrame(trajectoryData[currentFrame]);
             }
         });
@@ -855,7 +927,6 @@
             loadFrame(parseInt(e.target.value));
         });
         
-        // НОВОЕ: экспорт CSV
         document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
         
         const updateSliders = () => {
@@ -981,6 +1052,8 @@
             }
             
             updateDynamics();
+            // ИСПРАВЛЕНО №4: обновление графика каждый кадр в режиме анализа
+            if (analysisMode && playing) updateGraph();
             controls.update();
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
@@ -989,16 +1062,13 @@
         
         window.addEventListener('resize', () => {
             const aspect = window.innerWidth / window.innerHeight;
-            if (isOrthographic) {
-                const frustumSize = 20;
-                camera.left = frustumSize * aspect / -2;
-                camera.right = frustumSize * aspect / 2;
-                camera.top = frustumSize / 2;
-                camera.bottom = frustumSize / -2;
-            } else {
-                camera.aspect = aspect;
-            }
-            camera.updateProjectionMatrix();
+            perspCamera.aspect = aspect;
+            perspCamera.updateProjectionMatrix();
+            orthoCamera.left = -10 * aspect;
+            orthoCamera.right = 10 * aspect;
+            orthoCamera.top = 10;
+            orthoCamera.bottom = -10;
+            orthoCamera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             labelRenderer.setSize(window.innerWidth, window.innerHeight);
         });
