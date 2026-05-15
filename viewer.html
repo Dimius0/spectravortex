@@ -417,27 +417,48 @@
         function buildFlowLines() {
             while(flowLinesGroup.children.length) {
                 const child = flowLinesGroup.children[0];
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) child.material.dispose();
+                child.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                        else c.material.dispose();
+                    }
+                });
                 flowLinesGroup.remove(child);
             }
             if (!showFlowLines) return;
             
             for (let i = 0; i < vortices.length; i++) {
                 for (let j = i+1; j < vortices.length; j++) {
-                    const p1 = vortices[i].groupObj.position;
-                    const p2 = vortices[j].groupObj.position;
+                    const p1 = vortices[i].groupObj.position.clone();
+                    const p2 = vortices[j].groupObj.position.clone();
                     const dist = p1.distanceTo(p2);
                     const r1 = vortices[i].radius;
                     const r2 = vortices[j].radius;
                     
-                    // Связь при касании или перекрытии
-                    if (dist <= r1 + r2 + 0.01) {
-                        const geom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
-                        // Цвет — средний между цветами групп
+                    if (dist <= r1 + r2 + 0.05) {
+                        const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+                        const direction = new THREE.Vector3().subVectors(p2, p1).normalize();
                         const mixedColor = new THREE.Color().copy(vortices[i].groupColor).add(vortices[j].groupColor).multiplyScalar(0.5);
-                        const mat = new THREE.LineBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.8 });
-                        flowLinesGroup.add(new THREE.Line(geom, mat));
+                        
+                        // Цилиндр связи
+                        const cylGeom = new THREE.CylinderGeometry(0.06, 0.06, dist, 8);
+                        const cylMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.9 });
+                        const cylinder = new THREE.Mesh(cylGeom, cylMat);
+                        cylinder.position.copy(midPoint);
+                        const quaternion = new THREE.Quaternion();
+                        quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+                        cylinder.setRotationFromQuaternion(quaternion);
+                        flowLinesGroup.add(cylinder);
+                        
+                        // Сферы на концах
+                        const endMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.9 });
+                        const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), endMat);
+                        s1.position.copy(p1);
+                        flowLinesGroup.add(s1);
+                        const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), endMat);
+                        s2.position.copy(p2);
+                        flowLinesGroup.add(s2);
                     }
                 }
             }
@@ -776,6 +797,8 @@
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.params.Points = { threshold: 0.5 };
+            raycaster.params.Line = { threshold: 0.5 };
             raycaster.setFromCamera(mouse, camera);
             
             const clickable = [];
