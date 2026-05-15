@@ -3,123 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.8 — Научная визуализация ВММП</title>
+    <title>SpectraVortex v3.8.1 — Научная визуализация ВММП</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
         
-        /* Главная панель управления */
         #controls {
             position: absolute; bottom: 20px; left: 20px; right: 20px;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            padding: 10px 16px; border-radius: 12px;
-            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+            padding: 8px 12px; border-radius: 12px;
+            display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
             z-index: 100; border-top: 1px solid #333;
-            font-size: 11px;
+            font-size: 10px;
         }
         button {
             background: #1a1a2e; color: #0ff; border: 1px solid #0ff;
-            padding: 6px 12px; cursor: pointer; font-family: monospace;
-            font-size: 11px; transition: all 0.2s; border-radius: 6px;
+            padding: 4px 10px; cursor: pointer; font-family: monospace;
+            font-size: 10px; transition: all 0.2s; border-radius: 6px;
         }
-        button:hover { background: #0ff; color: #000; box-shadow: 0 0 8px #0ff; }
+        button:hover { background: #0ff; color: #000; }
         button.active { background: #ff3366; border-color: #ff3366; color: #fff; }
         button.learn-active { background: #44aa44; border-color: #44ffaa; color: #fff; }
         
-        .slider-container {
-            display: flex; align-items: center; gap: 6px;
-            background: #111; padding: 3px 10px; border-radius: 20px;
-        }
-        input[type="range"] { width: 100px; height: 3px; accent-color: #ffaa44; }
+        .slider-container { display: flex; align-items: center; gap: 4px; background: #111; padding: 2px 8px; border-radius: 16px; }
+        input[type="range"] { width: 80px; height: 3px; accent-color: #ffaa44; }
         
-        /* Панель статуса */
         .status-panel {
             position: absolute; top: 20px; right: 20px;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            padding: 10px 16px; border-radius: 12px;
+            padding: 8px 14px; border-radius: 12px;
             border-right: 3px solid #ffaa44; text-align: right;
-            font-family: monospace; font-size: 10px; z-index: 100;
-            min-width: 180px; pointer-events: none;
+            font-family: monospace; font-size: 9px; z-index: 100;
+            min-width: 160px; pointer-events: none;
         }
-        .status-panel .value { color: #ffaa44; font-size: 16px; font-weight: bold; }
+        .status-panel .value { color: #ffaa44; font-size: 14px; font-weight: bold; }
         
-        /* Error Hunter */
         .error-hunter {
-            position: absolute; top: 90px; left: 20px;
+            position: absolute; top: 80px; left: 20px;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            border-radius: 12px; padding: 8px 14px;
-            display: flex; gap: 12px; flex-wrap: wrap;
+            border-radius: 12px; padding: 6px 12px;
+            display: flex; gap: 10px; flex-wrap: wrap;
             z-index: 100; border-left: 3px solid #ff3366;
-            font-size: 10px;
+            font-size: 9px;
         }
-        .param-group { display: flex; gap: 6px; align-items: center; }
+        .param-group { display: flex; gap: 5px; align-items: center; }
         
-        /* Панель измерения */
         .measure-panel {
             position: absolute; bottom: 100px; right: 20px;
-            background: rgba(0,0,0,0.9); backdrop-filter: blur(8px);
-            border-radius: 12px; padding: 12px 16px;
+            background: rgba(0,0,0,0.95); backdrop-filter: blur(8px);
+            border-radius: 12px; padding: 10px 14px;
             border-right: 3px solid #44ffaa;
-            font-family: monospace; font-size: 10px;
-            z-index: 100; min-width: 260px;
+            font-family: monospace; font-size: 9px;
+            z-index: 100; min-width: 240px;
             display: none;
         }
-        .measure-panel .title { color: #44ffaa; margin-bottom: 8px; font-size: 12px; }
-        .measure-panel .pair { color: #ffaa44; margin-bottom: 5px; }
-        .measure-panel .formula { color: #888; font-size: 9px; margin-top: 5px; }
+        .measure-panel .title { color: #44ffaa; margin-bottom: 6px; font-size: 11px; }
+        .measure-panel .close-btn { float: right; cursor: pointer; color: #ff6666; margin-left: 10px; }
         
-        /* Легенда */
         .legend {
             position: absolute; bottom: 100px; left: 20px;
-            background: rgba(0,0,0,0.6); padding: 5px 10px;
-            border-radius: 8px; font-size: 8px; color: #ccc;
+            background: rgba(0,0,0,0.6); padding: 4px 8px;
+            border-radius: 8px; font-size: 7px; color: #ccc;
             pointer-events: none;
         }
         
-        /* Tooltip для режима обучения */
         .learn-tooltip {
             position: fixed;
             background: rgba(0,0,0,0.95); backdrop-filter: blur(12px);
             border-left: 3px solid #44ffaa;
             border-radius: 12px;
-            padding: 12px 16px;
-            max-width: 320px;
+            padding: 10px 14px;
+            max-width: 280px;
             z-index: 10000;
             font-family: monospace;
-            font-size: 11px;
+            font-size: 10px;
             pointer-events: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
-        .learn-tooltip .tt-title { color: #44ffaa; font-size: 14px; margin-bottom: 6px; }
-        .learn-tooltip .tt-formula { color: #ffaa44; font-size: 10px; margin-bottom: 8px; border-top: 1px solid #333; padding-top: 6px; }
-        .learn-tooltip .tt-desc { color: #ccc; line-height: 1.4; margin-bottom: 10px; }
-        .learn-tooltip .tt-ai { color: #88aaff; margin-top: 8px; border-top: 1px solid #333; padding-top: 6px; }
-        .learn-tooltip .tt-ai a { color: #88ffaa; cursor: pointer; text-decoration: underline; }
+        .learn-tooltip .tt-title { color: #44ffaa; font-size: 12px; margin-bottom: 4px; }
+        .learn-tooltip .tt-formula { color: #ffaa44; font-size: 9px; margin-bottom: 6px; border-top: 1px solid #333; padding-top: 5px; }
+        .learn-tooltip .tt-desc { color: #ccc; line-height: 1.3; margin-bottom: 8px; }
         
-        /* Оверлей загрузки */
         #loadingOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); backdrop-filter: blur(10px);
             z-index: 10000; display: flex; justify-content: center; align-items: center;
-            font-family: monospace; transition: opacity 0.4s;
+            font-family: monospace;
         }
-        .loading-container { text-align: center; color: #0f0; background: rgba(10,10,30,0.9); padding: 30px 50px; border-radius: 30px; border: 1px solid #44ffaa33; }
-        .vortex-loader { position: relative; width: 100px; height: 100px; margin: 0 auto 20px; }
-        .vortex-core { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; background: #ff3366; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px #ff3366; animation: pulse-core 1.2s ease infinite; }
-        .vortex-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 2px solid #44ffaa; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
-        .vortex-ring2 { position: absolute; top: 15px; left: 15px; width: calc(100% - 30px); height: calc(100% - 30px); border: 2px solid #ffaa44; border-radius: 50%; border-bottom-color: transparent; animation: spin-reverse 1.3s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes spin-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
-        @keyframes pulse-core { 0%,100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.7; } }
-        .loading-message { font-size: 14px; margin-bottom: 8px; color: #44ffaa; }
-        .loading-progress { width: 200px; height: 2px; background: #333; margin: 15px auto 0; border-radius: 2px; overflow: hidden; }
-        .loading-progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #44ffaa, #ffaa44); transition: width 0.2s; }
+        .loading-container { text-align: center; background: rgba(10,10,30,0.9); padding: 25px 40px; border-radius: 25px; border: 1px solid #44ffaa33; }
+        .vortex-loader { position: relative; width: 80px; height: 80px; margin: 0 auto 15px; }
+        .vortex-core { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; background: #ff3366; border-radius: 50%; transform: translate(-50%, -50%); animation: pulse-core 1s ease infinite; }
+        .vortex-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 2px solid #44ffaa; border-radius: 50%; border-top-color: transparent; animation: spin 0.8s linear infinite; }
+        .vortex-ring2 { position: absolute; top: 12px; left: 12px; width: calc(100% - 24px); height: calc(100% - 24px); border: 2px solid #ffaa44; border-radius: 50%; border-bottom-color: transparent; animation: spin-reverse 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin-reverse { to { transform: rotate(-360deg); } }
+        @keyframes pulse-core { 0%,100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.3); } }
+        .loading-message { font-size: 12px; margin-bottom: 8px; color: #44ffaa; }
+        .loading-progress { width: 180px; height: 2px; background: #333; margin: 12px auto 0; border-radius: 2px; overflow: hidden; }
+        .loading-progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #44ffaa, #ffaa44); }
         
-        #energy-fill { position: fixed; bottom: 100px; left: 20px; width: 160px; height: 3px; background: #333; border-radius: 2px; overflow: hidden; z-index: 101; }
+        #energy-fill { position: fixed; bottom: 100px; left: 20px; width: 140px; height: 2px; background: #333; border-radius: 2px; overflow: hidden; z-index: 101; }
         #energy-fill::after { content: ''; display: block; height: 100%; width: var(--energy, 0%); background: linear-gradient(90deg, #ff3366, #ffaa44, #44ffaa); transition: width 0.1s; }
         
         input[type="file"] { display: none; }
-        .demo-banner { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 5px 12px; border-radius: 20px; font-size: 9px; color: #ffaa44; z-index: 100; font-family: monospace; }
+        .demo-banner { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 16px; font-size: 8px; color: #ffaa44; z-index: 100; }
+        .highlight-ring { position: absolute; width: 30px; height: 30px; border: 2px solid #ffaa44; border-radius: 50%; pointer-events: none; z-index: 200; transform: translate(-50%, -50%); display: none; }
     </style>
 </head>
 <body>
@@ -130,37 +118,37 @@
         <button id="toggleCocoonBtn" class="active">🌀 Коконы</button>
         <button id="toggleFieldBtn" class="active">🌊 Поле</button>
         <button id="toggleTauBtn">⚡ τ-жилы</button>
-        <button id="learnModeBtn">📚 Обучение: Выкл</button>
-        <div class="slider-container"><span>🌀 Прозр.</span><input type="range" id="opacitySlider" min="0.15" max="0.7" step="0.01" value="0.35"></div>
-        <div class="slider-container"><span>💡 Яркость</span><input type="range" id="brightnessSlider" min="0.4" max="1.5" step="0.01" value="1.0"></div>
+        <button id="learnModeBtn">📚 Обучение</button>
+        <div class="slider-container"><span>🌀 Прозр.кок</span><input type="range" id="opacitySlider" min="0.1" max="0.7" step="0.01" value="0.35"></div>
+        <div class="slider-container"><span>💡 Яркость</span><input type="range" id="brightnessSlider" min="0.3" max="1.5" step="0.01" value="1.0"></div>
         <div class="slider-container"><span>🎞️ Кадр</span><input type="range" id="frameSlider" min="0" max="0" value="0" step="1" disabled></div>
         <input type="file" id="fileInput" accept=".json">
     </div>
 
     <div class="error-hunter">
-        <div class="param-group">🌡️ <input type="range" id="tempSlider" min="0" max="2000" value="300" step="10"><span id="tempVal">300K</span></div>
-        <div class="param-group">💥 <input type="range" id="pressureSlider" min="0.1" max="10" value="1" step="0.1"><span id="pressureVal">1.0</span></div>
-        <div class="param-group">⚡ <input type="range" id="fieldSlider" min="0" max="1.5" value="0.5" step="0.01"><span id="fieldVal">0.50</span></div>
-        <div class="param-group">🧪 <input type="range" id="puritySlider" min="0" max="1" value="0.9" step="0.01"><span id="purityVal">0.90</span></div>
+        <div class="param-group">🌡️ <span style="width:45px;">Темп.</span><input type="range" id="tempSlider" min="0" max="2000" value="300" step="10"><span id="tempVal">300K</span></div>
+        <div class="param-group">💥 <span style="width:45px;">Давл.</span><input type="range" id="pressureSlider" min="0.1" max="10" value="1" step="0.1"><span id="pressureVal">1.0</span></div>
+        <div class="param-group">⚡ <span style="width:45px;">Поле H</span><input type="range" id="fieldSlider" min="0" max="1.5" value="0.5" step="0.01"><span id="fieldVal">0.50</span></div>
+        <div class="param-group">🧪 <span style="width:45px;">Чистота</span><input type="range" id="puritySlider" min="0" max="1" value="0.9" step="0.01"><span id="purityVal">0.90</span></div>
     </div>
 
     <div class="status-panel">
         <div>🌀 Στ: <span id="totalTau" class="value">0.00</span></div>
         <div>💚 Энергия: <span id="cocoonEnergy" class="value">0.00</span></div>
         <div>📡 Излучение: <span id="fieldRadiation" class="value">0.00</span></div>
-        <div>⚠️ Риск: <span id="riskLevel" style="color:#ffaa44;">Низкий</span></div>
+        <div>⚠️ Риск: <span id="riskLevel">Низкий</span></div>
         <div>📊 Кадр: <span id="frameLabel">—</span>/<span id="totalFrames">—</span></div>
     </div>
 
     <div class="measure-panel" id="measurePanel">
-        <div class="title">📏 ИЗМЕРИТЕЛЬ РАССТОЯНИЙ</div>
+        <div class="title">📏 ИЗМЕРИТЕЛЬ <span class="close-btn" id="closeMeasureBtn">✕</span></div>
         <div id="measureContent">Выберите два атома кликами</div>
         <div class="formula">d_оболочка = d_центр - R₁ - R₂</div>
     </div>
 
     <div id="energy-fill"></div>
-    <div class="legend">🌑 Ядро | 🌀 Кокон | ✨ Поле | 🔗 Линии тока | 📚 Обучение: наведи на любой элемент</div>
-    <div class="demo-banner" id="demoBanner">📢 ДЕМО-РЕЖИМ: <span id="demoStatus">активна демо-сцена</span> | <a id="loadDemoLink" style="color:#44ffaa; cursor:pointer;">📂 загрузить свои данные</a></div>
+    <div class="legend">🌑 Ядро | 🌀 Кокон (R=1.65×R_v) | ✨ Поле-туман | 🔗 Линии тока | 📚 Обучение: наведи</div>
+    <div class="demo-banner" id="demoBanner">📢 ДЕМО | <a id="loadDemoLink" style="color:#44ffaa; cursor:pointer;">📂 загрузить свои данные</a> | 📄 <a href="#" id="infoLink" style="color:#ffaa44; cursor:pointer;">ℹ️ о проекте</a></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -170,17 +158,15 @@
         // ============ ИНИЦИАЛИЗАЦИЯ ============
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x030318);
-        scene.fog = new THREE.FogExp2(0x030318, 0.003);
+        scene.fog = new THREE.FogExp2(0x030318, 0.002);
         
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
         camera.position.set(18, 14, 22);
         
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
         
-        // CSS2 рендерер для подписей
         const labelRenderer = new THREE.CSS2DRenderer();
         labelRenderer.setSize(window.innerWidth, window.innerHeight);
         labelRenderer.domElement.style.position = 'absolute';
@@ -199,25 +185,23 @@
         scene.add(ambientLight);
         const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.3);
         mainLight.position.set(8, 15, 5);
-        mainLight.castShadow = true;
         scene.add(mainLight);
-        const fillLight = new THREE.PointLight(0x4488ff, 0.6);
+        const fillLight = new THREE.PointLight(0x4488ff, 0.5);
         fillLight.position.set(-4, 3, 6);
         scene.add(fillLight);
-        const backLight = new THREE.PointLight(0xffaa66, 0.5);
+        const backLight = new THREE.PointLight(0xffaa66, 0.4);
         backLight.position.set(0, 2, -10);
         scene.add(backLight);
-        const rimLight = new THREE.PointLight(0x88aaff, 0.4);
-        rimLight.position.set(0, -6, 0);
-        scene.add(rimLight);
-        const cameraLight = new THREE.PointLight(0xffaa88, 0.4);
+        const cameraLight = new THREE.PointLight(0xffaa88, 0.3);
         scene.add(cameraLight);
         
         // ============ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ============
         let trajectoryData = [];
         let currentFrame = 0;
         let playing = false;
+        let playInterval = null;
         let time = 0;
+        let updateTimeout = null;
         
         let vortexGroup = new THREE.Group();
         let interfaceGroup = new THREE.Group();
@@ -229,7 +213,6 @@
         scene.add(interfaceGroup);
         scene.add(fieldGroup);
         scene.add(flowLinesGroup);
-        scene.add(labelsGroup);
         
         let showCocoon = true;
         let showField = true;
@@ -239,71 +222,58 @@
         let totalTau = 0, cocoonEnergyVal = 0.5, fieldRadiationVal = 0.3;
         let vortices = [];
         let fieldParticles = null;
-        
-        let temperature = 300, pressure = 1.0, externalField = 0.5, purity = 0.9;
-        
-        // Измерилка
-        let selectedAtoms = [];
+        let selectedForMeasure = [];
         let measurePanel = document.getElementById('measurePanel');
         
-        // Tooltip
-        let currentTooltip = null;
+        let temperature = 300, pressure = 1.0, externalField = 0.5, purity = 0.9;
         
         const groupColors = ['#ff3366', '#ff8844', '#ffdd44', '#44cc44', '#44aaff', '#aa66ff', '#ff66cc'];
         const groupRadii = {1:0.55, 2:0.75, 3:0.95, 4:1.15, 5:1.35, 6:1.55, 7:1.75};
         const symbolsList = ['?','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca'];
-        
-        // ============ НАУЧНЫЕ КОЭФФИЦИЕНТЫ ============
-        const COCOON_FACTOR = 1.65;  // Теоретическое значение: кокон = радиус вихря × 1.65
+        const COCOON_FACTOR = 1.65;
         
         function getTauColor(tau) {
             const hue = 0.55 + (tau || 0) * 0.1;
             return new THREE.Color().setHSL(Math.min(0.85, Math.max(0.3, hue)), 1.0, 0.65);
         }
         
-        function getCocoonRadius(atom, neighbors) {
-            const baseRadius = groupRadii[atom.group] * COCOON_FACTOR;
-            if (!neighbors || neighbors.length === 0) return baseRadius;
-            let avgDist = 0;
-            neighbors.forEach(n => { avgDist += Math.hypot(atom.x - n.x, atom.y - n.y, atom.z - n.z); });
-            avgDist /= neighbors.length;
-            const compression = Math.min(0.85, 1.2 / (avgDist / baseRadius));
-            return baseRadius * compression;
+        function debouncedUpdate() {
+            if (updateTimeout) clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => updateDynamics(), 30);
         }
         
         function createVortex(x, y, z, group, tau, index) {
             const groupObj = new THREE.Group();
             const radius = groupRadii[group] * 0.5;
-            const coreMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x331100, roughness: 0.4, metalness: 0.7 });
+            const coreMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(groupColors[group-1]), emissive: new THREE.Color(groupColors[group-1]), emissiveIntensity: 0.2 });
             const core = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 32), coreMat);
             groupObj.add(core);
             
-            const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.85 });
-            const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.25, 32, 32), filamentMat);
+            const filamentMat = new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.7 });
+            const filament = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), filamentMat);
             groupObj.add(filament);
             groupObj.position.set(x, y, z);
             
-            // CSS2D подпись
             const div = document.createElement('div');
             div.textContent = symbolsList[index+1] || '?';
             div.style.color = '#fff';
-            div.style.fontSize = '11px';
+            div.style.fontSize = '10px';
             div.style.fontWeight = 'bold';
             div.style.fontFamily = 'monospace';
-            div.style.textShadow = '0 0 5px #000';
-            div.style.background = 'rgba(0,0,0,0.6)';
-            div.style.padding = '2px 5px';
-            div.style.borderRadius = '12px';
+            div.style.textShadow = '0 0 3px #000';
+            div.style.background = 'rgba(0,0,0,0.5)';
+            div.style.padding = '1px 4px';
+            div.style.borderRadius = '10px';
             div.style.border = `1px solid ${groupColors[group-1]}`;
             const label = new THREE.CSS2DObject(div);
-            label.position.set(0, radius * 1.8, 0);
+            label.position.set(0, radius * 1.3, 0);
             groupObj.add(label);
             
-            return { groupObj, core, filament, tau, label, index };
+            return { groupObj, core, filament, tau, label, index, x, y, z, group };
         }
         
-        function createCocoon(x, y, z, group, neighbors) {
-            const radius = getCocoonRadius({group, x, y, z}, neighbors);
+        function createCocoon(x, y, z, group) {
+            const radius = groupRadii[group] * COCOON_FACTOR;
             const mat = new THREE.MeshPhongMaterial({
                 color: new THREE.Color(groupColors[group-1]),
                 emissive: 0x2266aa,
@@ -316,25 +286,20 @@
             return sphere;
         }
         
-        function createField(atomCount) {
-            const count = Math.min(1800, 500 + atomCount * 25);
-            const positions = new Float32Array(count * 3);
-            const colors = new Float32Array(count * 3);
+        function createField() {
+            const count = 600;
+            const positions = [];
             for (let i = 0; i < count; i++) {
-                const r = 9 + Math.random() * 15;
+                const r = 7 + Math.random() * 14;
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(2 * Math.random() - 1);
-                positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
-                positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
-                positions[i*3+2] = r * Math.cos(phi);
-                const intensity = 0.3 + Math.random() * 0.5;
-                const color = new THREE.Color().setHSL(0.6, 0.7, 0.4 + intensity * 0.25);
-                colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
+                positions.push(r * Math.sin(phi) * Math.cos(theta));
+                positions.push(r * Math.sin(phi) * Math.sin(theta) * 0.5);
+                positions.push(r * Math.cos(phi));
             }
             const geom = new THREE.BufferGeometry();
-            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending });
+            geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+            const material = new THREE.PointsMaterial({ color: 0x4488ff, size: 0.08, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending });
             return new THREE.Points(geom, material);
         }
         
@@ -344,16 +309,17 @@
                 for (let j = i+1; j < vortices.length; j++) {
                     const p1 = vortices[i].groupObj.position;
                     const p2 = vortices[j].groupObj.position;
-                    if (p1.distanceTo(p2) < 5.0) {
+                    const dist = p1.distanceTo(p2);
+                    if (dist < 5.0) {
                         const geom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
-                        const mat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.4 });
+                        const thickness = Math.max(0.02, 0.1 * (1 - dist / 5.0));
+                        const mat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.5 });
                         flowLinesGroup.add(new THREE.Line(geom, mat));
                     }
                 }
             }
         }
         
-        // Вычисление центра масс системы
         function getSystemCenter(frame) {
             let sumX = 0, sumY = 0, sumZ = 0, count = 0;
             for (let g = 1; g <= 7; g++) {
@@ -368,16 +334,14 @@
         function buildFromFrame(frame) {
             while(vortexGroup.children.length) vortexGroup.remove(vortexGroup.children[0]);
             while(interfaceGroup.children.length) interfaceGroup.remove(interfaceGroup.children[0]);
-            while(labelsGroup.children.length) labelsGroup.remove(labelsGroup.children[0]);
             vortices = [];
             
             let totalAtoms = 0;
             for (let g = 1; g <= 7; g++) if (frame.groups && frame.groups[g]) totalAtoms += frame.groups[g].length;
             
             if (showField && fieldParticles) fieldGroup.remove(fieldParticles);
-            if (showField) { fieldParticles = createField(totalAtoms); fieldGroup.add(fieldParticles); }
+            if (showField) { fieldParticles = createField(); fieldGroup.add(fieldParticles); }
             
-            // Смещаем поле в центр масс системы
             const center = getSystemCenter(frame);
             fieldGroup.position.set(-center.x, -center.y, -center.z);
             
@@ -389,21 +353,9 @@
                     const tau = (g % 2 === 0) ? 1 : -1;
                     const vortex = createVortex(x, y, z, g, tau, counter);
                     vortexGroup.add(vortex.groupObj);
-                    
-                    // Собираем соседей для деформации кокона
-                    const neighbors = [];
-                    for (let gg = 1; gg <= 7; gg++) {
-                        if (frame.groups && frame.groups[gg]) {
-                            frame.groups[gg].forEach(otherPos => {
-                                const dist = Math.hypot(x - otherPos[0], y - otherPos[1], z - otherPos[2]);
-                                if (dist > 0.01 && dist < 4.5) neighbors.push({x: otherPos[0], y: otherPos[1], z: otherPos[2]});
-                            });
-                        }
-                    }
-                    
                     let cocoon = null;
-                    if (showCocoon) { cocoon = createCocoon(x, y, z, g, neighbors); interfaceGroup.add(cocoon); }
-                    vortices.push({ ...vortex, cocoon, group: g, tau, x, y, z });
+                    if (showCocoon) { cocoon = createCocoon(x, y, z, g); interfaceGroup.add(cocoon); }
+                    vortices.push({ ...vortex, cocoon });
                     counter++;
                 });
             }
@@ -418,7 +370,6 @@
             document.getElementById('frameSlider').value = frameIdx;
             document.getElementById('frameLabel').textContent = frameIdx;
             document.getElementById('totalFrames').textContent = trajectoryData.length-1;
-            document.getElementById('demoStatus').innerHTML = `кадр ${frameIdx}/${trajectoryData.length-1}`;
             
             let idx = 0;
             for (let g = 1; g <= 7; g++) {
@@ -470,39 +421,34 @@
                     v.cocoon.material.emissiveIntensity = 0.2 + fieldRadiationVal * 0.7;
                 }
             });
-            if (fieldParticles) fieldParticles.material.opacity = 0.35 + fieldRadiationVal * 0.5;
-            cameraLight.intensity = 0.3 + fieldRadiationVal * 0.5;
+            if (fieldParticles) fieldParticles.material.opacity = 0.25 + fieldRadiationVal * 0.4;
+            cameraLight.intensity = 0.3 + fieldRadiationVal * 0.4;
             cameraLight.position.copy(camera.position);
         }
         
-        // ============ ИЗМЕРИЛКА РАССТОЯНИЙ ============
         function showMeasurement(atom1, atom2, frameIdx) {
-            const pos1 = {x: atom1.x, y: atom1.y, z: atom1.z};
-            const pos2 = {x: atom2.x, y: atom2.y, z: atom2.z};
-            const dCenter = Math.hypot(pos1.x-pos2.x, pos1.y-pos2.y, pos1.z-pos2.z);
+            const dCenter = Math.hypot(atom1.x-atom2.x, atom1.y-atom2.y, atom1.z-atom2.z);
             const r1 = groupRadii[atom1.group];
             const r2 = groupRadii[atom2.group];
             const dShell = dCenter - r1 - r2;
             const overlap = dShell < 0 ? Math.abs(dShell).toFixed(3) : null;
             const tauSum = atom1.tau + atom2.tau;
-            
             const frame = trajectoryData[currentFrame];
             const energy = frame?.energy || (cocoonEnergyVal * 1000).toFixed(0);
             
             document.getElementById('measureContent').innerHTML = `
-                <div class="pair">🔘 ${symbolsList[atom1.index+1] || '?'} (τ=${atom1.tau}, R=${r1.toFixed(2)})</div>
-                <div class="pair">🔘 ${symbolsList[atom2.index+1] || '?'} (τ=${atom2.tau}, R=${r2.toFixed(2)})</div>
-                <div style="margin:8px 0; border-top:1px solid #333;"></div>
+                <div>🔘 ${symbolsList[atom1.index+1] || '?'} (τ=${atom1.tau}, R=${r1.toFixed(2)})</div>
+                <div>🔘 ${symbolsList[atom2.index+1] || '?'} (τ=${atom2.tau}, R=${r2.toFixed(2)})</div>
+                <div style="margin:6px 0; border-top:1px solid #333;"></div>
                 <div>📏 Центр→Центр: <span style="color:#44ffaa;">${dCenter.toFixed(3)} Å</span></div>
-                <div>🔘 Оболочка→Оболочка: <span style="color:#44ffaa;">${dShell.toFixed(3)} Å</span> ${overlap ? `<span style="color:#ff6666;"> [ПЕРЕКРЫТИЕ ${overlap} Å]</span>` : ''}</div>
-                <div>⚡ Στ: ${tauSum} ${tauSum === 0 ? '✅ (совместимы)' : '⚠️ (несовместимы)'}</div>
-                <div>📊 Кадр: ${frameIdx} | Энергия: ${energy} кДж/моль</div>
+                <div>🔘 Оболочка→Оболочка: <span style="color:#44ffaa;">${dShell.toFixed(3)} Å</span> ${overlap ? `<span style="color:#ff6666;"> [ПЕРЕКРЫТИЕ]</span>` : ''}</div>
+                <div>⚡ Στ: ${tauSum} ${tauSum === 0 ? '✅' : '⚠️'}</div>
+                <div>📊 Кадр: ${frameIdx} | Энергия: ${energy}</div>
             `;
             measurePanel.style.display = 'block';
-            setTimeout(() => { if (selectedAtoms.length < 2) measurePanel.style.display = 'none'; }, 5000);
         }
         
-        // Обработка кликов по атомам
+        // Клик по атомам
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         renderer.domElement.addEventListener('click', (event) => {
@@ -517,10 +463,10 @@
                 const hit = intersects[0].object.parent;
                 const vortex = vortices.find(v => v.groupObj === hit);
                 if (vortex) {
-                    selectedAtoms.push(vortex);
-                    if (selectedAtoms.length === 2) {
-                        showMeasurement(selectedAtoms[0], selectedAtoms[1], currentFrame);
-                        selectedAtoms = [];
+                    selectedForMeasure.push(vortex);
+                    if (selectedForMeasure.length === 2) {
+                        showMeasurement(selectedForMeasure[0], selectedForMeasure[1], currentFrame);
+                        selectedForMeasure = [];
                     } else {
                         measurePanel.style.display = 'block';
                         document.getElementById('measureContent').innerHTML = `Выбран: ${symbolsList[vortex.index+1] || '?'} (τ=${vortex.tau})<br>Кликните второй атом`;
@@ -529,55 +475,19 @@
             }
         });
         
-        // ============ РЕЖИМ ОБУЧЕНИЯ (TOOLTIP) ============
-        const tooltipsData = {
-            cocoon: { title: "🌀 КОКОН (Обменная сущность)", formula: "H(r) = H₀·exp(-r²/ξ²)", desc: "Полупрозрачная оболочка вихря. Здесь градиент поля H максимален, энергия передаётся от ядра к окружающему конденсату. Радиус кокона = 1.65 × радиус вихря (теоретическое значение).", query: "обменная сущность кокон в ВММП" },
-            core: { title: "🌑 ВИХРЕВОЕ ЯДРО", formula: "τ = ∮∇ψ·dl / 2π, τ ∈ ℤ", desc: "Топологический скелет — носитель циркуляции. Тёмное ядро с пульсирующей жилой, цвет которой кодирует топологический заряд τ.", query: "топологический заряд вихря ВММП" },
-            field: { title: "✨ ПОЛЕВАЯ СУЩНОСТЬ", formula: "∇⁴ψ = 0", desc: "Конденсатный фон — пространство-время как сверхтекучая среда. Волны излучения расходятся от коконов в поле.", query: "полевая сущность конденсат ВММП" },
-            flowline: { title: "🔗 ЛИНИИ ТОКА", formula: "J = ∇H", desc: "Адаптивный роутинг — пути наименьшего сопротивления для передачи энергии между вихрями.", query: "адаптивный роутинг линии тока ВММП" },
-            errorhunter: { title: "🎮 ERROR HUNTER", formula: "P = P₀·(1+Σδ)·exp(N)", desc: "Теорема Липсика: систематическое нарушение протоколов увеличивает вероятность прорывных открытий.", query: "теорема Липсика ошибки ВММП" }
-        };
-        
-        function showTooltip(element, type, x, y) {
-            if (!learnMode) return;
-            if (currentTooltip) currentTooltip.remove();
-            const data = tooltipsData[type];
-            if (!data) return;
-            const tooltip = document.createElement('div');
-            tooltip.className = 'learn-tooltip';
-            tooltip.style.left = (x + 15) + 'px';
-            tooltip.style.top = (y + 15) + 'px';
-            tooltip.innerHTML = `
-                <div class="tt-title">${data.title}</div>
-                <div class="tt-formula">📐 ${data.formula}</div>
-                <div class="tt-desc">💡 ${data.desc}</div>
-                <div class="tt-ai">🤖 <a onclick="window.open('https://chat.deepseek.com/?q=${encodeURIComponent('В рамках Вихревой Модели Материи-Пространства (ВММП) объясни: ' + data.query)}', '_blank')">Спросить ИИ-аналитика о ${data.title.split(' ')[0]}</a></div>
-            `;
-            document.body.appendChild(tooltip);
-            currentTooltip = tooltip;
-            setTimeout(() => { if (currentTooltip === tooltip) currentTooltip = null; tooltip.remove(); }, 8000);
-        }
-        
-        document.getElementById('learnModeBtn').addEventListener('click', () => {
-            learnMode = !learnMode;
-            document.getElementById('learnModeBtn').textContent = learnMode ? '📚 Обучение: Вкл' : '📚 Обучение: Выкл';
-            document.getElementById('learnModeBtn').classList.toggle('learn-active', learnMode);
-        });
+        document.getElementById('closeMeasureBtn').addEventListener('click', () => { measurePanel.style.display = 'none'; selectedForMeasure = []; });
         
         // ============ ЗАГРУЗКА JSON ============
-        function showLoading(message) {
+        function showLoading(msg) {
             let overlay = document.getElementById('loadingOverlay');
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'loadingOverlay';
-                overlay.innerHTML = `<div class="loading-container"><div class="vortex-loader"><div class="vortex-core"></div><div class="vortex-ring"></div><div class="vortex-ring2"></div></div><div class="loading-message" id="loadingMsg">${message}</div><div class="loading-progress"><div class="loading-progress-bar" id="loadingBar"></div></div></div>`;
+                overlay.innerHTML = `<div class="loading-container"><div class="vortex-loader"><div class="vortex-core"></div><div class="vortex-ring"></div><div class="vortex-ring2"></div></div><div class="loading-message" id="loadingMsg">${msg}</div><div class="loading-progress"><div class="loading-progress-bar" id="loadingBar"></div></div></div>`;
                 document.body.appendChild(overlay);
-            } else {
-                document.getElementById('loadingMsg').textContent = message;
-                overlay.style.display = 'flex';
-            }
+            } else { overlay.style.display = 'flex'; document.getElementById('loadingMsg').textContent = msg; }
         }
-        function updateLoadingProgress(percent) { const bar = document.getElementById('loadingBar'); if (bar) bar.style.width = percent + '%'; }
+        function updateLoadingProgress(p) { const bar = document.getElementById('loadingBar'); if (bar) bar.style.width = p + '%'; }
         function hideLoading() { const overlay = document.getElementById('loadingOverlay'); if (overlay) overlay.style.display = 'none'; }
         
         document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -598,10 +508,9 @@
                         document.getElementById('playBtn').disabled = false;
                         buildFromFrame(trajectoryData[0]);
                         loadFrame(0);
-                        document.getElementById('demoStatus').innerHTML = `загружено ${trajectoryData.length} кадров`;
                         hideLoading();
                     } catch(err) { hideLoading(); alert("Ошибка: " + err.message); }
-                }, 300);
+                }, 200);
             };
             reader.readAsText(file);
         });
@@ -612,7 +521,16 @@
         document.getElementById('playBtn').addEventListener('click', () => {
             playing = !playing;
             document.getElementById('playBtn').textContent = playing ? "⏸" : "▶";
+            if (playInterval) clearInterval(playInterval);
+            if (playing) {
+                playInterval = setInterval(() => {
+                    if (playing && trajectoryData.length) {
+                        loadFrame((currentFrame + 1) % trajectoryData.length);
+                    }
+                }, 100);
+            }
         });
+        
         document.getElementById('resetViewBtn').addEventListener('click', () => {
             camera.position.set(18, 14, 22);
             controls.target.set(0, 0, 0);
@@ -636,10 +554,11 @@
         document.getElementById('frameSlider').addEventListener('input', (e) => {
             playing = false;
             document.getElementById('playBtn').textContent = "▶";
+            if (playInterval) clearInterval(playInterval);
             loadFrame(parseInt(e.target.value));
         });
         
-        const updateErrorHunter = () => {
+        const updateSliders = () => {
             temperature = parseFloat(document.getElementById('tempSlider').value);
             pressure = parseFloat(document.getElementById('pressureSlider').value);
             externalField = parseFloat(document.getElementById('fieldSlider').value);
@@ -648,66 +567,91 @@
             document.getElementById('pressureVal').innerText = pressure.toFixed(1);
             document.getElementById('fieldVal').innerText = externalField.toFixed(2);
             document.getElementById('purityVal').innerText = purity.toFixed(2);
-            updateDynamics();
+            debouncedUpdate();
         };
-        document.getElementById('tempSlider').addEventListener('input', updateErrorHunter);
-        document.getElementById('pressureSlider').addEventListener('input', updateErrorHunter);
-        document.getElementById('fieldSlider').addEventListener('input', updateErrorHunter);
-        document.getElementById('puritySlider').addEventListener('input', updateErrorHunter);
-        document.getElementById('opacitySlider').addEventListener('input', updateDynamics);
-        document.getElementById('brightnessSlider').addEventListener('input', updateDynamics);
+        document.getElementById('tempSlider').addEventListener('input', updateSliders);
+        document.getElementById('pressureSlider').addEventListener('input', updateSliders);
+        document.getElementById('fieldSlider').addEventListener('input', updateSliders);
+        document.getElementById('puritySlider').addEventListener('input', updateSliders);
+        document.getElementById('opacitySlider').addEventListener('input', debouncedUpdate);
+        document.getElementById('brightnessSlider').addEventListener('input', debouncedUpdate);
+        
+        // ============ РЕЖИМ ОБУЧЕНИЯ ============
+        let currentTooltip = null;
+        const tooltipsData = {
+            cocoon: { title: "🌀 КОКОН", formula: "R = R_v × 1.65", desc: "Обменная сущность — место максимального градиента поля H. Радиус определён теоретически." },
+            core: { title: "🌑 ЯДРО", formula: "τ = ∮∇ψ·dl / 2π", desc: "Топологический скелет. Цвет τ-жилы показывает топологический заряд." },
+            field: { title: "✨ ПОЛЕ", formula: "∇⁴ψ = 0", desc: "Конденсатный фон — пространство-время как сверхтекучая среда." },
+            flowline: { title: "🔗 СВЯЗЬ", formula: "J = ∇H", desc: "Линии тока — пути передачи энергии между вихрями." }
+        };
+        function showTooltip(type, x, y) {
+            if (!learnMode) return;
+            if (currentTooltip) currentTooltip.remove();
+            const data = tooltipsData[type];
+            if (!data) return;
+            const div = document.createElement('div');
+            div.className = 'learn-tooltip';
+            div.style.left = (x + 15) + 'px';
+            div.style.top = (y + 15) + 'px';
+            div.innerHTML = `<div class="tt-title">${data.title}</div><div class="tt-formula">📐 ${data.formula}</div><div class="tt-desc">💡 ${data.desc}</div><div class="tt-ai">🤖 Спросите ИИ-аналитика в рамках ВММП</div>`;
+            document.body.appendChild(div);
+            currentTooltip = div;
+            setTimeout(() => { if (currentTooltip === div) { div.remove(); currentTooltip = null; } }, 6000);
+        }
+        document.getElementById('learnModeBtn').addEventListener('click', () => {
+            learnMode = !learnMode;
+            document.getElementById('learnModeBtn').textContent = learnMode ? '📚 Обучение: Вкл' : '📚 Обучение';
+            document.getElementById('learnModeBtn').classList.toggle('learn-active', learnMode);
+        });
+        
+        // Отслеживание наведения для тултипов
+        renderer.domElement.addEventListener('mousemove', (event) => {
+            if (!learnMode) return;
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interfaceGroup.children.concat(flowLinesGroup.children, vortexGroup.children));
+            if (intersects.length) {
+                let type = 'core';
+                if (interfaceGroup.children.includes(intersects[0].object)) type = 'cocoon';
+                else if (flowLinesGroup.children.includes(intersects[0].object)) type = 'flowline';
+                showTooltip(type, event.clientX, event.clientY);
+            }
+        });
         
         // ============ ДЕМО-СЦЕНА ============
         const embeddedDemo = [{
-            "step": 0, "d_min": 2.45,
-            "groups": {
-                "1": [[0,0,0], [2.8,1.2,0.8]],
-                "2": [[-2.0,-0.8,1.2], [1.2,-2.0,-0.8]],
-                "3": [[0,2.5,-1.8], [-2.2,0,2.0], [1.8,1.8,1.8]],
-                "4": [[-1.8,-1.8,-1.8], [2.2,-2.2,0], [0,-2.2,2.2]],
-                "5": [[-2.8,2.2,-1.2], [1.2,-2.8,2.2]],
-                "6": [[3.2,0,0], [-3.2,0,0], [0,3.2,0]],
-                "7": [[0,-3.2,0], [0,0,3.2], [0,0,-3.2]]
+            "step": 0, "groups": {
+                "1": [[0,0,0], [2.5,1,0.5]], "2": [[-2,-1,1], [1.5,-1.5,0]],
+                "3": [[0,2,-1.5], [-1.5,0,1.5], [1.8,1.2,1.2]],
+                "4": [[-1.5,-1.5,-1.5], [2,-2,0]], "5": [[-2.5,2,-1], [1,-2.5,2]],
+                "6": [[3,0,0], [-3,0,0]], "7": [[0,-3,0], [0,0,3]]
             }
         }];
         
-        function loadEmbeddedDemo() {
-            trajectoryData = embeddedDemo;
-            document.getElementById('frameSlider').max = trajectoryData.length - 1;
-            document.getElementById('frameSlider').disabled = false;
-            document.getElementById('playBtn').disabled = false;
-            buildFromFrame(trajectoryData[0]);
-            loadFrame(0);
-            document.getElementById('demoStatus').innerHTML = `активна демо-сцена (${trajectoryData.length} кадров)`;
-        }
+        trajectoryData = embeddedDemo;
+        document.getElementById('frameSlider').max = 0;
+        document.getElementById('playBtn').disabled = false;
+        buildFromFrame(trajectoryData[0]);
+        loadFrame(0);
         
-        const storedDemo = localStorage.getItem('spectravortex_demo_data');
-        if (storedDemo) {
-            localStorage.removeItem('spectravortex_demo_data');
-            try {
-                trajectoryData = JSON.parse(storedDemo);
-                document.getElementById('frameSlider').max = trajectoryData.length - 1;
-                document.getElementById('frameSlider').disabled = false;
-                document.getElementById('playBtn').disabled = false;
-                buildFromFrame(trajectoryData[0]);
-                loadFrame(0);
-                document.getElementById('demoStatus').innerHTML = `демо-сцена (${trajectoryData.length} кадров)`;
-            } catch(e) { loadEmbeddedDemo(); }
-        } else { loadEmbeddedDemo(); }
+        // ============ ИНФО О ПРОЕКТЕ ============
+        document.getElementById('infoLink').addEventListener('click', () => {
+            alert("📢 SpectraVortex — Вихревая Модель Материи-Пространства (ВММП)\n\nМы выкладываем для всех созданные файлы JSON для обучения, исследований, обсуждений. Для генерации новых идей и смыслов.\n\nЕсли у вас будет желание выложить/добавить свои JSON с описанием вашей системы — приветствуется!\n\n© SpectraVortex Open Research");
+        });
         
         // ============ АНИМАЦИЯ ============
-        let lastTime = performance.now();
         function animate() {
-            const now = performance.now();
-            let delta = Math.min(0.033, (now - lastTime) / 1000);
-            lastTime = now;
-            time += delta;
-            if (playing && trajectoryData.length) loadFrame((currentFrame + 1) % trajectoryData.length);
+            requestAnimationFrame(animate);
+            time += 0.016;
+            if (playing && !playInterval && trajectoryData.length) {
+                loadFrame((currentFrame + 1) % trajectoryData.length);
+            }
             updateDynamics();
             controls.update();
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
-            requestAnimationFrame(animate);
         }
         animate();
         window.addEventListener('resize', () => {
@@ -716,8 +660,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             labelRenderer.setSize(window.innerWidth, window.innerHeight);
         });
-        
-        console.log("SpectraVortex v3.8 — Научная визуализация | Коконы: радиус = R_vortex × 1.65 | Измерилка активна | Режим обучения: наведи на любой объект");
     </script>
 </body>
 </html>
