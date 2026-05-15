@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.9.3 — Честная. Из первых принципов</title>
+    <title>SpectraVortex v3.9.5 — Честная. Из первых принципов</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
@@ -51,11 +51,12 @@
             border-radius: 12px; padding: 10px 14px;
             border-right: 3px solid #44ffaa;
             font-family: monospace; font-size: 9px;
-            z-index: 100; min-width: 280px;
-            display: none;
+            z-index: 100; min-width: 320px; max-width: 380px;
+            display: none; max-height: 70vh; overflow-y: auto;
         }
         .measure-panel .title { color: #44ffaa; margin-bottom: 6px; font-size: 11px; }
         .measure-panel .close-btn { float: right; cursor: pointer; color: #ff6666; margin-left: 10px; }
+        .measure-panel .copy-btn { float: right; cursor: pointer; color: #ffaa44; margin-left: 6px; font-size: 14px; }
         
         .legend {
             position: absolute; bottom: 100px; left: 20px;
@@ -151,7 +152,7 @@
     </div>
 
     <div class="measure-panel" id="measurePanel">
-        <div class="title">📏 ИЗМЕРИТЕЛЬ <span class="close-btn" id="closeMeasureBtn">✕</span></div>
+        <div class="title">📏 ИЗМЕРИТЕЛЬ <span class="copy-btn" id="copyMeasureBtn" title="Копировать в буфер">📋</span><span class="close-btn" id="closeMeasureBtn">✕</span></div>
         <div id="measureContent">Выберите два атома кликами (Esc — сброс)</div>
     </div>
 
@@ -215,6 +216,7 @@
         let time = 0;
         let updateTimeout = null;
         let measureResetTimeout = null;
+        let pulsePhase = 0; // для пульсации линии измерения
         
         let vortexGroup = new THREE.Group();
         let interfaceGroup = new THREE.Group();
@@ -243,6 +245,7 @@
         let fieldParticles = null;
         let selectedForMeasure = [];
         let measurePanel = document.getElementById('measurePanel');
+        let dminForFrame = null; // d_min для текущего кадра
         
         let positionHistory = [];
         const TRAIL_LENGTH = 10;
@@ -323,7 +326,6 @@
             return (n >= 0 && n < syms.length) ? syms[n] : '?';
         }
         
-        // ИСПРАВЛЕНО №1,6: радиус кокона = радиус ядра. Гантель при связи.
         function createCocoon(x, y, z, radius, group) {
             const groupColor = getGroupColor(group);
             const mat = new THREE.MeshPhongMaterial({
@@ -339,7 +341,6 @@
             return sphere;
         }
         
-        // ИСПРАВЛЕНО №6: коконы-гантели при перекрытии
         function createDumbbellCocoon(v1, v2) {
             const group = new THREE.Group();
             const dist = v1.groupObj.position.distanceTo(v2.groupObj.position);
@@ -349,7 +350,6 @@
             
             if (overlap <= 0) return null;
             
-            // Сфера первого вихря
             const mat1 = new THREE.MeshPhongMaterial({
                 color: v1.groupColor, emissive: 0x112233,
                 transparent: true, opacity: 0.3,
@@ -360,7 +360,6 @@
             s1.position.copy(v1.groupObj.position);
             group.add(s1);
             
-            // Сфера второго вихря
             const mat2 = new THREE.MeshPhongMaterial({
                 color: v2.groupColor, emissive: 0x112233,
                 transparent: true, opacity: 0.3,
@@ -371,7 +370,6 @@
             s2.position.copy(v2.groupObj.position);
             group.add(s2);
             
-            // Перемычка между ними (цилиндр в зоне перекрытия)
             const midPoint = new THREE.Vector3().addVectors(v1.groupObj.position, v2.groupObj.position).multiplyScalar(0.5);
             const direction = new THREE.Vector3().subVectors(v2.groupObj.position, v1.groupObj.position).normalize();
             const bridgeRadius = Math.min(r1, r2) * 0.5;
@@ -386,7 +384,6 @@
             const bridge = new THREE.Mesh(bridgeGeom, bridgeMat);
             bridge.position.copy(midPoint);
             
-            // Ориентация цилиндра
             const quaternion = new THREE.Quaternion();
             quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
             bridge.setRotationFromQuaternion(quaternion);
@@ -413,7 +410,6 @@
             return new THREE.Points(geom, material);
         }
         
-        // ИСПРАВЛЕНО №2,5: связи цветом группы, условие dist <= r1+r2
         function buildFlowLines() {
             while(flowLinesGroup.children.length) {
                 const child = flowLinesGroup.children[0];
@@ -441,7 +437,6 @@
                         const direction = new THREE.Vector3().subVectors(p2, p1).normalize();
                         const mixedColor = new THREE.Color().copy(vortices[i].groupColor).add(vortices[j].groupColor).multiplyScalar(0.5);
                         
-                        // Цилиндр связи
                         const cylGeom = new THREE.CylinderGeometry(0.06, 0.06, dist, 8);
                         const cylMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.9 });
                         const cylinder = new THREE.Mesh(cylGeom, cylMat);
@@ -451,7 +446,6 @@
                         cylinder.setRotationFromQuaternion(quaternion);
                         flowLinesGroup.add(cylinder);
                         
-                        // Сферы на концах
                         const endMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.9 });
                         const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), endMat);
                         s1.position.copy(p1);
@@ -464,9 +458,7 @@
             }
         }
         
-        // ИСПРАВЛЕНО №6: гантели коконов
         function buildDumbbells() {
-            // Удаляем старые гантели (они в interfaceGroup)
             const toRemove = [];
             interfaceGroup.children.forEach(child => {
                 if (child.name === 'dumbbell') toRemove.push(child);
@@ -600,6 +592,9 @@
             const center = getSystemCenter(frame);
             fieldGroup.position.set(-center.x, -center.y, -center.z);
             
+            // d_min из кадра
+            dminForFrame = frame.d_min || null;
+            
             let counter = 0;
             for (let g = 1; g <= 7; g++) {
                 if (!frame.groups || !frame.groups[g]) continue;
@@ -613,7 +608,6 @@
                     const vortex = createVortex(x, y, z, g, tau, counter, sym, rad);
                     vortexGroup.add(vortex.groupObj);
                     
-                    // Одиночный кокон того же радиуса
                     let cocoon = null;
                     if (showCocoon && !analysisMode) { 
                         cocoon = createCocoon(x, y, z, rad, g); 
@@ -649,7 +643,16 @@
             return Math.min(1.5, Math.max(0.1, baseEnergy + envFactor * 0.3));
         }
         
-        // ИСПРАВЛЕНО №8: автофокус камеры при загрузке
+        // Сила связи между двумя атомами
+        function calculateBondStrength(v1, v2) {
+            const dist = v1.groupObj.position.distanceTo(v2.groupObj.position);
+            const overlap = v1.radius + v2.radius - dist;
+            if (overlap <= 0) return 0;
+            // Пропорциональна перекрытию и произведению |τ|
+            const tauFactor = Math.abs(v1.tau * v2.tau) || 1;
+            return overlap * tauFactor / (v1.radius + v2.radius);
+        }
+        
         function autoFocusCamera() {
             if (!vortices.length) return;
             let cx = 0, cy = 0, cz = 0;
@@ -676,6 +679,8 @@
             document.getElementById('frameInput').value = frameIdx;
             document.getElementById('frameLabel').textContent = frameIdx;
             document.getElementById('totalFrames').textContent = trajectoryData.length-1;
+            
+            dminForFrame = frame.d_min || null;
             
             let idx = 0;
             const currentPositions = [];
@@ -704,9 +709,10 @@
         
         function exportCSV() {
             if (!vortices.length) return;
-            let csv = 'index,group,tau,x,y,z,radius,energy\n';
+            let csv = 'index,group,tau,symbol,x,y,z,radius,energy\n';
             vortices.forEach((v, i) => {
-                csv += `${i},${v.group},${v.tau},${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)},${v.radius.toFixed(3)},${cocoonEnergyVal.toFixed(4)}\n`;
+                const sym = v.label.element.textContent;
+                csv += `${i},${v.group},${v.tau},${sym},${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)},${v.radius.toFixed(3)},${cocoonEnergyVal.toFixed(4)}\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
@@ -740,7 +746,7 @@
             if (fieldParticles) fieldParticles.material.opacity = 0.25 + fieldRadiationVal * 0.4;
         }
         
-        // ИСПРАВЛЕНО №3: измеритель с энергией в панели
+        // ИСПРАВЛЕНО: кольцо СНАРУЖИ атома (как в v3.6)
         function highlightSelected() {
             while(highlightGroup.children.length) {
                 const child = highlightGroup.children[0];
@@ -750,10 +756,11 @@
             }
             if (selectedForMeasure.length === 0) return;
             selectedForMeasure.forEach(v => {
-                const ringGeom = new THREE.TorusGeometry(v.radius * 0.8, 0.06, 8, 16);
+                const ringGeom = new THREE.TorusGeometry(v.radius * 1.35, 0.08, 8, 16);
                 const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.9 });
                 const ring = new THREE.Mesh(ringGeom, ringMat);
                 ring.position.copy(v.groupObj.position);
+                ring.userData = { vortex: v };
                 highlightGroup.add(ring);
             });
             if (selectedForMeasure.length === 2) {
@@ -761,7 +768,9 @@
                 const p2 = selectedForMeasure[1].groupObj.position;
                 const lineGeom = new THREE.BufferGeometry().setFromPoints([p1.clone(), p2.clone()]);
                 const lineMat = new THREE.LineBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.8 });
-                highlightGroup.add(new THREE.Line(lineGeom, lineMat));
+                const line = new THREE.Line(lineGeom, lineMat);
+                line.name = 'pulseLine';
+                highlightGroup.add(line);
             }
         }
         
@@ -770,25 +779,54 @@
             const r1 = atom1.radius;
             const r2 = atom2.radius;
             const dShell = dCenter - r1 - r2;
-            const overlap = dShell < 0 ? Math.abs(dShell).toFixed(3) : null;
+            const overlap = dShell < 0;
+            const overlapVal = overlap ? Math.abs(dShell) : 0;
             const tauSum = atom1.tau + atom2.tau;
             const sym1 = atom1.label.element.textContent;
             const sym2 = atom2.label.element.textContent;
-            const energy = cocoonEnergyVal.toFixed(3);
+            const energy = cocoonEnergyVal.toFixed(4);
+            const bondStrength = calculateBondStrength(atom1, atom2);
+            const dminStr = dminForFrame ? dminForFrame.toFixed(4) : '—';
             
-            document.getElementById('measureContent').innerHTML = `
-                <div>🔘 ${sym1} (τ=${atom1.tau}, R=${r1.toFixed(2)}) — гр.${atom1.group}</div>
-                <div>🔘 ${sym2} (τ=${atom2.tau}, R=${r2.toFixed(2)}) — гр.${atom2.group}</div>
-                <div style="margin:6px 0; border-top:1px solid #333;"></div>
-                <div>📏 Центр→Центр: <span style="color:#44ffaa;">${dCenter.toFixed(3)}</span></div>
-                <div>🔘 Оболочка→Оболочка: <span style="color:#44ffaa;">${dShell.toFixed(3)}</span> ${overlap ? `<span style="color:#ff6666;">[ПЕРЕКРЫТИЕ ${overlap}]</span>` : ''}</div>
-                <div>⚡ Στ: ${tauSum} ${tauSum === 0 ? '✅' : '⚠️'}</div>
-                <div>💚 Энергия системы: <span style="color:#ffaa44;">${energy}</span></div>
-                <div>📊 Кадр: ${frameIdx}</div>
-            `;
+            // Находим все связи для этого кадра
+            let bondCount = 0;
+            for (let i = 0; i < vortices.length; i++) {
+                for (let j = i+1; j < vortices.length; j++) {
+                    const dist = vortices[i].groupObj.position.distanceTo(vortices[j].groupObj.position);
+                    if (dist <= vortices[i].radius + vortices[j].radius + 0.05) bondCount++;
+                }
+            }
+            
+            const measureText = `
+🔘 ${sym1} | τ=${atom1.tau} | R=${r1.toFixed(3)} | гр.${atom1.group}
+   📍 x=${atom1.x.toFixed(3)} y=${atom1.y.toFixed(3)} z=${atom1.z.toFixed(3)}
+🔘 ${sym2} | τ=${atom2.tau} | R=${r2.toFixed(3)} | гр.${atom2.group}
+   📍 x=${atom2.x.toFixed(3)} y=${atom2.y.toFixed(3)} z=${atom2.z.toFixed(3)}
+──────────────────────────────
+📏 Центр→Центр: ${dCenter.toFixed(4)}
+🔘 Обол→Обол: ${dShell.toFixed(4)} ${overlap ? '⚡ ПЕРЕКРЫТИЕ ' + overlapVal.toFixed(4) : ''}
+🔗 Сила связи: ${bondStrength.toFixed(4)} ${bondStrength > 0.1 ? '💪' : bondStrength > 0.01 ? '📎' : '📌'}
+⚡ Στ: ${tauSum} ${tauSum === 0 ? '✅' : '⚠️'}
+──────────────────────────────
+📊 Кадр: ${frameIdx} | d_min: ${dminStr}
+💚 Энергия системы: ${energy}
+🔗 Всего связей: ${bondCount}
+            `.trim();
+            
+            document.getElementById('measureContent').innerHTML = `<pre style="margin:0;white-space:pre-wrap;line-height:1.5;">${measureText}</pre>`;
             measurePanel.style.display = 'block';
             highlightSelected();
         }
+        
+        // Копирование в буфер
+        document.getElementById('copyMeasureBtn').addEventListener('click', () => {
+            const text = document.getElementById('measureContent').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyMeasureBtn');
+                btn.textContent = '✅';
+                setTimeout(() => { btn.textContent = '📋'; }, 1000);
+            });
+        });
         
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -797,8 +835,10 @@
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.params.Points = { threshold: 0.5 };
-            raycaster.params.Line = { threshold: 0.5 };
+            
+            // ИСПРАВЛЕНО: порог 1.5 как в v3.6
+            raycaster.params.Points = { threshold: 1.5 };
+            raycaster.params.Line = { threshold: 1.5 };
             raycaster.setFromCamera(mouse, camera);
             
             const clickable = [];
@@ -830,13 +870,14 @@
                         selectedForMeasure = [];
                     } else {
                         measurePanel.style.display = 'block';
-                        document.getElementById('measureContent').innerHTML = `Выбран: ${vortex.label.element.textContent} (τ=${vortex.tau}, R=${vortex.radius.toFixed(2)})<br>Кликните второй атом`;
+                        const sym = vortex.label.element.textContent;
+                        document.getElementById('measureContent').innerHTML = `<pre style="margin:0;">Выбран: ${sym} (τ=${vortex.tau}, R=${vortex.radius.toFixed(3)})\nКликните второй атом</pre>`;
                         highlightSelected();
                         measureResetTimeout = setTimeout(() => {
                             selectedForMeasure = [];
                             highlightSelected();
                             document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами (Esc — сброс)';
-                        }, 5000);
+                        }, 8000);
                     }
                 }
             } else {
@@ -900,7 +941,6 @@
                         document.getElementById('exportCsvBtn').disabled = false;
                         buildFromFrame(trajectoryData[0]);
                         loadFrame(0);
-                        // ИСПРАВЛЕНО №8: автофокус
                         setTimeout(autoFocusCamera, 100);
                         hideLoading();
                     } catch(err) { hideLoading(); alert("Ошибка: " + err.message); }
@@ -1124,7 +1164,7 @@
         // ============ ДЕМО-СЦЕНА ============
         const embeddedDemo = [
             {
-                "step": 0, "groups": {
+                "step": 0, "d_min": 2.345, "groups": {
                     "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.55}, {"pos":[2.5,1,0.5],"tau":-1,"symbol":"H","radius":0.55}],
                     "2": [{"pos":[-2,-1,1],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.5,-1.5,0],"tau":-1,"symbol":"He","radius":0.75}],
                     "3": [{"pos":[0,2,-1.5],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.5,0,1.5],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.8,1.2,1.2],"tau":1,"symbol":"Be","radius":1.15}],
@@ -1135,7 +1175,7 @@
                 }
             },
             {
-                "step": 1, "groups": {
+                "step": 1, "d_min": 2.278, "groups": {
                     "1": [{"pos":[0.1,0.05,0.02],"tau":1,"symbol":"H","radius":0.55}, {"pos":[2.4,1.1,0.4],"tau":-1,"symbol":"H","radius":0.55}],
                     "2": [{"pos":[-1.9,-0.9,1.1],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.6,-1.4,0.1],"tau":-1,"symbol":"He","radius":0.75}],
                     "3": [{"pos":[0.1,2.1,-1.4],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.4,0.1,1.6],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.9,1.3,1.1],"tau":1,"symbol":"Be","radius":1.15}],
@@ -1146,7 +1186,7 @@
                 }
             },
             {
-                "step": 2, "groups": {
+                "step": 2, "d_min": 2.201, "groups": {
                     "1": [{"pos":[0.2,0.1,0.04],"tau":1,"symbol":"H","radius":0.55}, {"pos":[2.3,1.2,0.3],"tau":-1,"symbol":"H","radius":0.55}],
                     "2": [{"pos":[-1.8,-0.8,1.2],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.7,-1.3,0.2],"tau":-1,"symbol":"He","radius":0.75}],
                     "3": [{"pos":[0.2,2.2,-1.3],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.3,0.2,1.7],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[2.0,1.4,1.0],"tau":1,"symbol":"Be","radius":1.15}],
@@ -1176,12 +1216,27 @@
         function animate(timestamp) {
             requestAnimationFrame(animate);
             time += 0.016;
+            pulsePhase += 0.05;
             
             if (playing && trajectoryData.length > 1) {
                 if (timestamp - lastFrameTime >= FRAME_INTERVAL) {
                     loadFrame((currentFrame + 1) % trajectoryData.length);
                     lastFrameTime = timestamp;
                 }
+            }
+            
+            // Пульсация линии измерения и колец
+            if (highlightGroup.children.length > 0) {
+                highlightGroup.children.forEach(child => {
+                    if (child.name === 'pulseLine') {
+                        const alpha = 0.5 + 0.5 * Math.sin(pulsePhase * 3);
+                        child.material.opacity = alpha;
+                    }
+                    if (child.geometry && child.geometry.type === 'TorusGeometry') {
+                        const scale = 1 + 0.08 * Math.sin(pulsePhase * 2);
+                        child.scale.setScalar(scale);
+                    }
+                });
             }
             
             updateDynamics();
