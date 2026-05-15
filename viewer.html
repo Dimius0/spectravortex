@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.8.1 — Научная визуализация ВММП</title>
+    <title>SpectraVortex v3.8.2 — Научная визуализация ВММП</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
@@ -199,9 +199,12 @@
         let trajectoryData = [];
         let currentFrame = 0;
         let playing = false;
-        let playInterval = null;
+        // ИСПРАВЛЕНО №5: убран playInterval, используется RAF с временной меткой
+        let lastFrameTime = 0;
+        const FRAME_INTERVAL = 100; // мс между кадрами
         let time = 0;
         let updateTimeout = null;
+        let measureResetTimeout = null; // ИСПРАВЛЕНО №7
         
         let vortexGroup = new THREE.Group();
         let interfaceGroup = new THREE.Group();
@@ -242,6 +245,7 @@
             updateTimeout = setTimeout(() => updateDynamics(), 30);
         }
         
+        // ИСПРАВЛЕНО №1: tau теперь приходит из данных, а не вычисляется по чётности
         function createVortex(x, y, z, group, tau, index) {
             const groupObj = new THREE.Group();
             const radius = groupRadii[group] * 0.5;
@@ -303,8 +307,15 @@
             return new THREE.Points(geom, material);
         }
         
+        // ИСПРАВЛЕНО №4: dispose старых геометрий и материалов
         function buildFlowLines() {
-            while(flowLinesGroup.children.length) flowLinesGroup.remove(flowLinesGroup.children[0]);
+            // Очистка с dispose
+            while(flowLinesGroup.children.length) {
+                const child = flowLinesGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                flowLinesGroup.remove(child);
+            }
             for (let i = 0; i < vortices.length; i++) {
                 for (let j = i+1; j < vortices.length; j++) {
                     const p1 = vortices[i].groupObj.position;
@@ -324,23 +335,47 @@
             let sumX = 0, sumY = 0, sumZ = 0, count = 0;
             for (let g = 1; g <= 7; g++) {
                 if (frame.groups && frame.groups[g]) {
-                    frame.groups[g].forEach(pos => { sumX += pos[0]; sumY += pos[1]; sumZ += pos[2]; count++; });
+                    frame.groups[g].forEach(pos => { 
+                        // Поддержка нового формата: объект с полем pos
+                        const p = Array.isArray(pos) ? pos : pos.pos;
+                        sumX += p[0]; sumY += p[1]; sumZ += p[2]; count++; 
+                    });
                 }
             }
             if (count === 0) return { x: 0, y: 0, z: 0 };
             return { x: sumX/count, y: sumY/count, z: sumZ/count };
         }
         
+        // ИСПРАВЛЕНО №6: fieldParticles создаётся один раз, здесь только позиция
+        // ИСПРАВЛЕНО №8: коконы корректно скрываются/показываются
         function buildFromFrame(frame) {
-            while(vortexGroup.children.length) vortexGroup.remove(vortexGroup.children[0]);
-            while(interfaceGroup.children.length) interfaceGroup.remove(interfaceGroup.children[0]);
+            // Очистка старых вихрей с dispose
+            while(vortexGroup.children.length) {
+                const child = vortexGroup.children[0];
+                child.traverse(c => {
+                    if (c.geometry && c !== child) c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                        else c.material.dispose();
+                    }
+                });
+                vortexGroup.remove(child);
+            }
+            // Очистка коконов с dispose
+            while(interfaceGroup.children.length) {
+                const child = interfaceGroup.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                interfaceGroup.remove(child);
+            }
             vortices = [];
             
-            let totalAtoms = 0;
-            for (let g = 1; g <= 7; g++) if (frame.groups && frame.groups[g]) totalAtoms += frame.groups[g].length;
-            
-            if (showField && fieldParticles) fieldGroup.remove(fieldParticles);
-            if (showField) { fieldParticles = createField(); fieldGroup.add(fieldParticles); }
+            // Создаём fieldParticles один раз, если ещё не созданы
+            if (!fieldParticles) {
+                fieldParticles = createField();
+                fieldGroup.add(fieldParticles);
+            }
+            fieldParticles.visible = showField;
             
             const center = getSystemCenter(frame);
             fieldGroup.position.set(-center.x, -center.y, -center.z);
@@ -349,18 +384,48 @@
             for (let g = 1; g <= 7; g++) {
                 if (!frame.groups || !frame.groups[g]) continue;
                 frame.groups[g].forEach(pos => {
-                    const [x, y, z] = pos;
-                    const tau = (g % 2 === 0) ? 1 : -1;
+                    const p = Array.isArray(pos) ? pos : pos.pos;
+                    // ИСПРАВЛЕНО №1: tau из данных, если нет — из поля frame.tau_map или 0
+                    const tau = (pos.tau !== undefined) ? pos.tau : ((frame.tau_map && frame.tau_map[counter] !== undefined) ? frame.tau_map[counter] : 0);
+                    const [x, y, z] = p;
                     const vortex = createVortex(x, y, z, g, tau, counter);
                     vortexGroup.add(vortex.groupObj);
                     let cocoon = null;
-                    if (showCocoon) { cocoon = createCocoon(x, y, z, g); interfaceGroup.add(cocoon); }
+                    if (showCocoon) { 
+                        cocoon = createCocoon(x, y, z, g); 
+                        interfaceGroup.add(cocoon); 
+                    }
                     vortices.push({ ...vortex, cocoon });
                     counter++;
                 });
             }
+            // ИСПРАВЛЕНО №8: синхронизация видимости коконов
+            interfaceGroup.visible = showCocoon;
             buildFlowLines();
             updateDynamics();
+        }
+        
+        // ИСПРАВЛЕНО №3: энергия из парных взаимодействий + внешние модуляторы
+        function calculateEnergy() {
+            if (vortices.length < 2) return 0.5;
+            let pairEnergy = 0;
+            let pairCount = 0;
+            for (let i = 0; i < vortices.length; i++) {
+                for (let j = i+1; j < vortices.length; j++) {
+                    const p1 = vortices[i].groupObj.position;
+                    const p2 = vortices[j].groupObj.position;
+                    const dist = p1.distanceTo(p2);
+                    if (dist > 0.01) {
+                        // Энергия взаимодействия: τᵢ·τⱼ / r
+                        pairEnergy += (vortices[i].tau * vortices[j].tau) / dist;
+                        pairCount++;
+                    }
+                }
+            }
+            const baseEnergy = pairCount > 0 ? pairEnergy / pairCount : 0.5;
+            // Внешние модуляторы влияют на энергию, но не определяют её полностью
+            const envFactor = (temperature / 500) * pressure * externalField * (1 - purity * 0.2);
+            return Math.min(1.5, Math.max(0.1, baseEnergy + envFactor * 0.3));
         }
         
         function loadFrame(frameIdx) {
@@ -376,7 +441,8 @@
                 if (!frame.groups || !frame.groups[g]) continue;
                 frame.groups[g].forEach(pos => {
                     if (idx < vortices.length) {
-                        const [x, y, z] = pos;
+                        const p = Array.isArray(pos) ? pos : pos.pos;
+                        const [x, y, z] = p;
                         vortices[idx].groupObj.position.set(x, y, z);
                         vortices[idx].x = x; vortices[idx].y = y; vortices[idx].z = z;
                         if (vortices[idx].cocoon) vortices[idx].cocoon.position.set(x, y, z);
@@ -391,12 +457,13 @@
         function updateDynamics() {
             if (!vortices.length) return;
             totalTau = vortices.reduce((sum, v) => sum + (v.tau || 0), 0);
-            const envFactor = (temperature / 500) * pressure * externalField * (1 - purity * 0.2);
-            cocoonEnergyVal = Math.min(1.5, 0.5 + envFactor * 0.65);
+            // ИСПРАВЛЕНО №3: энергия из физического расчёта
+            cocoonEnergyVal = calculateEnergy();
             fieldRadiationVal = Math.min(1.2, cocoonEnergyVal * 0.8 + Math.sin(time * 1.2) * 0.1);
             
             let risk = "Низкий";
-            if (totalTau !== 0 && Math.abs(totalTau) > 0.5) risk = "Высокий (τ≠0)";
+            const absTauSum = vortices.reduce((sum, v) => sum + Math.abs(v.tau || 0), 0);
+            if (absTauSum > vortices.length * 0.5) risk = "Высокий (τ дисбаланс)";
             else if (cocoonEnergyVal > 1.2) risk = "Средний (перегрев)";
             else if (purity < 0.3) risk = "Критический";
             
@@ -448,7 +515,7 @@
             measurePanel.style.display = 'block';
         }
         
-        // Клик по атомам
+        // ИСПРАВЛЕНО №7: клик с проверкой коконов и ядер, сброс при промахе
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         renderer.domElement.addEventListener('click', (event) => {
@@ -457,12 +524,39 @@
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            const meshes = vortices.map(v => v.groupObj.children[0]);
-            const intersects = raycaster.intersectObjects(meshes);
+            
+            // Собираем все кликабельные объекты: ядра и коконы
+            const clickable = [];
+            vortices.forEach(v => {
+                clickable.push(v.core);
+                if (v.cocoon) clickable.push(v.cocoon);
+            });
+            
+            const intersects = raycaster.intersectObjects(clickable);
             if (intersects.length) {
-                const hit = intersects[0].object.parent;
-                const vortex = vortices.find(v => v.groupObj === hit);
+                const hit = intersects[0].object;
+                // Найти, какому вихрю принадлежит hit
+                let vortex = null;
+                for (const v of vortices) {
+                    if (v.core === hit || v.cocoon === hit || v.groupObj === hit || v.groupObj.children.includes(hit)) {
+                        vortex = v;
+                        break;
+                    }
+                }
+                // Если hit — кокон, найти родительский вихрь по позиции
+                if (!vortex) {
+                    for (const v of vortices) {
+                        if (v.cocoon && v.cocoon === hit) {
+                            vortex = v;
+                            break;
+                        }
+                    }
+                }
+                
                 if (vortex) {
+                    // Сброс таймера автосброса
+                    if (measureResetTimeout) clearTimeout(measureResetTimeout);
+                    
                     selectedForMeasure.push(vortex);
                     if (selectedForMeasure.length === 2) {
                         showMeasurement(selectedForMeasure[0], selectedForMeasure[1], currentFrame);
@@ -470,12 +564,26 @@
                     } else {
                         measurePanel.style.display = 'block';
                         document.getElementById('measureContent').innerHTML = `Выбран: ${symbolsList[vortex.index+1] || '?'} (τ=${vortex.tau})<br>Кликните второй атом`;
+                        // ИСПРАВЛЕНО №7: автосброс через 5 секунд
+                        measureResetTimeout = setTimeout(() => {
+                            selectedForMeasure = [];
+                            document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами';
+                        }, 5000);
                     }
                 }
+            } else {
+                // Промах — сброс выбора
+                selectedForMeasure = [];
+                if (measureResetTimeout) clearTimeout(measureResetTimeout);
+                document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами';
             }
         });
         
-        document.getElementById('closeMeasureBtn').addEventListener('click', () => { measurePanel.style.display = 'none'; selectedForMeasure = []; });
+        document.getElementById('closeMeasureBtn').addEventListener('click', () => { 
+            measurePanel.style.display = 'none'; 
+            selectedForMeasure = []; 
+            if (measureResetTimeout) clearTimeout(measureResetTimeout);
+        });
         
         // ============ ЗАГРУЗКА JSON ============
         function showLoading(msg) {
@@ -501,7 +609,7 @@
                 setTimeout(() => {
                     try {
                         const data = JSON.parse(ev.target.result);
-                        if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат");
+                        if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат: ожидается массив кадров");
                         trajectoryData = data;
                         document.getElementById('frameSlider').max = trajectoryData.length - 1;
                         document.getElementById('frameSlider').disabled = false;
@@ -518,17 +626,11 @@
         document.getElementById('loadDemoLink').addEventListener('click', () => document.getElementById('fileInput').click());
         
         // ============ УПРАВЛЕНИЕ ============
+        // ИСПРАВЛЕНО №5: playBtn без setInterval, используется RAF
         document.getElementById('playBtn').addEventListener('click', () => {
             playing = !playing;
             document.getElementById('playBtn').textContent = playing ? "⏸" : "▶";
-            if (playInterval) clearInterval(playInterval);
-            if (playing) {
-                playInterval = setInterval(() => {
-                    if (playing && trajectoryData.length) {
-                        loadFrame((currentFrame + 1) % trajectoryData.length);
-                    }
-                }, 100);
-            }
+            lastFrameTime = performance.now();
         });
         
         document.getElementById('resetViewBtn').addEventListener('click', () => {
@@ -536,6 +638,8 @@
             controls.target.set(0, 0, 0);
             controls.update();
         });
+        
+        // ИСПРАВЛЕНО №8: toggleCocoon корректно управляет видимостью
         document.getElementById('toggleCocoonBtn').addEventListener('click', () => {
             showCocoon = !showCocoon;
             interfaceGroup.visible = showCocoon;
@@ -544,6 +648,7 @@
         document.getElementById('toggleFieldBtn').addEventListener('click', () => {
             showField = !showField;
             fieldGroup.visible = showField;
+            if (fieldParticles) fieldParticles.visible = showField;
             document.getElementById('toggleFieldBtn').classList.toggle('active', showField);
         });
         document.getElementById('toggleTauBtn').addEventListener('click', () => {
@@ -554,7 +659,7 @@
         document.getElementById('frameSlider').addEventListener('input', (e) => {
             playing = false;
             document.getElementById('playBtn').textContent = "▶";
-            if (playInterval) clearInterval(playInterval);
+            lastFrameTime = performance.now();
             loadFrame(parseInt(e.target.value));
         });
         
@@ -604,7 +709,6 @@
             document.getElementById('learnModeBtn').classList.toggle('learn-active', learnMode);
         });
         
-        // Отслеживание наведения для тултипов
         renderer.domElement.addEventListener('mousemove', (event) => {
             if (!learnMode) return;
             const rect = renderer.domElement.getBoundingClientRect();
@@ -620,18 +724,46 @@
             }
         });
         
-        // ============ ДЕМО-СЦЕНА ============
-        const embeddedDemo = [{
-            "step": 0, "groups": {
-                "1": [[0,0,0], [2.5,1,0.5]], "2": [[-2,-1,1], [1.5,-1.5,0]],
-                "3": [[0,2,-1.5], [-1.5,0,1.5], [1.8,1.2,1.2]],
-                "4": [[-1.5,-1.5,-1.5], [2,-2,0]], "5": [[-2.5,2,-1], [1,-2.5,2]],
-                "6": [[3,0,0], [-3,0,0]], "7": [[0,-3,0], [0,0,3]]
+        // ============ ДЕМО-СЦЕНА (ИСПРАВЛЕНО №2: несколько кадров) ============
+        const embeddedDemo = [
+            {
+                "step": 0, "groups": {
+                    "1": [{"pos":[0,0,0],"tau":1}, {"pos":[2.5,1,0.5],"tau":-1}],
+                    "2": [{"pos":[-2,-1,1],"tau":1}, {"pos":[1.5,-1.5,0],"tau":-1}],
+                    "3": [{"pos":[0,2,-1.5],"tau":1}, {"pos":[-1.5,0,1.5],"tau":-1}, {"pos":[1.8,1.2,1.2],"tau":1}],
+                    "4": [{"pos":[-1.5,-1.5,-1.5],"tau":-1}, {"pos":[2,-2,0],"tau":1}],
+                    "5": [{"pos":[-2.5,2,-1],"tau":-1}, {"pos":[1,-2.5,2],"tau":1}],
+                    "6": [{"pos":[3,0,0],"tau":1}, {"pos":[-3,0,0],"tau":-1}],
+                    "7": [{"pos":[0,-3,0],"tau":-1}, {"pos":[0,0,3],"tau":1}]
+                }
+            },
+            {
+                "step": 1, "groups": {
+                    "1": [{"pos":[0.1,0.05,0.02],"tau":1}, {"pos":[2.4,1.1,0.4],"tau":-1}],
+                    "2": [{"pos":[-1.9,-0.9,1.1],"tau":1}, {"pos":[1.6,-1.4,0.1],"tau":-1}],
+                    "3": [{"pos":[0.1,2.1,-1.4],"tau":1}, {"pos":[-1.4,0.1,1.6],"tau":-1}, {"pos":[1.9,1.3,1.1],"tau":1}],
+                    "4": [{"pos":[-1.4,-1.4,-1.4],"tau":-1}, {"pos":[2.1,-1.9,0.1],"tau":1}],
+                    "5": [{"pos":[-2.4,2.1,-0.9],"tau":-1}, {"pos":[1.1,-2.4,2.1],"tau":1}],
+                    "6": [{"pos":[3.1,0.1,0.1],"tau":1}, {"pos":[-2.9,0.1,0.1],"tau":-1}],
+                    "7": [{"pos":[0.1,-2.9,0.1],"tau":-1}, {"pos":[0.1,0.1,3.1],"tau":1}]
+                }
+            },
+            {
+                "step": 2, "groups": {
+                    "1": [{"pos":[0.2,0.1,0.04],"tau":1}, {"pos":[2.3,1.2,0.3],"tau":-1}],
+                    "2": [{"pos":[-1.8,-0.8,1.2],"tau":1}, {"pos":[1.7,-1.3,0.2],"tau":-1}],
+                    "3": [{"pos":[0.2,2.2,-1.3],"tau":1}, {"pos":[-1.3,0.2,1.7],"tau":-1}, {"pos":[2.0,1.4,1.0],"tau":1}],
+                    "4": [{"pos":[-1.3,-1.3,-1.3],"tau":-1}, {"pos":[2.2,-1.8,0.2],"tau":1}],
+                    "5": [{"pos":[-2.3,2.2,-0.8],"tau":-1}, {"pos":[1.2,-2.3,2.2],"tau":1}],
+                    "6": [{"pos":[3.2,0.2,0.2],"tau":1}, {"pos":[-2.8,0.2,0.2],"tau":-1}],
+                    "7": [{"pos":[0.2,-2.8,0.2],"tau":-1}, {"pos":[0.2,0.2,3.2],"tau":1}]
+                }
             }
-        }];
+        ];
         
         trajectoryData = embeddedDemo;
-        document.getElementById('frameSlider').max = 0;
+        document.getElementById('frameSlider').max = trajectoryData.length - 1;
+        document.getElementById('frameSlider').disabled = false;
         document.getElementById('playBtn').disabled = false;
         buildFromFrame(trajectoryData[0]);
         loadFrame(0);
@@ -641,19 +773,26 @@
             alert("📢 SpectraVortex — Вихревая Модель Материи-Пространства (ВММП)\n\nМы выкладываем для всех созданные файлы JSON для обучения, исследований, обсуждений. Для генерации новых идей и смыслов.\n\nЕсли у вас будет желание выложить/добавить свои JSON с описанием вашей системы — приветствуется!\n\n© SpectraVortex Open Research");
         });
         
-        // ============ АНИМАЦИЯ ============
-        function animate() {
+        // ============ АНИМАЦИЯ (ИСПРАВЛЕНО №5) ============
+        function animate(timestamp) {
             requestAnimationFrame(animate);
             time += 0.016;
-            if (playing && !playInterval && trajectoryData.length) {
-                loadFrame((currentFrame + 1) % trajectoryData.length);
+            
+            // ИСПРАВЛЕНО №5: единый источник смены кадров через RAF
+            if (playing && trajectoryData.length > 1) {
+                if (timestamp - lastFrameTime >= FRAME_INTERVAL) {
+                    loadFrame((currentFrame + 1) % trajectoryData.length);
+                    lastFrameTime = timestamp;
+                }
             }
+            
             updateDynamics();
             controls.update();
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
         }
-        animate();
+        requestAnimationFrame(animate);
+        
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
