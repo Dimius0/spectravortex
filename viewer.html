@@ -99,6 +99,19 @@
         }
         .mode-banner.demo { border-left: 3px solid #44ffaa; color: #44ffaa; }
         .mode-banner.analysis { border-left: 3px solid #ffaa44; color: #ffaa44; }
+        
+        /* Добавлен слайдер кадров */
+        .frame-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #111;
+            padding: 2px 8px;
+            border-radius: 16px;
+        }
+        .frame-slider-container input {
+            width: 150px;
+        }
     </style>
 </head>
 <body>
@@ -108,6 +121,10 @@
         <button id="prevFrameBtn" disabled>◀</button>
         <input type="number" id="frameInput" value="0" min="0" max="0" disabled style="width:50px;">
         <button id="nextFrameBtn" disabled>▶</button>
+        <div class="frame-slider-container">
+            <span>🎞️</span>
+            <input type="range" id="frameSlider" min="0" max="0" step="1" disabled style="width:150px;">
+        </div>
         <button id="resetViewBtn">🎥 Сброс</button>
         <button id="toggleProjectionBtn">📐 Перспектива</button>
         <button id="toggleModeBtn" class="active">📚 Демо</button>
@@ -119,7 +136,7 @@
         <button id="learnModeBtn">📚 Обучение</button>
         <div class="slider-container"><span>🌀 Прозр.</span><input type="range" id="opacitySlider" min="0.05" max="0.8" step="0.01" value="0.3"></div>
         <div class="slider-container"><span>💡 Ярк.</span><input type="range" id="brightnessSlider" min="0.3" max="1.5" step="0.01" value="0.9"></div>
-        <input type="file" id="fileInput" accept=".json">
+        <input type="file" id="fileInput" accept=".json" style="display:none;">
         <button id="exportCsvBtn" disabled>📥 CSV</button>
     </div>
 
@@ -152,15 +169,12 @@
     <script>
         // ============ КОНСТАНТЫ ВММП ============
         const VMMP = {
-            // d_opt по умолчанию для каждой группы (из таблицы ступенек)
             d_opt_default: {1:0.74, 2:1.22, 3:1.52, 4:1.82, 5:2.05, 6:2.20, 7:2.40},
-            // Базовое d_env при нормальных условиях
             d_env_base: 2.10,
-            // Коэффициенты влияния среды на d_env
-            temp_coef: 0.0003,    // на 1 K
-            press_coef: -0.05,    // на 1 ГПа (в наших единицах)
-            field_coef: 0.15,     // на единицу внешнего H
-            purity_coef: 0.08,    // отклонение при χ=0
+            temp_coef: 0.0003,
+            press_coef: -0.05,
+            field_coef: 0.15,
+            purity_coef: 0.08,
         };
 
         // ============ СЦЕНА ============
@@ -170,7 +184,7 @@
         
         const aspect = window.innerWidth / window.innerHeight;
         const perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 500);
-        perspCamera.position.set(18, 12, 22);
+        perspCamera.position.set(8, 6, 12);
         const orthoCamera = new THREE.OrthographicCamera(-10*aspect, 10*aspect, 10, -10, 0.1, 500);
         orthoCamera.position.copy(perspCamera.position);
         
@@ -195,14 +209,12 @@
         controls.dampingFactor = 0.08;
         controls.zoomSpeed = 1.1;
         
-        // Освещение
         scene.add(new THREE.AmbientLight(0x404060, 0.7));
         const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.1);
         mainLight.position.set(8, 15, 5);
         scene.add(mainLight);
         scene.add(new THREE.PointLight(0x4488ff, 0.4, 30, 1));
         
-        // Группы
         const vortexGroup = new THREE.Group();
         const interfaceGroup = new THREE.Group();
         const fieldGroup = new THREE.Group();
@@ -230,16 +242,12 @@
         
         const groupColors = ['#ff3366', '#ff8844', '#ffdd44', '#44cc44', '#44aaff', '#aa66ff', '#ff66cc'];
         const groupRadii = {1:0.55, 2:0.75, 3:0.95, 4:1.15, 5:1.35, 6:1.55, 7:1.75};
-        let tauWarnings = []; // предупреждения о нецелых τ
+        let tauWarnings = [];
         
         function getGroupColor(g) { return new THREE.Color(groupColors[(g-1)%7]); }
         
-        // τ-цвет: hue от заряда, целочисленность проверяется
         function getTauColor(tau) {
-            if (!Number.isInteger(tau) && tauWarnings.indexOf(tau) === -1) {
-                tauWarnings.push(tau);
-                console.warn(`[ВММП] ПРЕДУПРЕЖДЕНИЕ: τ = ${tau} не является целым. Нарушено квантование ∮∇ψ·dl = 2πN.`);
-            }
+            if (!Number.isInteger(tau)) console.warn(`τ = ${tau} не целое`);
             const hue = 0.55 + (tau || 0) * 0.1;
             return new THREE.Color().setHSL(Math.min(0.85, Math.max(0.25, hue)), 1.0, 0.65);
         }
@@ -260,9 +268,6 @@
             controls.update();
         }
         
-        // ============ ВЫЧИСЛЕНИЯ ВММП ============
-        
-        // d_env — равновесное межвихревое расстояние при текущих условиях среды
         function calcDEnv() {
             let d = VMMP.d_env_base;
             d += VMMP.temp_coef * (temperature - 300);
@@ -272,54 +277,33 @@
             return Math.max(0.5, Math.min(5.0, d));
         }
         
-        // Δ = |d_opt - d_env| / d_env — топологическое напряжение для вихря
         function calcDelta(vortex) {
             const dOpt = VMMP.d_opt_default[vortex.group] || 2.0;
             return Math.abs(dOpt - d_env) / d_env;
         }
         
-        // Энергия вихревой конфигурации: E ∝ Σ|∇H|²
-        // В дискретном приближении: E ∝ Σ (Δ_i + Δ_j) / (1 + exp(-(d_ij - d_env)))
         function calcEnergyVortex() {
             if (vortices.length < 2) return 0;
             let totalEnergy = 0;
             let pairCount = 0;
-            
             for (let i = 0; i < vortices.length; i++) {
                 for (let j = i + 1; j < vortices.length; j++) {
                     const p1 = vortices[i].groupObj.position;
                     const p2 = vortices[j].groupObj.position;
                     const dist = p1.distanceTo(p2);
-                    
-                    // Энергия пропорциональна сумме топологических напряжений
-                    // и зависит от близости расстояния к d_env
                     const deltaSum = calcDelta(vortices[i]) + calcDelta(vortices[j]);
                     const distFactor = 1.0 / (1.0 + Math.exp(-(dist - d_env) * 3));
-                    
                     totalEnergy += deltaSum * distFactor * (1 + Math.abs(vortices[i].tau * vortices[j].tau) * 0.2);
                     pairCount++;
                 }
             }
-            
             return pairCount > 0 ? totalEnergy / pairCount : 0;
         }
         
-        // Проверка совпадения ступенек: связь есть, если d_ij близко к d_env
-        // и топологические заряды допускают обмен
         function stepsMatch(v1, v2) {
             const dist = v1.groupObj.position.distanceTo(v2.groupObj.position);
-            // Ступеньки совпадают, если расстояние в пределах 15% от d_env
             return Math.abs(dist - d_env) / d_env < 0.15;
         }
-        
-        // Период «дрожания» из размерного анализа (раздел 8 дневника)
-        function calcTremorPeriod() {
-            // T_dr ~ d_env / c_s, где c_s ~ sqrt(E_vortex)
-            const cs = Math.sqrt(Math.max(0.01, energyVortex));
-            return d_env / cs;
-        }
-        
-        // ============ ПОСТРОЕНИЕ ОБЪЕКТОВ ============
         
         function createVortex(x, y, z, group, tau, index, customSymbol, customRadius) {
             const groupObj = new THREE.Group();
@@ -392,7 +376,8 @@
         function buildFlowLines() {
             while(flowLinesGroup.children.length) {
                 const c = flowLinesGroup.children[0];
-                c.traverse(ch => { if(ch.geometry) ch.geometry.dispose(); if(ch.material) ch.material.dispose(); });
+                if(c.geometry) c.geometry.dispose();
+                if(c.material) c.material.dispose();
                 flowLinesGroup.remove(c);
             }
             if (!showFlowLines || vortices.length < 2) return;
@@ -400,14 +385,12 @@
             for (let i = 0; i < vortices.length; i++) {
                 for (let j = i+1; j < vortices.length; j++) {
                     if (!stepsMatch(vortices[i], vortices[j])) continue;
-                    
                     const p1 = vortices[i].groupObj.position.clone();
                     const p2 = vortices[j].groupObj.position.clone();
                     const dist = p1.distanceTo(p2);
                     const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
                     const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
                     const mixedColor = new THREE.Color().copy(vortices[i].groupColor).add(vortices[j].groupColor).multiplyScalar(0.5);
-                    
                     const cylGeom = new THREE.CylinderGeometry(0.05, 0.05, dist, 8);
                     const cylMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.8, depthWrite: false });
                     const cyl = new THREE.Mesh(cylGeom, cylMat);
@@ -415,13 +398,6 @@
                     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
                     cyl.setRotationFromQuaternion(q);
                     flowLinesGroup.add(cyl);
-                    
-                    const endMat = new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.8 });
-                    [p1, p2].forEach(p => {
-                        const s = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), endMat);
-                        s.position.copy(p);
-                        flowLinesGroup.add(s);
-                    });
                 }
             }
         }
@@ -430,7 +406,8 @@
             const toRemove = [];
             interfaceGroup.children.forEach(c => { if (c.name === 'dumbbell') toRemove.push(c); });
             toRemove.forEach(c => {
-                c.traverse(ch => { if(ch.geometry) ch.geometry.dispose(); if(ch.material) ch.material.dispose(); });
+                if(c.geometry) c.geometry.dispose();
+                if(c.material) c.material.dispose();
                 interfaceGroup.remove(c);
             });
             if (!showCocoon || analysisMode) return;
@@ -451,19 +428,6 @@
                     if (dist < (r1 + r2) * 1.5) {
                         const group = new THREE.Group();
                         group.name = 'dumbbell';
-                        
-                        [vortices[i], vortices[j]].forEach((v, idx) => {
-                            const mat = new THREE.MeshPhongMaterial({
-                                color: v.groupColor, emissive: 0x112233,
-                                transparent: true, opacity: 0.25, side: THREE.DoubleSide,
-                                depthWrite: false
-                            });
-                            const s = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), mat);
-                            s.scale.setScalar(v.radius);
-                            s.position.copy(v.groupObj.position);
-                            group.add(s);
-                        });
-                        
                         const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
                         const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
                         const bridgeLen = Math.max(0.1, dist - r1 - r2 + 0.3);
@@ -476,7 +440,6 @@
                         bridge.position.copy(mid);
                         bridge.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir));
                         group.add(bridge);
-                        
                         interfaceGroup.add(group);
                         processed.add(key);
                     }
@@ -507,26 +470,16 @@
         }
         
         function buildFromFrame(frame) {
-            while(vortexGroup.children.length) {
-                const c = vortexGroup.children[0];
-                c.traverse(ch => { if(ch.geometry && ch !== c) ch.geometry.dispose(); if(ch.material) ch.material.dispose(); });
-                vortexGroup.remove(c);
-            }
-            document.querySelectorAll('#labelRenderer > div').forEach?.(el => el.remove?.());
-            
-            while(interfaceGroup.children.length) {
-                const c = interfaceGroup.children[0];
-                c.traverse(ch => { if(ch.geometry) ch.geometry.dispose(); if(ch.material) ch.material.dispose(); });
-                interfaceGroup.remove(c);
-            }
+            while(vortexGroup.children.length) vortexGroup.remove(vortexGroup.children[0]);
+            while(interfaceGroup.children.length) interfaceGroup.remove(interfaceGroup.children[0]);
             
             vortices = [];
             selectedForMeasure = [];
             positionHistory = [];
             tauWarnings = [];
             
-            while(highlightGroup.children.length) { const c = highlightGroup.children[0]; if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); highlightGroup.remove(c); }
-            while(trailsGroup.children.length) { const c = trailsGroup.children[0]; if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); trailsGroup.remove(c); }
+            while(highlightGroup.children.length) highlightGroup.remove(highlightGroup.children[0]);
+            while(trailsGroup.children.length) trailsGroup.remove(trailsGroup.children[0]);
             
             if (!fieldParticles) { fieldParticles = createField(); fieldGroup.add(fieldParticles); }
             fieldParticles.visible = showField && !analysisMode;
@@ -559,7 +512,6 @@
             
             interfaceGroup.visible = showCocoon && !analysisMode;
             
-            // Вычисляем энергию и Δ
             energyVortex = calcEnergyVortex();
             const avgDelta = vortices.length > 0 ? vortices.reduce((s,v) => s + calcDelta(v), 0) / vortices.length : 0;
             deltaTopo = avgDelta;
@@ -576,9 +528,6 @@
             document.getElementById('dminVal').textContent = dminForFrame ? dminForFrame.toFixed(3) : '—';
             document.getElementById('energyVal').textContent = energyVortex.toFixed(3);
             document.getElementById('deltaVal').textContent = deltaTopo.toFixed(4);
-            if (tauWarnings.length) {
-                document.getElementById('deltaVal').textContent += ' ⚠️τ';
-            }
         }
         
         function loadFrame(frameIdx) {
@@ -588,7 +537,7 @@
             dminForFrame = frame.d_min || null;
             d_env = calcDEnv();
             
-            document.getElementById('frameSlider') && (document.getElementById('frameSlider').value = frameIdx);
+            document.getElementById('frameSlider').value = frameIdx;
             document.getElementById('frameInput').value = frameIdx;
             
             let idx = 0;
@@ -634,20 +583,13 @@
                 }
                 if (v.cocoon && v.cocoon.material) {
                     v.cocoon.material.opacity = opacity + energyVortex * 0.2;
-                    v.cocoon.material.emissiveIntensity = 0.1 + energyVortex * 0.4;
                 }
             });
             if (fieldParticles) fieldParticles.material.opacity = 0.15 + energyVortex * 0.3;
         }
         
-        // ============ ИЗМЕРИТЕЛЬ (исправлен) ============
         function highlightSelected() {
-            while(highlightGroup.children.length) {
-                const c = highlightGroup.children[0];
-                if(c.geometry) c.geometry.dispose();
-                if(c.material) c.material.dispose();
-                highlightGroup.remove(c);
-            }
+            while(highlightGroup.children.length) highlightGroup.remove(highlightGroup.children[0]);
             if (!selectedForMeasure.length) return;
             
             selectedForMeasure.forEach(v => {
@@ -655,7 +597,6 @@
                 const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.85, depthTest: false });
                 const ring = new THREE.Mesh(ringGeom, ringMat);
                 ring.position.copy(v.groupObj.position);
-                ring.userData = { vortex: v };
                 highlightGroup.add(ring);
             });
             
@@ -678,7 +619,6 @@
             const tauSum = v1.tau + v2.tau;
             const delta1 = calcDelta(v1), delta2 = calcDelta(v2);
             const matchSteps = stepsMatch(v1, v2);
-            const tremorPeriod = calcTremorPeriod();
             
             const text = [
                 `🔘 ${v1.label.element.textContent} | τ=${v1.tau} | R=${v1.radius.toFixed(2)} | гр.${v1.group} | Δ=${delta1.toFixed(3)}`,
@@ -687,14 +627,13 @@
                 `   📍 (${v2.x.toFixed(3)}, ${v2.y.toFixed(3)}, ${v2.z.toFixed(3)})`,
                 `──────────────────────────────`,
                 `📏 Центр→Центр: ${dCenter.toFixed(4)}`,
-                `🔘 Обол→Обол: ${dShell.toFixed(4)} ${overlap ? '⚡ ПЕРЕКРЫТИЕ ' + Math.abs(dShell).toFixed(4) : ''}`,
+                `🔘 Обол→Обол: ${dShell.toFixed(4)} ${overlap ? '⚡ ПЕРЕКРЫТИЕ' : ''}`,
                 `🎯 Совпадение ступенек: ${matchSteps ? '✅ ДА' : '❌ НЕТ'} (d_env = ${d_env.toFixed(3)})`,
                 `⚡ Στ: ${tauSum} ${tauSum === 0 ? '(компенсация)' : ''}`,
                 `──────────────────────────────`,
-                `📊 Кадр: ${frameIdx} | d_min системы: ${dminForFrame ? dminForFrame.toFixed(3) : '—'}`,
+                `📊 Кадр: ${frameIdx} | d_min: ${dminForFrame ? dminForFrame.toFixed(3) : '—'}`,
                 `💚 E_vortex: ${energyVortex.toFixed(4)} | Δ_сред: ${deltaTopo.toFixed(4)}`,
-                `🕐 T_дрожания: ${tremorPeriod.toFixed(2)} (период собств. колебаний)`,
-                `🌡️ d_env: ${d_env.toFixed(3)} (при T=${temperature}K, P=${pressure.toFixed(1)})`
+                `🌡️ d_env: ${d_env.toFixed(3)} (T=${temperature}K, P=${pressure.toFixed(1)})`
             ].join('\n');
             
             document.getElementById('measureContent').innerHTML = `<pre style="margin:0;white-space:pre-wrap;line-height:1.45;font-size:9px;">${text}</pre>`;
@@ -704,18 +643,13 @@
         
         document.getElementById('copyMeasureBtn').addEventListener('click', () => {
             const text = document.getElementById('measureContent').innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.getElementById('copyMeasureBtn');
-                btn.textContent = '✅';
-                setTimeout(() => btn.textContent = '📋', 1000);
-            });
+            navigator.clipboard.writeText(text);
         });
         
         document.getElementById('closeMeasureBtn').addEventListener('click', () => {
             document.getElementById('measurePanel').style.display = 'none';
             selectedForMeasure = [];
             highlightSelected();
-            if (measureResetTimeout) clearTimeout(measureResetTimeout);
         });
         
         document.addEventListener('keydown', (e) => {
@@ -723,12 +657,10 @@
                 document.getElementById('measurePanel').style.display = 'none';
                 selectedForMeasure = [];
                 highlightSelected();
-                if (measureResetTimeout) clearTimeout(measureResetTimeout);
                 document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами (Esc — сброс)';
             }
         });
         
-        // Рейкастинг для измерителя (ИСПРАВЛЕНО)
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         
@@ -741,7 +673,6 @@
             
             raycaster.setFromCamera(mouse, camera);
             
-            // Собираем все кликабельные меши
             const clickable = [];
             vortices.forEach(v => {
                 clickable.push(v.core);
@@ -781,7 +712,6 @@
                     }
                 }
             } else {
-                // Клик мимо — сброс
                 selectedForMeasure = [];
                 highlightSelected();
                 if (measureResetTimeout) clearTimeout(measureResetTimeout);
@@ -789,101 +719,68 @@
             }
         });
         
-        // ============ ЗАГРУЗКА ============
-        function showLoading(msg) {
-            let overlay = document.getElementById('loadingOverlay');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'loadingOverlay';
-                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);backdrop-filter:blur(10px);z-index:10000;display:flex;justify-content:center;align-items:center;font-family:monospace;';
-                overlay.innerHTML = `<div style="text-align:center;background:rgba(10,10,30,0.9);padding:25px 40px;border-radius:25px;border:1px solid #44ffaa33;"><div style="position:relative;width:80px;height:80px;margin:0 auto 15px;"><div style="position:absolute;top:50%;left:50%;width:12px;height:12px;background:#ff3366;border-radius:50%;transform:translate(-50%,-50%);animation:pulse-core 1s ease infinite;"></div><div style="position:absolute;top:0;left:0;width:100%;height:100%;border:2px solid #44ffaa;border-radius:50%;border-top-color:transparent;animation:spin 0.8s linear infinite;"></div><div style="position:absolute;top:12px;left:12px;width:calc(100% - 24px);height:calc(100% - 24px);border:2px solid #ffaa44;border-radius:50%;border-bottom-color:transparent;animation:spin-reverse 1s linear infinite;"></div></div><div id="loadingMsg" style="font-size:12px;margin-bottom:8px;color:#44ffaa;">${msg}</div><div style="width:180px;height:2px;background:#333;margin:12px auto 0;border-radius:2px;overflow:hidden;"><div id="loadingBar" style="width:0%;height:100%;background:linear-gradient(90deg,#44ffaa,#ffaa44);"></div></div></div>`;
-                document.body.appendChild(overlay);
-                const style = document.createElement('style');
-                style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}@keyframes spin-reverse{to{transform:rotate(-360deg)}}@keyframes pulse-core{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.3)}}';
-                document.head.appendChild(style);
-            } else {
-                overlay.style.display = 'flex';
-                document.getElementById('loadingMsg').textContent = msg;
-            }
-        }
-        function hideLoading() {
-            const overlay = document.getElementById('loadingOverlay');
-            if (overlay) overlay.style.display = 'none';
-        }
-        function updateLoadingProgress(p) {
-            const bar = document.getElementById('loadingBar');
-            if (bar) bar.style.width = p + '%';
-        }
-        
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            showLoading(`Загрузка "${file.name}"...`);
             const reader = new FileReader();
-            reader.onprogress = (ev) => { if (ev.lengthComputable) updateLoadingProgress((ev.loaded / ev.total) * 100); };
             reader.onload = (ev) => {
-                updateLoadingProgress(100);
-                setTimeout(() => {
-                    try {
-                        const data = JSON.parse(ev.target.result);
-                        if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат: ожидается массив кадров");
-                        trajectoryData = data;
-                        document.getElementById('frameSlider').max = trajectoryData.length - 1;
-                        document.getElementById('frameInput').max = trajectoryData.length - 1;
-                        document.getElementById('frameSlider').disabled = false;
-                        document.getElementById('frameInput').disabled = false;
-                        document.getElementById('playBtn').disabled = false;
-                        document.getElementById('prevFrameBtn').disabled = false;
-                        document.getElementById('nextFrameBtn').disabled = false;
-                        document.getElementById('exportCsvBtn').disabled = false;
-                        document.getElementById('toggleTrailsBtn').disabled = false;
-                        playing = false;
-                        document.getElementById('playBtn').textContent = '▶';
-                        buildFromFrame(trajectoryData[0]);
-                        loadFrame(0);
-                        setTimeout(autoFocusCamera, 100);
-                        hideLoading();
-                    } catch(err) { hideLoading(); alert("Ошибка: " + err.message); }
-                }, 200);
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат");
+                    trajectoryData = data;
+                    document.getElementById('frameSlider').max = trajectoryData.length - 1;
+                    document.getElementById('frameSlider').disabled = false;
+                    document.getElementById('frameInput').max = trajectoryData.length - 1;
+                    document.getElementById('frameInput').disabled = false;
+                    document.getElementById('playBtn').disabled = false;
+                    document.getElementById('prevFrameBtn').disabled = false;
+                    document.getElementById('nextFrameBtn').disabled = false;
+                    document.getElementById('exportCsvBtn').disabled = false;
+                    document.getElementById('toggleTrailsBtn').disabled = false;
+                    playing = false;
+                    document.getElementById('playBtn').textContent = '▶';
+                    buildFromFrame(trajectoryData[0]);
+                    loadFrame(0);
+                    setTimeout(autoFocusCamera, 100);
+                } catch(err) { alert("Ошибка: " + err.message); }
             };
             reader.readAsText(file);
         });
-        document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
         
-        // ============ УПРАВЛЕНИЕ ============
-        function updateTrailsBtn() {
-            document.getElementById('toggleTrailsBtn').disabled = playing;
-        }
+        document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('fileInput').click());
         
         document.getElementById('playBtn').addEventListener('click', () => {
             playing = !playing;
             document.getElementById('playBtn').textContent = playing ? '⏸' : '▶';
             lastFrameTime = performance.now();
-            updateTrailsBtn();
-            if (!playing) { buildTrails(); buildDumbbells(); }
-            else {
-                while(trailsGroup.children.length) {
-                    const c = trailsGroup.children[0];
-                    if(c.geometry) c.geometry.dispose();
-                    if(c.material) c.material.dispose();
-                    trailsGroup.remove(c);
-                }
-            }
         });
         
         document.getElementById('prevFrameBtn').addEventListener('click', () => {
-            playing = false; document.getElementById('playBtn').textContent = '▶'; updateTrailsBtn();
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
             if (currentFrame > 0) loadFrame(currentFrame - 1);
         });
+        
         document.getElementById('nextFrameBtn').addEventListener('click', () => {
-            playing = false; document.getElementById('playBtn').textContent = '▶'; updateTrailsBtn();
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
             if (currentFrame < trajectoryData.length - 1) loadFrame(currentFrame + 1);
         });
+        
         document.getElementById('frameInput').addEventListener('change', (e) => {
-            playing = false; document.getElementById('playBtn').textContent = '▶'; updateTrailsBtn();
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
             const val = parseInt(e.target.value);
             if (!isNaN(val) && val >= 0 && val < trajectoryData.length) loadFrame(val);
         });
+        
+        document.getElementById('frameSlider').addEventListener('input', (e) => {
+            playing = false;
+            document.getElementById('playBtn').textContent = '▶';
+            const val = parseInt(e.target.value);
+            if (!isNaN(val) && val >= 0 && val < trajectoryData.length) loadFrame(val);
+        });
+        
         document.getElementById('resetViewBtn').addEventListener('click', autoFocusCamera);
         
         document.getElementById('toggleProjectionBtn').addEventListener('click', () => {
@@ -901,21 +798,19 @@
             showTrails = !showTrails;
             document.getElementById('toggleTrailsBtn').classList.toggle('active', showTrails);
             if (showTrails) buildTrails();
-            else { while(trailsGroup.children.length) { const c = trailsGroup.children[0]; if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); trailsGroup.remove(c); } }
+            else while(trailsGroup.children.length) trailsGroup.remove(trailsGroup.children[0]);
         });
         
         document.getElementById('toggleModeBtn').addEventListener('click', () => {
             analysisMode = !analysisMode;
             const btn = document.getElementById('toggleModeBtn');
             const banner = document.getElementById('modeBanner');
-            const legend = document.getElementById('legend');
             
             if (analysisMode) {
                 btn.textContent = '📊 Анализ';
                 btn.classList.remove('active');
-                banner.textContent = '📊 АНАЛИЗ ВММП: τ-жилы, ступеньки, Δ-напряжение, E_vortex';
+                banner.textContent = '📊 АНАЛИЗ ВММП';
                 banner.className = 'mode-banner analysis';
-                legend.textContent = '🌑 Ядро | ⚡ τ-жилы | 📏 Измеритель | 🔗 Связи (ступеньки) | 📊 d_env=' + d_env.toFixed(2);
                 showCocoon = false; showField = false;
                 interfaceGroup.visible = false; fieldGroup.visible = false;
                 if (fieldParticles) fieldParticles.visible = false;
@@ -927,14 +822,12 @@
                 document.getElementById('toggleTauBtn').classList.add('active');
                 vortices.forEach(v => { if(v.filament) v.filament.visible = true; });
                 document.getElementById('measurePanel').style.display = 'block';
-                document.getElementById('measureContent').innerHTML = 'Выберите два атома кликами (Esc — сброс)';
                 if (trajectoryData.length) buildFromFrame(trajectoryData[currentFrame]);
             } else {
                 btn.textContent = '📚 Демо';
                 btn.classList.add('active');
                 banner.textContent = '📚 ДЕМО: Вихревая Модель Материи-Пространства';
                 banner.className = 'mode-banner demo';
-                legend.innerHTML = '🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи | ⚡ τ-жилы | 📚 Обучение';
                 showCocoon = true; showField = true;
                 document.getElementById('toggleCocoonBtn').disabled = false;
                 document.getElementById('toggleFieldBtn').disabled = false;
@@ -953,6 +846,7 @@
             document.getElementById('toggleCocoonBtn').classList.toggle('active', showCocoon);
             if (showCocoon) buildDumbbells();
         });
+        
         document.getElementById('toggleFieldBtn').addEventListener('click', () => {
             if (analysisMode) return;
             showField = !showField;
@@ -960,6 +854,7 @@
             if (fieldParticles) fieldParticles.visible = showField;
             document.getElementById('toggleFieldBtn').classList.toggle('active', showField);
         });
+        
         document.getElementById('toggleTauBtn').addEventListener('click', () => {
             showTau = !showTau;
             vortices.forEach(v => { if(v.filament) v.filament.visible = showTau; });
@@ -968,12 +863,10 @@
         
         function autoFocusCamera() {
             if (!vortices.length) return;
-            let cx = 0, cy = 0, cz = 0, maxDist = 0;
+            let cx = 0, cy = 0, cz = 0;
             vortices.forEach(v => { cx += v.x; cy += v.y; cz += v.z; });
             cx /= vortices.length; cy /= vortices.length; cz /= vortices.length;
-            vortices.forEach(v => { const d = Math.hypot(v.x-cx, v.y-cy, v.z-cz); if (d > maxDist) maxDist = d; });
-            const dist = Math.max(maxDist * 2.5, 10);
-            camera.position.set(cx + dist*0.6, cy + dist*0.5, cz + dist*0.7);
+            camera.position.set(cx + 8, cy + 6, cz + 12);
             controls.target.set(cx, cy, cz);
             controls.update();
         }
@@ -987,11 +880,10 @@
             const blob = new Blob([csv], {type:'text/csv'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `spectravortex_vmmp_frame${currentFrame}.csv`; a.click();
+            a.href = url; a.download = `vmmp_frame${currentFrame}.csv`; a.click();
             URL.revokeObjectURL(url);
         });
         
-        // Слайдеры
         const updateSliders = () => {
             temperature = parseFloat(document.getElementById('tempSlider').value);
             pressure = parseFloat(document.getElementById('pressureSlider').value);
@@ -1010,20 +902,19 @@
             buildDumbbells();
             debouncedUpdate();
         };
+        
         ['tempSlider','pressureSlider','fieldSlider','puritySlider'].forEach(id => {
             document.getElementById(id).addEventListener('input', updateSliders);
         });
         document.getElementById('opacitySlider').addEventListener('input', debouncedUpdate);
         document.getElementById('brightnessSlider').addEventListener('input', debouncedUpdate);
         
-        // ============ ОБУЧЕНИЕ ============
         let currentTooltip = null;
         const tooltipsData = {
-            cocoon: { title: "🌀 КОКОН", formula: "Граница вихря. Радиус = R_ядра", desc: "Обменная сущность. При связи — гантель. В ВММП это область, где |∇H| максимален." },
-            core: { title: "🌑 ЯДРО", formula: "τ = ∮∇ψ·dl / 2π  (N ∈ ℤ)", desc: "Топологический скелет вихря. τ — целое число. Нецелые τ нарушают квантование." },
-            field: { title: "✨ ПОЛЕ H", formula: "∇⁴ψ = 0", desc: "Сверхтекучий конденсат. Пространство-время как среда. Частицы — топологические дефекты." },
-            flowline: { title: "🔗 СВЯЗЬ", formula: "Ступеньки совпадают: |d_ij − d_env| / d_env < 0.15", desc: "Связь есть только при совпадении ступенек. Не просто касание — топологический резонанс." },
-            trail: { title: "🐾 ТРАЕКТОРИЯ", formula: "10 кадров истории", desc: "След вихря в поле H. Ломаные траектории — признак скрытых неоднородностей." }
+            cocoon: { title: "🌀 КОКОН", formula: "Граница вихря", desc: "Обменная сущность. При связи — гантель." },
+            core: { title: "🌑 ЯДРО", formula: "τ = ∮∇ψ·dl / 2π", desc: "Топологический скелет вихря." },
+            field: { title: "✨ ПОЛЕ H", formula: "∇⁴ψ = 0", desc: "Сверхтекучий конденсат." },
+            flowline: { title: "🔗 СВЯЗЬ", formula: "|d_ij − d_env| / d_env < 0.15", desc: "Связь при совпадении ступенек." }
         };
         
         function showTooltip(type, x, y) {
@@ -1053,66 +944,45 @@
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            const objs = [...interfaceGroup.children, ...flowLinesGroup.children, ...trailsGroup.children, ...vortexGroup.children];
+            const objs = [...interfaceGroup.children, ...flowLinesGroup.children, ...vortexGroup.children];
             const intersects = raycaster.intersectObjects(objs, true);
             if (intersects.length) {
                 let type = 'core';
                 const hit = intersects[0].object;
                 if (interfaceGroup.children.some(c => c === hit || c.children.includes(hit))) type = 'cocoon';
                 else if (flowLinesGroup.children.some(c => c === hit || c.children.includes(hit))) type = 'flowline';
-                else if (trailsGroup.children.some(c => c === hit || c.children.includes(hit))) type = 'trail';
                 showTooltip(type, event.clientX, event.clientY);
             }
         });
         
-        // ============ ДЕМО-ДАННЫЕ (СБЛИЖЕННАЯ СЦЕНА) ============
-        const embeddedDemo = [
-            {
-                "step": 0, "d_min": 1.45, "groups": {
-                    "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.55}, {"pos":[1.2,0.6,0.3],"tau":-1,"symbol":"H","radius":0.55}],
-                    "2": [{"pos":[-1.5,-0.8,0.8],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.0,-1.2,0.2],"tau":-1,"symbol":"He","radius":0.75}],
-                    "3": [{"pos":[0.2,1.5,-1.0],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.0,0.3,1.2],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.3,0.9,0.8],"tau":1,"symbol":"Be","radius":1.15}],
-                    "4": [{"pos":[-1.0,-1.0,-1.0],"tau":-1,"symbol":"B","radius":1.15}, {"pos":[1.5,-1.3,0.2],"tau":1,"symbol":"C","radius":1.35}],
-                    "5": [{"pos":[-1.8,1.5,-0.6],"tau":-1,"symbol":"N","radius":1.35}, {"pos":[0.8,-1.8,1.5],"tau":1,"symbol":"O","radius":1.55}],
-                    "6": [{"pos":[2.2,0.2,0.2],"tau":1,"symbol":"F","radius":1.55}, {"pos":[-2.2,0.1,0.2],"tau":-1,"symbol":"Ne","radius":1.75}],
-                    "7": [{"pos":[0.1,-2.2,0.1],"tau":-1,"symbol":"Na","radius":1.75}, {"pos":[0.1,0.2,2.3],"tau":1,"symbol":"Mg","radius":1.75}]
-                }
-            },
-            {
-                "step": 1, "d_min": 1.28, "groups": {
-                    "1": [{"pos":[0.08,0.04,0.02],"tau":1,"symbol":"H","radius":0.55}, {"pos":[1.1,0.65,0.25],"tau":-1,"symbol":"H","radius":0.55}],
-                    "2": [{"pos":[-1.4,-0.7,0.85],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.1,-1.1,0.25],"tau":-1,"symbol":"He","radius":0.75}],
-                    "3": [{"pos":[0.25,1.55,-0.9],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-0.9,0.35,1.25],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.35,0.95,0.75],"tau":1,"symbol":"Be","radius":1.15}],
-                    "4": [{"pos":[-0.9,-0.9,-0.9],"tau":-1,"symbol":"B","radius":1.15}, {"pos":[1.55,-1.25,0.25],"tau":1,"symbol":"C","radius":1.35}],
-                    "5": [{"pos":[-1.7,1.55,-0.55],"tau":-1,"symbol":"N","radius":1.35}, {"pos":[0.85,-1.7,1.55],"tau":1,"symbol":"O","radius":1.55}],
-                    "6": [{"pos":[2.25,0.25,0.25],"tau":1,"symbol":"F","radius":1.55}, {"pos":[-2.1,0.15,0.25],"tau":-1,"symbol":"Ne","radius":1.75}],
-                    "7": [{"pos":[0.15,-2.1,0.15],"tau":-1,"symbol":"Na","radius":1.75}, {"pos":[0.15,0.25,2.35],"tau":1,"symbol":"Mg","radius":1.75}]
-                }
-            },
-            {
-                "step": 2, "d_min": 1.09, "groups": {
-                    "1": [{"pos":[0.15,0.08,0.04],"tau":1,"symbol":"H","radius":0.55}, {"pos":[0.95,0.7,0.2],"tau":-1,"symbol":"H","radius":0.55}],
-                    "2": [{"pos":[-1.3,-0.6,0.9],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.2,-1.0,0.3],"tau":-1,"symbol":"He","radius":0.75}],
-                    "3": [{"pos":[0.3,1.6,-0.8],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-0.8,0.4,1.3],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.4,1.0,0.7],"tau":1,"symbol":"Be","radius":1.15}],
-                    "4": [{"pos":[-0.8,-0.8,-0.8],"tau":-1,"symbol":"B","radius":1.15}, {"pos":[1.6,-1.2,0.3],"tau":1,"symbol":"C","radius":1.35}],
-                    "5": [{"pos":[-1.6,1.6,-0.5],"tau":-1,"symbol":"N","radius":1.35}, {"pos":[0.9,-1.6,1.6],"tau":1,"symbol":"O","radius":1.55}],
-                    "6": [{"pos":[2.3,0.3,0.3],"tau":1,"symbol":"F","radius":1.55}, {"pos":[-2.0,0.2,0.3],"tau":-1,"symbol":"Ne","radius":1.75}],
-                    "7": [{"pos":[0.2,-2.0,0.2],"tau":-1,"symbol":"Na","radius":1.75}, {"pos":[0.2,0.3,2.4],"tau":1,"symbol":"Mg","radius":1.75}]
-                }
+        // Демо-данные
+        const embeddedDemo = [{
+            "step": 0, "d_min": 1.45, "groups": {
+                "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.55}, {"pos":[2.2,0.6,0.3],"tau":-1,"symbol":"H","radius":0.55}],
+                "2": [{"pos":[-1.5,-0.8,0.8],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.8,-1.2,0.2],"tau":-1,"symbol":"He","radius":0.75}],
+                "3": [{"pos":[0.2,1.5,-1.0],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.2,0.3,1.2],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.8,0.9,0.8],"tau":1,"symbol":"Be","radius":1.15}],
+                "4": [{"pos":[-1.4,-1.2,-1.0],"tau":-1,"symbol":"B","radius":1.15}, {"pos":[1.5,-1.5,0.2],"tau":1,"symbol":"C","radius":1.35}],
+                "5": [{"pos":[-1.8,1.5,-0.6],"tau":-1,"symbol":"N","radius":1.35}, {"pos":[0.8,-1.8,1.5],"tau":1,"symbol":"O","radius":1.55}],
+                "6": [{"pos":[2.5,0.2,0.2],"tau":1,"symbol":"F","radius":1.55}, {"pos":[-2.2,0.1,0.2],"tau":-1,"symbol":"Ne","radius":1.75}],
+                "7": [{"pos":[0.1,-2.2,0.1],"tau":-1,"symbol":"Na","radius":1.75}, {"pos":[0.1,0.2,2.5],"tau":1,"symbol":"Mg","radius":1.75}]
             }
-        ];
+        }];
         
         trajectoryData = embeddedDemo;
         document.getElementById('frameSlider').max = trajectoryData.length - 1;
+        document.getElementById('frameSlider').disabled = false;
         document.getElementById('frameInput').max = trajectoryData.length - 1;
-        ['frameSlider','frameInput','playBtn','prevFrameBtn','nextFrameBtn','exportCsvBtn','toggleTrailsBtn'].forEach(id => {
-            document.getElementById(id).disabled = false;
-        });
+        document.getElementById('frameInput').disabled = false;
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('prevFrameBtn').disabled = false;
+        document.getElementById('nextFrameBtn').disabled = false;
+        document.getElementById('exportCsvBtn').disabled = false;
+        document.getElementById('toggleTrailsBtn').disabled = false;
+        
         buildFromFrame(trajectoryData[0]);
         loadFrame(0);
         setTimeout(autoFocusCamera, 200);
         
-        // ============ АНИМАЦИЯ ============
         function animate(timestamp) {
             requestAnimationFrame(animate);
             time += 0.016;
@@ -1125,20 +995,16 @@
                 }
             }
             
-            // Пульсация измерительных колец
             highlightGroup.children.forEach(child => {
-                if (child.name === 'pulseLine') {
-                    child.material.opacity = 0.5 + 0.5 * Math.sin(pulsePhase * 3);
-                }
-                if (child.geometry && child.geometry.type === 'TorusGeometry') {
-                    child.scale.setScalar(1 + 0.06 * Math.sin(pulsePhase * 2));
-                }
+                if (child.name === 'pulseLine') child.material.opacity = 0.5 + 0.5 * Math.sin(pulsePhase * 3);
+                if (child.geometry && child.geometry.type === 'TorusGeometry') child.scale.setScalar(1 + 0.06 * Math.sin(pulsePhase * 2));
             });
             
             controls.update();
             renderer.render(scene, camera);
             labelRenderer.render(scene, camera);
         }
+        
         requestAnimationFrame(animate);
         
         window.addEventListener('resize', () => {
