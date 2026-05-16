@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.9.12 — ВММП. Честная модель</title>
+    <title>SpectraVortex v3.9.11 — ВММП. Честная модель</title>
     <style>
         :root {
             --bg: #030318;
@@ -33,6 +33,7 @@
         }
         button:hover { background: var(--info); color: #000; }
         button.active { background: var(--danger); border-color: var(--danger); color: #fff; }
+        button.help-active { background: #44aa44; border-color: var(--accent); color: #fff; }
         button:disabled { opacity: 0.4; cursor: not-allowed; background: #111; color: #555; border-color: #333; }
         
         .slider-container { display: flex; align-items: center; gap: 4px; background: #111; padding: 2px 6px; border-radius: 16px; }
@@ -88,6 +89,7 @@
         }
         .frame-slider-container input { width: 150px; }
 
+        /* Модальное окно справки */
         .help-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.92); backdrop-filter: blur(12px);
@@ -104,7 +106,10 @@
         .help-modal h2 { color: var(--accent); font-size: 14px; margin-bottom: 10px; }
         .help-modal h3 { color: var(--warn); font-size: 12px; margin: 12px 0 4px; }
         .help-modal p { margin: 4px 0; }
-        .help-modal .close-help { float: right; cursor: pointer; color: #ff6666; font-size: 14px; margin-left: 10px; }
+        .help-modal .close-help {
+            float: right; cursor: pointer; color: #ff6666;
+            font-size: 14px; margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -151,8 +156,9 @@
         <div id="measureContent" style="color:#ccc;">Выберите два атома кликами (Esc — сброс)</div>
     </div>
 
-    <div class="legend" id="legend">🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи (ступеньки или зацепление) | ⚡ τ-жилы | ❓ Справка</div>
+    <div class="legend" id="legend">🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи (ступеньки) | ⚡ τ-жилы | ❓ Справка</div>
 
+    <!-- Модальное окно справки -->
     <div class="help-overlay" id="helpOverlay">
         <div class="help-modal">
             <span class="close-help" id="closeHelp">✕</span>
@@ -160,24 +166,30 @@
             <p>Этот плеер визуализирует <b>Вихревую Модель Материи-Пространства (ВММП)</b>.</p>
             
             <h3>Что я вижу?</h3>
-            <p><b>🌑 Ядра</b> — топологические сингулярности. Радиус = d_opt × 0.35.</p>
-            <p><b>⚡ τ-жилы</b> — визуализация топологического заряда. Цвет зависит от τ. τ должен быть целым числом.</p>
-            <p><b>🌀 Коконы</b> — границы вихрей. Радиус = d_opt × 0.65.</p>
-            <p><b>✨ Поле H</b> — сверхтекучий конденсат. Подчиняется ∇⁴ψ = 0.</p>
-            <p><b>🔗 Связи</b> — отображаются при совпадении ступенек (резонанс через поле H) ИЛИ при прямом зацеплении (перекрытие коконов).</p>
+            <p><b>🌑 Ядра</b> — топологические сингулярности. Их радиус пропорционален d_opt (оптимальному межвихревому расстоянию).</p>
+            <p><b>⚡ τ-жилы</b> — визуализация топологического заряда. Цвет зависит от τ. τ должен быть целым числом (иначе — предупреждение в консоли).</p>
+            <p><b>🌀 Коконы</b> — границы вихрей. Когда коконы касаются, возможно образование связи.</p>
+            <p><b>✨ Поле H</b> — сверхтекучий конденсат, среда-носитель. Подчиняется бигармоническому уравнению ∇⁴ψ = 0.</p>
+            <p><b>🔗 Связи</b> — отображаются только когда расстояние между вихрями близко к d_env (равновесному для данной среды). Это условие «совпадения ступенек».</p>
             
             <h3>Измеритель</h3>
-            <p>Кликните на два атома. Вы увидите:<br>
+            <p>В режиме анализа кликните на два атома. Вы увидите:<br>
             — расстояние центр-центр и оболочка-оболочка<br>
-            — тип связи: FIELD RESONANCE (ступеньки) или DIRECT ENGAGEMENT (зацепление)<br>
+            — совпадение ступенек (Steps match)<br>
             — топологическое напряжение Δ для каждого вихря<br>
-            — энергию системы E_vortex</p>
+            — энергию системы E_vortex и среднее Δ</p>
             
             <h3>Параметры среды</h3>
-            <p><b>T</b> — увеличивает d_env. <b>P</b> — уменьшает d_env. <b>H</b> — сдвигает d_env. <b>χ</b> — чистота среды.</p>
+            <p><b>T (температура)</b> — увеличивает d_env (среда «расширяется»).<br>
+            <b>P (давление)</b> — уменьшает d_env (среда «сжимается»).<br>
+            <b>H (внешнее поле)</b> — сдвигает d_env.<br>
+            <b>χ (чистота)</b> — 1.0 = бездефектная среда. При низкой чистоте d_env отклоняется от нормы.</p>
             
             <h3>Гравитация</h3>
-            <p>В ВММП гравитация — не притяжение, а <b>приталкивание</b>. Эмерджентный эффект деформации конденсата поля H.</p>
+            <p>В ВММП гравитация — не притяжение, а <b>приталкивание</b>. Это эмерджентный эффект деформации конденсата поля H.</p>
+            
+            <h3>Где данные?</h3>
+            <p>Загрузите JSON-файл с траекториями через кнопку «📂 JSON». Формат: массив кадров, каждый кадр содержит группы 1–7 с массивами позиций, tau, symbol, radius.</p>
         </div>
     </div>
 
@@ -210,7 +222,7 @@
             fileInput: $('fileInput'), exportCsvBtn: $('exportCsvBtn'),
             infoBanner: $('infoBanner'), frameLabel: $('frameLabel'), totalFrames: $('totalFrames'),
             dminVal: $('dminVal'), energyVal: $('energyVal'), deltaVal: $('deltaVal'),
-            tempSlider: $('tempSlider'), tempVal: $('tempVal'),
+            errorHunter: $('errorHunter'), tempSlider: $('tempSlider'), tempVal: $('tempVal'),
             pressureSlider: $('pressureSlider'), pressureVal: $('pressureVal'),
             fieldSlider: $('fieldSlider'), fieldVal: $('fieldVal'),
             puritySlider: $('puritySlider'), purityVal: $('purityVal'),
@@ -295,9 +307,13 @@
             return new THREE.Color().setHSL(Math.min(0.85, Math.max(0.25, hue)), 1.0, 0.65);
         };
 
+        // Радиусы из d_opt (первые принципы)
         const getRadii = (group) => {
             const dOpt = VMMP.d_opt_default[group] || 2.0;
-            return { core: dOpt * 0.35, cocoon: dOpt * 0.65 };
+            return {
+                core: dOpt * 0.35,    // ядро — область сингулярности
+                cocoon: dOpt * 0.65,  // кокон — граница вихря
+            };
         };
         
         const debouncedUpdate = () => {
@@ -345,23 +361,9 @@
             return pairCount > 0 ? totalEnergy / pairCount : 0;
         };
         
-        // Связь: резонанс через поле ИЛИ прямое зацепление коконов
         const stepsMatch = (v1, v2) => {
             const dist = v1.groupObj.position.distanceTo(v2.groupObj.position);
-            const fieldResonance = Math.abs(dist - d_env) / d_env < 0.15;
-            const directEngagement = dist < v1.cocoonRadius + v2.cocoonRadius;
-            return fieldResonance || directEngagement;
-        };
-        
-        // Тип связи (для измерялки)
-        const bondType = (v1, v2) => {
-            const dist = v1.groupObj.position.distanceTo(v2.groupObj.position);
-            const fieldResonance = Math.abs(dist - d_env) / d_env < 0.15;
-            const directEngagement = dist < v1.cocoonRadius + v2.cocoonRadius;
-            if (fieldResonance && directEngagement) return 'FIELD + DIRECT';
-            if (fieldResonance) return 'FIELD RESONANCE';
-            if (directEngagement) return 'DIRECT ENGAGEMENT';
-            return 'NONE';
+            return Math.abs(dist - d_env) / d_env < 0.15;
         };
         
         const getElementSymbol = (n) => {
@@ -373,6 +375,7 @@
             const el = document.getElementById(id);
             if (el) el[attr] = value;
         };
+        
         const safeEnable = (id) => {
             const el = document.getElementById(id);
             if (el) el.disabled = false;
@@ -403,6 +406,7 @@
             
             groupObj.position.set(x, y, z);
             
+            // Простой текст без плашки
             const div = document.createElement('div');
             const sym = customSymbol || ((index < 118) ? getElementSymbol(index) : (index+1).toString());
             div.textContent = sym;
@@ -490,29 +494,34 @@
             
             if (!showCocoon) return;
             
+            const processed = new Set();
             for (let i = 0; i < vortices.length; i++) {
                 for (let j = i+1; j < vortices.length; j++) {
-                    if (!stepsMatch(vortices[i], vortices[j])) continue;
+                    const key = `${Math.min(i,j)}_${Math.max(i,j)}`;
+                    if (processed.has(key) || !stepsMatch(vortices[i], vortices[j])) continue;
                     
                     const p1 = vortices[i].groupObj.position;
                     const p2 = vortices[j].groupObj.position;
                     const dist = p1.distanceTo(p2);
                     const r1 = vortices[i].cocoonRadius, r2 = vortices[j].cocoonRadius;
                     
-                    const group = new THREE.Group();
-                    group.name = 'dumbbell';
-                    const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
-                    const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
-                    const bridgeLen = Math.max(0.02, dist);
-                    
-                    const bridge = new THREE.Mesh(
-                        new THREE.CylinderGeometry(Math.min(r1,r2)*0.2, Math.min(r1,r2)*0.2, bridgeLen, 8),
-                        new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x112233, transparent: true, opacity: 0.35, depthWrite: false })
-                    );
-                    bridge.position.copy(mid);
-                    bridge.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir));
-                    group.add(bridge);
-                    interfaceGroup.add(group);
+                    if (dist < r1 + r2 + 0.1) {
+                        const group = new THREE.Group();
+                        group.name = 'dumbbell';
+                        const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+                        const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
+                        const bridgeLen = Math.max(0.05, dist - r1 - r2 + 0.2);
+                        
+                        const bridge = new THREE.Mesh(
+                            new THREE.CylinderGeometry(Math.min(r1,r2)*0.3, Math.min(r1,r2)*0.3, bridgeLen, 8),
+                            new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x112233, transparent: true, opacity: 0.35, depthWrite: false })
+                        );
+                        bridge.position.copy(mid);
+                        bridge.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir));
+                        group.add(bridge);
+                        interfaceGroup.add(group);
+                        processed.add(key);
+                    }
                 }
             }
         }
@@ -562,7 +571,7 @@
                     const tau = pos.tau ?? (frame.tau_map?.[counter] ?? 0);
                     const [x, y, z] = p;
                     const sym = pos.symbol || frame.symbols?.[counter];
-                    const rad = pos.radius || null;
+                    const rad = pos.radius || null; // если задан в данных — используем, иначе из d_opt
                     
                     const vortex = createVortex(x, y, z, g, tau, counter, sym, rad);
                     vortexGroup.add(vortex.groupObj);
@@ -693,8 +702,7 @@
             const overlap = dShell < 0;
             const tauSum = v1.tau + v2.tau;
             const delta1 = calcDelta(v1), delta2 = calcDelta(v2);
-            const match = stepsMatch(v1, v2);
-            const bType = bondType(v1, v2);
+            const matchSteps = stepsMatch(v1, v2);
             
             const lines = [
                 `${v1.label.element.textContent} | tau=${v1.tau} | R=${v1.radius.toFixed(2)} | grp.${v1.group} | D=${delta1.toFixed(3)}`,
@@ -704,7 +712,7 @@
                 `---`,
                 `Center->Center: ${dCenter.toFixed(4)}`,
                 `Shell->Shell: ${dShell.toFixed(4)} ${overlap ? 'OVERLAP ' + Math.abs(dShell).toFixed(4) : ''}`,
-                `Bond: ${bType} (d_env = ${d_env.toFixed(3)})`,
+                `Steps match: ${matchSteps ? 'YES' : 'NO'} (d_env = ${d_env.toFixed(3)})`,
                 `Sum tau: ${tauSum} ${tauSum === 0 ? '(compensation)' : ''}`,
                 `---`,
                 `Frame: ${frameIdx} | d_min: ${dminForFrame ? dminForFrame.toFixed(3) : '--'}`,
@@ -738,11 +746,8 @@
         
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (dom.helpOverlay.classList.contains('show')) {
-                    dom.helpOverlay.classList.remove('show');
-                    return;
-                }
                 if (dom.measurePanel.style.display !== 'none') {
+                    dom.measurePanel.style.display = 'block';
                     resetMeasurement();
                 }
             }
@@ -798,7 +803,7 @@
             reader.onload = (ev) => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    if (!Array.isArray(data) || !data.length) throw new Error("Invalid format");
+                    if (!Array.isArray(data) || !data.length) throw new Error("Invalid format: expected array of frames");
                     trajectoryData = data;
                     const maxFrames = trajectoryData.length - 1;
                     safeSetAttr('frameSlider', 'max', maxFrames);
@@ -811,10 +816,11 @@
                     buildFromFrame(trajectoryData[0]);
                     loadFrame(0);
                     setTimeout(autoFocusCamera, 100);
-                } catch(err) { alert("Error: " + err.message); }
+                } catch(err) { alert("Error loading: " + err.message); }
             };
             reader.readAsText(file);
         });
+        
         dom.loadBtn.addEventListener('click', () => dom.fileInput.click());
         
         // ============ УПРАВЛЕНИЕ ============
@@ -830,15 +836,18 @@
             playing = false; dom.playBtn.textContent = '\u25B6';
             if (currentFrame > 0) loadFrame(currentFrame - 1);
         });
+        
         dom.nextFrameBtn.addEventListener('click', () => {
             playing = false; dom.playBtn.textContent = '\u25B6';
             if (currentFrame < trajectoryData.length - 1) loadFrame(currentFrame + 1);
         });
+        
         dom.frameInput.addEventListener('change', (e) => {
             playing = false; dom.playBtn.textContent = '\u25B6';
             const val = parseInt(e.target.value);
             if (!isNaN(val) && val >= 0 && val < trajectoryData.length) loadFrame(val);
         });
+        
         dom.frameSlider.addEventListener('input', (e) => {
             playing = false; dom.playBtn.textContent = '\u25B6';
             const val = parseInt(e.target.value);
@@ -851,28 +860,33 @@
             setProjection(!isOrthographic);
             dom.toggleProjectionBtn.textContent = isOrthographic ? 'Ortho' : 'Perspective';
         });
+        
         dom.toggleFlowBtn.addEventListener('click', () => {
             showFlowLines = !showFlowLines;
             dom.toggleFlowBtn.classList.toggle('active', showFlowLines);
             buildFlowLines();
         });
+        
         dom.toggleTrailsBtn.addEventListener('click', () => {
             showTrails = !showTrails;
             dom.toggleTrailsBtn.classList.toggle('active', showTrails);
             if (showTrails) buildTrails(); else clearGroup(trailsGroup);
         });
+        
         dom.toggleCocoonBtn.addEventListener('click', () => {
             showCocoon = !showCocoon;
             interfaceGroup.visible = showCocoon;
             dom.toggleCocoonBtn.classList.toggle('active', showCocoon);
             if (showCocoon) buildDumbbells();
         });
+        
         dom.toggleFieldBtn.addEventListener('click', () => {
             showField = !showField;
             fieldGroup.visible = showField;
             if (fieldParticles) fieldParticles.visible = showField;
             dom.toggleFieldBtn.classList.toggle('active', showField);
         });
+        
         dom.toggleTauBtn.addEventListener('click', () => {
             showTau = !showTau;
             vortices.forEach(v => { if(v.filament) v.filament.visible = showTau; });
@@ -928,13 +942,22 @@
         dom.brightnessSlider.addEventListener('input', debouncedUpdate);
         
         // ============ СПРАВКА ============
-        dom.helpBtn.addEventListener('click', () => dom.helpOverlay.classList.add('show'));
-        dom.closeHelp.addEventListener('click', () => dom.helpOverlay.classList.remove('show'));
+        dom.helpBtn.addEventListener('click', () => {
+            dom.helpOverlay.classList.add('show');
+        });
+        dom.closeHelp.addEventListener('click', () => {
+            dom.helpOverlay.classList.remove('show');
+        });
         dom.helpOverlay.addEventListener('click', (e) => {
             if (e.target === dom.helpOverlay) dom.helpOverlay.classList.remove('show');
         });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dom.helpOverlay.classList.contains('show')) {
+                dom.helpOverlay.classList.remove('show');
+            }
+        });
         
-        // ============ ДЕМО-ДАННЫЕ ============
+        // ============ ДЕМО-ДАННЫЕ (сближенные для видимости связей) ============
         const embeddedDemo = [{
             "step": 0, "d_min": 1.52, "groups": {
                 "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.26}, {"pos":[0.8,0.4,0.2],"tau":-1,"symbol":"H","radius":0.26}],
@@ -955,6 +978,7 @@
         safeEnable('playBtn'); safeEnable('prevFrameBtn'); safeEnable('nextFrameBtn');
         safeEnable('exportCsvBtn'); safeEnable('toggleTrailsBtn');
         
+        // Стартуем в режиме анализа
         showCocoon = true; showField = true; showTau = true;
         dom.toggleCocoonBtn.classList.add('active');
         dom.toggleFieldBtn.classList.add('active');
