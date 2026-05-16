@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>SpectraVortex v3.9.10 — ВММП. Честная модель</title>
+    <title>SpectraVortex v3.9.11 — ВММП. Честная модель</title>
     <style>
         :root {
             --bg: #030318;
@@ -33,7 +33,7 @@
         }
         button:hover { background: var(--info); color: #000; }
         button.active { background: var(--danger); border-color: var(--danger); color: #fff; }
-        button.learn-active { background: #44aa44; border-color: var(--accent); color: #fff; }
+        button.help-active { background: #44aa44; border-color: var(--accent); color: #fff; }
         button:disabled { opacity: 0.4; cursor: not-allowed; background: #111; color: #555; border-color: #333; }
         
         .slider-container { display: flex; align-items: center; gap: 4px; background: #111; padding: 2px 6px; border-radius: 16px; }
@@ -61,7 +61,7 @@
             border-right: 3px solid var(--accent);
             font-family: monospace; font-size: 9px;
             z-index: 100; min-width: 280px; max-width: 360px;
-            display: none; max-height: 65vh; overflow-y: auto;
+            display: block; max-height: 65vh; overflow-y: auto;
         }
         .measure-panel .title { color: var(--accent); margin-bottom: 6px; font-size: 10px; }
         .measure-panel .close-btn { float: right; cursor: pointer; color: #ff6666; margin-left: 8px; }
@@ -74,18 +74,6 @@
             pointer-events: none; max-width: 90vw;
         }
         
-        .learn-tooltip {
-            position: fixed;
-            background: rgba(0,0,0,0.95); backdrop-filter: blur(12px);
-            border-left: 3px solid var(--accent);
-            border-radius: 12px; padding: 10px 14px; max-width: 260px;
-            z-index: 10000; font-family: monospace; font-size: 10px;
-            pointer-events: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        .learn-tooltip .tt-title { color: var(--accent); font-size: 11px; margin-bottom: 4px; }
-        .learn-tooltip .tt-formula { color: var(--warn); font-size: 9px; margin-bottom: 5px; border-top: 1px solid #333; padding-top: 4px; }
-        .learn-tooltip .tt-desc { color: var(--text); line-height: 1.3; }
-        
         .info-banner {
             position: absolute; top: 15px; right: 15px;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
@@ -95,20 +83,33 @@
             color: var(--warn); max-width: 280px;
         }
         
-        .mode-banner {
-            position: absolute; top: 70px; left: 15px;
-            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
-            padding: 5px 12px; border-radius: 10px;
-            font-family: monospace; font-size: 9px; z-index: 100;
-        }
-        .mode-banner.demo { border-left: 3px solid var(--accent); color: var(--accent); }
-        .mode-banner.analysis { border-left: 3px solid var(--warn); color: var(--warn); }
-        
         .frame-slider-container {
             display: flex; align-items: center; gap: 8px;
             background: #111; padding: 2px 8px; border-radius: 16px;
         }
         .frame-slider-container input { width: 150px; }
+
+        /* Модальное окно справки */
+        .help-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); backdrop-filter: blur(12px);
+            z-index: 10000; display: none; justify-content: center; align-items: center;
+            font-family: monospace;
+        }
+        .help-overlay.show { display: flex; }
+        .help-modal {
+            background: rgba(10,10,30,0.95); border: 1px solid #44ffaa44;
+            border-radius: 16px; padding: 20px 24px; max-width: 500px;
+            max-height: 80vh; overflow-y: auto;
+            color: #ccc; font-size: 11px; line-height: 1.5;
+        }
+        .help-modal h2 { color: var(--accent); font-size: 14px; margin-bottom: 10px; }
+        .help-modal h3 { color: var(--warn); font-size: 12px; margin: 12px 0 4px; }
+        .help-modal p { margin: 4px 0; }
+        .help-modal .close-help {
+            float: right; cursor: pointer; color: #ff6666;
+            font-size: 14px; margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -124,20 +125,18 @@
         </div>
         <button id="resetViewBtn">🎥 Сброс</button>
         <button id="toggleProjectionBtn">📐 Перспектива</button>
-        <button id="toggleModeBtn" class="active">📚 Демо</button>
         <button id="toggleCocoonBtn" class="active">🌀 Коконы</button>
         <button id="toggleFieldBtn" class="active">🌊 Поле</button>
         <button id="toggleTauBtn">⚡ τ-жилы</button>
         <button id="toggleFlowBtn" class="active">🔗 Связи</button>
         <button id="toggleTrailsBtn" disabled>🐾 Траектории</button>
-        <button id="learnModeBtn">📚 Обучение</button>
+        <button id="helpBtn">❓ Справка</button>
         <div class="slider-container"><span>🌀 Прозр.</span><input type="range" id="opacitySlider" min="0.05" max="0.8" step="0.01" value="0.3"></div>
         <div class="slider-container"><span>💡 Ярк.</span><input type="range" id="brightnessSlider" min="0.3" max="1.5" step="0.01" value="0.9"></div>
         <input type="file" id="fileInput" accept=".json" style="display:none;">
         <button id="exportCsvBtn" disabled>📥 CSV</button>
     </div>
 
-    <div class="mode-banner demo" id="modeBanner">📚 ДЕМО: Вихревая Модель Материи-Пространства</div>
     <div class="info-banner" id="infoBanner">
         📊 Кадр <span id="frameLabel">0</span>/<span id="totalFrames">0</span>
         | d_min: <span id="dminVal">—</span>
@@ -154,10 +153,45 @@
 
     <div class="measure-panel" id="measurePanel">
         <div class="title">📏 ИЗМЕРИТЕЛЬ ВММП <span class="copy-btn" id="copyMeasureBtn" title="Копировать">📋</span><span class="close-btn" id="closeMeasureBtn">✕</span></div>
-        <div id="measureContent">Выберите два атома кликами (Esc — сброс)</div>
+        <div id="measureContent" style="color:#ccc;">Выберите два атома кликами (Esc — сброс)</div>
     </div>
 
-    <div class="legend" id="legend">🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи (ступеньки) | ⚡ τ-жилы | 📚 Обучение</div>
+    <div class="legend" id="legend">🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи (ступеньки) | ⚡ τ-жилы | ❓ Справка</div>
+
+    <!-- Модальное окно справки -->
+    <div class="help-overlay" id="helpOverlay">
+        <div class="help-modal">
+            <span class="close-help" id="closeHelp">✕</span>
+            <h2>❓ SpectraVortex — Справка</h2>
+            <p>Этот плеер визуализирует <b>Вихревую Модель Материи-Пространства (ВММП)</b>.</p>
+            
+            <h3>Что я вижу?</h3>
+            <p><b>🌑 Ядра</b> — топологические сингулярности. Их радиус пропорционален d_opt (оптимальному межвихревому расстоянию).</p>
+            <p><b>⚡ τ-жилы</b> — визуализация топологического заряда. Цвет зависит от τ. τ должен быть целым числом (иначе — предупреждение в консоли).</p>
+            <p><b>🌀 Коконы</b> — границы вихрей. Когда коконы касаются, возможно образование связи.</p>
+            <p><b>✨ Поле H</b> — сверхтекучий конденсат, среда-носитель. Подчиняется бигармоническому уравнению ∇⁴ψ = 0.</p>
+            <p><b>🔗 Связи</b> — отображаются только когда расстояние между вихрями близко к d_env (равновесному для данной среды). Это условие «совпадения ступенек».</p>
+            
+            <h3>Измеритель</h3>
+            <p>В режиме анализа кликните на два атома. Вы увидите:<br>
+            — расстояние центр-центр и оболочка-оболочка<br>
+            — совпадение ступенек (Steps match)<br>
+            — топологическое напряжение Δ для каждого вихря<br>
+            — энергию системы E_vortex и среднее Δ</p>
+            
+            <h3>Параметры среды</h3>
+            <p><b>T (температура)</b> — увеличивает d_env (среда «расширяется»).<br>
+            <b>P (давление)</b> — уменьшает d_env (среда «сжимается»).<br>
+            <b>H (внешнее поле)</b> — сдвигает d_env.<br>
+            <b>χ (чистота)</b> — 1.0 = бездефектная среда. При низкой чистоте d_env отклоняется от нормы.</p>
+            
+            <h3>Гравитация</h3>
+            <p>В ВММП гравитация — не притяжение, а <b>приталкивание</b>. Это эмерджентный эффект деформации конденсата поля H.</p>
+            
+            <h3>Где данные?</h3>
+            <p>Загрузите JSON-файл с траекториями через кнопку «📂 JSON». Формат: массив кадров, каждый кадр содержит группы 1–7 с массивами позиций, tau, symbol, radius.</p>
+        </div>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -175,18 +209,17 @@
             purity_coef: 0.08,
         };
 
-        // ============ DOM ЭЛЕМЕНТЫ (один раз, без повторных поисков) ============
+        // ============ DOM ============
         const $ = (id) => document.getElementById(id);
         const dom = {
             loadBtn: $('loadBtn'), playBtn: $('playBtn'), prevFrameBtn: $('prevFrameBtn'),
             frameInput: $('frameInput'), nextFrameBtn: $('nextFrameBtn'), frameSlider: $('frameSlider'),
             resetViewBtn: $('resetViewBtn'), toggleProjectionBtn: $('toggleProjectionBtn'),
-            toggleModeBtn: $('toggleModeBtn'), toggleCocoonBtn: $('toggleCocoonBtn'),
-            toggleFieldBtn: $('toggleFieldBtn'), toggleTauBtn: $('toggleTauBtn'),
-            toggleFlowBtn: $('toggleFlowBtn'), toggleTrailsBtn: $('toggleTrailsBtn'),
-            learnModeBtn: $('learnModeBtn'), opacitySlider: $('opacitySlider'),
-            brightnessSlider: $('brightnessSlider'), fileInput: $('fileInput'),
-            exportCsvBtn: $('exportCsvBtn'), modeBanner: $('modeBanner'),
+            toggleCocoonBtn: $('toggleCocoonBtn'), toggleFieldBtn: $('toggleFieldBtn'),
+            toggleTauBtn: $('toggleTauBtn'), toggleFlowBtn: $('toggleFlowBtn'),
+            toggleTrailsBtn: $('toggleTrailsBtn'), helpBtn: $('helpBtn'),
+            opacitySlider: $('opacitySlider'), brightnessSlider: $('brightnessSlider'),
+            fileInput: $('fileInput'), exportCsvBtn: $('exportCsvBtn'),
             infoBanner: $('infoBanner'), frameLabel: $('frameLabel'), totalFrames: $('totalFrames'),
             dminVal: $('dminVal'), energyVal: $('energyVal'), deltaVal: $('deltaVal'),
             errorHunter: $('errorHunter'), tempSlider: $('tempSlider'), tempVal: $('tempVal'),
@@ -195,7 +228,7 @@
             puritySlider: $('puritySlider'), purityVal: $('purityVal'),
             measurePanel: $('measurePanel'), measureContent: $('measureContent'),
             copyMeasureBtn: $('copyMeasureBtn'), closeMeasureBtn: $('closeMeasureBtn'),
-            legend: $('legend')
+            legend: $('legend'), helpOverlay: $('helpOverlay'), closeHelp: $('closeHelp')
         };
 
         // ============ СЦЕНА ============
@@ -257,22 +290,30 @@
         let selectedForMeasure = [], positionHistory = [];
         const TRAIL_LENGTH = 10;
         
-        let analysisMode = false, showCocoon = true, showField = true;
-        let showTau = true, showFlowLines = true, showTrails = false, learnMode = false;
+        let showCocoon = true, showField = true;
+        let showTau = true, showFlowLines = true, showTrails = false;
         
         let temperature = 300, pressure = 1.0, externalField = 0.5, purity = 0.9;
         let dminForFrame = null, energyVortex = 0, deltaTopo = 0, d_env = 0;
         
         const groupColors = ['#ff3366', '#ff8844', '#ffdd44', '#44cc44', '#44aaff', '#aa66ff', '#ff66cc'];
-        const groupRadii = {1:0.55, 2:0.75, 3:0.95, 4:1.15, 5:1.35, 6:1.55, 7:1.75};
         
         // ============ УТИЛИТЫ ============
         const getGroupColor = (g) => new THREE.Color(groupColors[(g-1)%7]);
         
         const getTauColor = (tau) => {
-            if (!Number.isInteger(tau)) console.warn(`[ВММП] τ = ${tau} не целое`);
+            if (!Number.isInteger(tau)) console.warn(`[VMMP] tau = ${tau} is not integer`);
             const hue = 0.55 + (tau || 0) * 0.1;
             return new THREE.Color().setHSL(Math.min(0.85, Math.max(0.25, hue)), 1.0, 0.65);
+        };
+
+        // Радиусы из d_opt (первые принципы)
+        const getRadii = (group) => {
+            const dOpt = VMMP.d_opt_default[group] || 2.0;
+            return {
+                core: dOpt * 0.35,    // ядро — область сингулярности
+                cocoon: dOpt * 0.65,  // кокон — граница вихря
+            };
         };
         
         const debouncedUpdate = () => {
@@ -343,18 +384,20 @@
         // ============ ПОСТРОЕНИЕ ОБЪЕКТОВ ============
         function createVortex(x, y, z, group, tau, index, customSymbol, customRadius) {
             const groupObj = new THREE.Group();
-            const radius = customRadius || groupRadii[group] * 0.5;
+            const radii = getRadii(group);
+            const coreRadius = customRadius || radii.core;
+            const cocoonRadius = radii.cocoon;
             const groupColor = getGroupColor(group);
             
             const core = new THREE.Mesh(
-                new THREE.SphereGeometry(radius, 32, 32),
+                new THREE.SphereGeometry(coreRadius, 32, 32),
                 new THREE.MeshStandardMaterial({ color: groupColor, emissive: groupColor, emissiveIntensity: 0.25, roughness: 0.4 })
             );
             core.name = 'core';
             groupObj.add(core);
             
             const filament = new THREE.Mesh(
-                new THREE.SphereGeometry(radius * 1.12, 32, 32),
+                new THREE.SphereGeometry(coreRadius * 1.12, 32, 32),
                 new THREE.MeshStandardMaterial({ color: getTauColor(tau), emissive: getTauColor(tau), emissiveIntensity: 0.6, roughness: 0.3 })
             );
             filament.name = 'filament';
@@ -363,23 +406,24 @@
             
             groupObj.position.set(x, y, z);
             
+            // Простой текст без плашки
             const div = document.createElement('div');
             const sym = customSymbol || ((index < 118) ? getElementSymbol(index) : (index+1).toString());
             div.textContent = sym;
-            div.style.cssText = `color:#fff;font-size:10px;font-weight:bold;font-family:monospace;text-shadow:0 0 3px #000;background:rgba(0,0,0,0.6);padding:1px 4px;border-radius:10px;border:1px solid ${groupColors[(group-1)%7]}`;
+            div.style.cssText = `color:#fff;font-size:8px;font-weight:bold;font-family:monospace;text-shadow:0 0 4px #000,0 0 2px #000;pointer-events:none;`;
             const label = new THREE.CSS2DObject(div);
-            label.position.set(0, radius * 1.5, 0);
+            label.position.set(0, coreRadius * 1.8, 0);
             groupObj.add(label);
             
-            return { groupObj, core, filament, tau, label, index, x, y, z, group, radius, groupColor };
+            return { groupObj, core, filament, tau, label, index, x, y, z, group, radius: coreRadius, cocoonRadius, groupColor };
         }
         
-        function createCocoon(x, y, z, radius, group) {
+        function createCocoon(x, y, z, cocoonRadius, group) {
             const sphere = new THREE.Mesh(
                 new THREE.SphereGeometry(1, 32, 32),
                 new THREE.MeshPhongMaterial({ color: getGroupColor(group), emissive: 0x112233, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
             );
-            sphere.scale.setScalar(radius);
+            sphere.scale.setScalar(cocoonRadius);
             sphere.position.set(x, y, z);
             sphere.name = 'cocoon';
             return sphere;
@@ -412,6 +456,11 @@
                 group.remove(c);
             }
         }
+
+        function clearDOMLabels() {
+            const domEl = labelRenderer.domElement;
+            while (domEl.firstChild) domEl.removeChild(domEl.firstChild);
+        }
         
         function buildFlowLines() {
             clearGroup(flowLinesGroup);
@@ -428,7 +477,7 @@
                     const mixedColor = new THREE.Color().copy(vortices[i].groupColor).add(vortices[j].groupColor).multiplyScalar(0.5);
                     
                     const cyl = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.05, 0.05, dist, 8),
+                        new THREE.CylinderGeometry(0.04, 0.04, dist, 8),
                         new THREE.MeshBasicMaterial({ color: mixedColor, transparent: true, opacity: 0.8, depthWrite: false })
                     );
                     cyl.position.copy(mid);
@@ -439,12 +488,11 @@
         }
         
         function buildDumbbells() {
-            // Удаляем старые гантели
             const toRemove = [];
             interfaceGroup.children.forEach(c => { if (c.name === 'dumbbell') toRemove.push(c); });
             toRemove.forEach(c => { interfaceGroup.remove(c); });
             
-            if (!showCocoon || analysisMode) return;
+            if (!showCocoon) return;
             
             const processed = new Set();
             for (let i = 0; i < vortices.length; i++) {
@@ -455,17 +503,17 @@
                     const p1 = vortices[i].groupObj.position;
                     const p2 = vortices[j].groupObj.position;
                     const dist = p1.distanceTo(p2);
-                    const r1 = vortices[i].radius, r2 = vortices[j].radius;
+                    const r1 = vortices[i].cocoonRadius, r2 = vortices[j].cocoonRadius;
                     
-                    if (dist < (r1 + r2) * 1.5) {
+                    if (dist < r1 + r2 + 0.1) {
                         const group = new THREE.Group();
                         group.name = 'dumbbell';
                         const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
                         const dir = new THREE.Vector3().subVectors(p2, p1).normalize();
-                        const bridgeLen = Math.max(0.1, dist - r1 - r2 + 0.3);
+                        const bridgeLen = Math.max(0.05, dist - r1 - r2 + 0.2);
                         
                         const bridge = new THREE.Mesh(
-                            new THREE.CylinderGeometry(Math.min(r1,r2)*0.4, Math.min(r1,r2)*0.4, bridgeLen, 8),
+                            new THREE.CylinderGeometry(Math.min(r1,r2)*0.3, Math.min(r1,r2)*0.3, bridgeLen, 8),
                             new THREE.MeshPhongMaterial({ color: 0x88aacc, emissive: 0x112233, transparent: true, opacity: 0.35, depthWrite: false })
                         );
                         bridge.position.copy(mid);
@@ -499,6 +547,7 @@
         }
         
         function buildFromFrame(frame) {
+            clearDOMLabels();
             clearGroup(vortexGroup);
             clearGroup(interfaceGroup);
             clearGroup(highlightGroup);
@@ -509,7 +558,7 @@
             positionHistory = [];
             
             if (!fieldParticles) { fieldParticles = createField(); fieldGroup.add(fieldParticles); }
-            fieldParticles.visible = showField && !analysisMode;
+            fieldParticles.visible = showField;
             
             dminForFrame = frame.d_min || null;
             d_env = calcDEnv();
@@ -522,13 +571,13 @@
                     const tau = pos.tau ?? (frame.tau_map?.[counter] ?? 0);
                     const [x, y, z] = p;
                     const sym = pos.symbol || frame.symbols?.[counter];
-                    const rad = pos.radius || groupRadii[g] * 0.5;
+                    const rad = pos.radius || null; // если задан в данных — используем, иначе из d_opt
                     
                     const vortex = createVortex(x, y, z, g, tau, counter, sym, rad);
                     vortexGroup.add(vortex.groupObj);
                     
-                    if (showCocoon && !analysisMode) {
-                        const cocoon = createCocoon(x, y, z, rad, g);
+                    if (showCocoon) {
+                        const cocoon = createCocoon(x, y, z, vortex.cocoonRadius, g);
                         interfaceGroup.add(cocoon);
                         vortex.cocoon = cocoon;
                     }
@@ -537,7 +586,7 @@
                 });
             }
             
-            interfaceGroup.visible = showCocoon && !analysisMode;
+            interfaceGroup.visible = showCocoon;
             
             energyVortex = calcEnergyVortex();
             deltaTopo = vortices.length > 0 ? vortices.reduce((s,v) => s + calcDelta(v), 0) / vortices.length : 0;
@@ -551,7 +600,7 @@
         function updateInfoBanner() {
             dom.frameLabel.textContent = currentFrame;
             dom.totalFrames.textContent = trajectoryData.length - 1;
-            dom.dminVal.textContent = dminForFrame ? dminForFrame.toFixed(3) : '—';
+            dom.dminVal.textContent = dminForFrame ? dminForFrame.toFixed(3) : '--';
             dom.energyVal.textContent = energyVortex.toFixed(3);
             dom.deltaVal.textContent = deltaTopo.toFixed(4);
         }
@@ -627,7 +676,7 @@
             
             selectedForMeasure.forEach(v => {
                 const ring = new THREE.Mesh(
-                    new THREE.TorusGeometry(v.radius * 1.3, 0.07, 8, 16),
+                    new THREE.TorusGeometry(v.radius * 1.5, 0.06, 8, 16),
                     new THREE.MeshBasicMaterial({ color: 0x44ffaa, transparent: true, opacity: 0.85, depthTest: false })
                 );
                 ring.position.copy(v.groupObj.position);
@@ -655,51 +704,60 @@
             const delta1 = calcDelta(v1), delta2 = calcDelta(v2);
             const matchSteps = stepsMatch(v1, v2);
             
-            const text = [
-                `🔘 ${v1.label.element.textContent} | τ=${v1.tau} | R=${v1.radius.toFixed(2)} | гр.${v1.group} | Δ=${delta1.toFixed(3)}`,
-                `   📍 (${v1.x.toFixed(3)}, ${v1.y.toFixed(3)}, ${v1.z.toFixed(3)})`,
-                `🔘 ${v2.label.element.textContent} | τ=${v2.tau} | R=${v2.radius.toFixed(2)} | гр.${v2.group} | Δ=${delta2.toFixed(3)}`,
-                `   📍 (${v2.x.toFixed(3)}, ${v2.y.toFixed(3)}, ${v2.z.toFixed(3)})`,
-                `──────────────────────────────`,
-                `📏 Центр→Центр: ${dCenter.toFixed(4)}`,
-                `🔘 Обол→Обол: ${dShell.toFixed(4)} ${overlap ? '⚡ ПЕРЕКРЫТИЕ' : ''}`,
-                `🎯 Совпадение ступенек: ${matchSteps ? '✅ ДА' : '❌ НЕТ'} (d_env = ${d_env.toFixed(3)})`,
-                `⚡ Στ: ${tauSum} ${tauSum === 0 ? '(компенсация)' : ''}`,
-                `──────────────────────────────`,
-                `📊 Кадр: ${frameIdx} | d_min: ${dminForFrame ? dminForFrame.toFixed(3) : '—'}`,
-                `💚 E_vortex: ${energyVortex.toFixed(4)} | Δ_сред: ${deltaTopo.toFixed(4)}`,
-                `🌡️ d_env: ${d_env.toFixed(3)} (T=${temperature}K, P=${pressure.toFixed(1)})`
-            ].join('\n');
+            const lines = [
+                `${v1.label.element.textContent} | tau=${v1.tau} | R=${v1.radius.toFixed(2)} | grp.${v1.group} | D=${delta1.toFixed(3)}`,
+                `   pos: (${v1.x.toFixed(3)}, ${v1.y.toFixed(3)}, ${v1.z.toFixed(3)})`,
+                `${v2.label.element.textContent} | tau=${v2.tau} | R=${v2.radius.toFixed(2)} | grp.${v2.group} | D=${delta2.toFixed(3)}`,
+                `   pos: (${v2.x.toFixed(3)}, ${v2.y.toFixed(3)}, ${v2.z.toFixed(3)})`,
+                `---`,
+                `Center->Center: ${dCenter.toFixed(4)}`,
+                `Shell->Shell: ${dShell.toFixed(4)} ${overlap ? 'OVERLAP ' + Math.abs(dShell).toFixed(4) : ''}`,
+                `Steps match: ${matchSteps ? 'YES' : 'NO'} (d_env = ${d_env.toFixed(3)})`,
+                `Sum tau: ${tauSum} ${tauSum === 0 ? '(compensation)' : ''}`,
+                `---`,
+                `Frame: ${frameIdx} | d_min: ${dminForFrame ? dminForFrame.toFixed(3) : '--'}`,
+                `E_vortex: ${energyVortex.toFixed(4)} | D_avg: ${deltaTopo.toFixed(4)}`,
+                `d_env: ${d_env.toFixed(3)} (T=${temperature}K, P=${pressure.toFixed(1)})`
+            ];
             
-            dom.measureContent.innerHTML = `<pre style="margin:0;white-space:pre-wrap;line-height:1.45;font-size:9px;">${text}</pre>`;
-            dom.measurePanel.style.display = 'block';
+            dom.measureContent.innerHTML = `<pre style="margin:0;white-space:pre-wrap;line-height:1.45;font-size:9px;color:#ccc;">${lines.join('\n')}</pre>`;
             highlightSelected();
         }
         
         function resetMeasurement() {
-            dom.measurePanel.style.display = 'none';
             selectedForMeasure = [];
             highlightSelected();
             if (measureResetTimeout) clearTimeout(measureResetTimeout);
-            dom.measureContent.innerHTML = 'Выберите два атома кликами (Esc — сброс)';
+            dom.measureContent.innerHTML = '<span style="color:#ccc;">Select two atoms (Esc to reset)</span>';
         }
         
         dom.copyMeasureBtn.addEventListener('click', () => {
             const text = dom.measureContent.innerText;
             navigator.clipboard.writeText(text).then(() => {
-                dom.copyMeasureBtn.textContent = '✅';
+                dom.copyMeasureBtn.textContent = 'OK';
                 setTimeout(() => dom.copyMeasureBtn.textContent = '📋', 1000);
             });
         });
         
-        dom.closeMeasureBtn.addEventListener('click', resetMeasurement);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') resetMeasurement(); });
+        dom.closeMeasureBtn.addEventListener('click', () => {
+            dom.measurePanel.style.display = 'none';
+            resetMeasurement();
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (dom.measurePanel.style.display !== 'none') {
+                    dom.measurePanel.style.display = 'block';
+                    resetMeasurement();
+                }
+            }
+        });
         
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         
         renderer.domElement.addEventListener('click', (event) => {
-            if (!vortices.length || !analysisMode) return;
+            if (!vortices.length) return;
             
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -727,7 +785,7 @@
                         selectedForMeasure = [];
                     } else {
                         dom.measurePanel.style.display = 'block';
-                        dom.measureContent.innerHTML = `<pre style="margin:0;">Выбран: ${vortex.label.element.textContent} (τ=${vortex.tau}, R=${vortex.radius.toFixed(2)})\nКликните второй атом (Esc — сброс)</pre>`;
+                        dom.measureContent.innerHTML = `<span style="color:#ccc;">Selected: ${vortex.label.element.textContent} (tau=${vortex.tau}, R=${vortex.radius.toFixed(2)}) — click second atom</span>`;
                         highlightSelected();
                         measureResetTimeout = setTimeout(resetMeasurement, 8000);
                     }
@@ -745,7 +803,7 @@
             reader.onload = (ev) => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    if (!Array.isArray(data) || !data.length) throw new Error("Неверный формат: ожидается массив кадров");
+                    if (!Array.isArray(data) || !data.length) throw new Error("Invalid format: expected array of frames");
                     trajectoryData = data;
                     const maxFrames = trajectoryData.length - 1;
                     safeSetAttr('frameSlider', 'max', maxFrames);
@@ -754,11 +812,11 @@
                     safeEnable('playBtn'); safeEnable('prevFrameBtn'); safeEnable('nextFrameBtn');
                     safeEnable('exportCsvBtn'); safeEnable('toggleTrailsBtn');
                     playing = false;
-                    dom.playBtn.textContent = '▶';
+                    dom.playBtn.textContent = '\u25B6';
                     buildFromFrame(trajectoryData[0]);
                     loadFrame(0);
                     setTimeout(autoFocusCamera, 100);
-                } catch(err) { alert("Ошибка загрузки: " + err.message); }
+                } catch(err) { alert("Error loading: " + err.message); }
             };
             reader.readAsText(file);
         });
@@ -768,30 +826,30 @@
         // ============ УПРАВЛЕНИЕ ============
         dom.playBtn.addEventListener('click', () => {
             playing = !playing;
-            dom.playBtn.textContent = playing ? '⏸' : '▶';
+            dom.playBtn.textContent = playing ? '\u23F8' : '\u25B6';
             lastFrameTime = performance.now();
             if (!playing) { buildTrails(); buildDumbbells(); }
             else clearGroup(trailsGroup);
         });
         
         dom.prevFrameBtn.addEventListener('click', () => {
-            playing = false; dom.playBtn.textContent = '▶';
+            playing = false; dom.playBtn.textContent = '\u25B6';
             if (currentFrame > 0) loadFrame(currentFrame - 1);
         });
         
         dom.nextFrameBtn.addEventListener('click', () => {
-            playing = false; dom.playBtn.textContent = '▶';
+            playing = false; dom.playBtn.textContent = '\u25B6';
             if (currentFrame < trajectoryData.length - 1) loadFrame(currentFrame + 1);
         });
         
         dom.frameInput.addEventListener('change', (e) => {
-            playing = false; dom.playBtn.textContent = '▶';
+            playing = false; dom.playBtn.textContent = '\u25B6';
             const val = parseInt(e.target.value);
             if (!isNaN(val) && val >= 0 && val < trajectoryData.length) loadFrame(val);
         });
         
         dom.frameSlider.addEventListener('input', (e) => {
-            playing = false; dom.playBtn.textContent = '▶';
+            playing = false; dom.playBtn.textContent = '\u25B6';
             const val = parseInt(e.target.value);
             if (!isNaN(val) && val >= 0 && val < trajectoryData.length) loadFrame(val);
         });
@@ -800,7 +858,7 @@
         
         dom.toggleProjectionBtn.addEventListener('click', () => {
             setProjection(!isOrthographic);
-            dom.toggleProjectionBtn.textContent = isOrthographic ? '📐 Орто' : '📐 Перспектива';
+            dom.toggleProjectionBtn.textContent = isOrthographic ? 'Ortho' : 'Perspective';
         });
         
         dom.toggleFlowBtn.addEventListener('click', () => {
@@ -815,43 +873,7 @@
             if (showTrails) buildTrails(); else clearGroup(trailsGroup);
         });
         
-        dom.toggleModeBtn.addEventListener('click', () => {
-            analysisMode = !analysisMode;
-            if (analysisMode) {
-                dom.toggleModeBtn.textContent = '📊 Анализ';
-                dom.toggleModeBtn.classList.remove('active');
-                dom.modeBanner.textContent = '📊 АНАЛИЗ ВММП: τ-жилы, ступеньки, Δ-напряжение, E_vortex';
-                dom.modeBanner.className = 'mode-banner analysis';
-                dom.legend.textContent = '🌑 Ядро | ⚡ τ-жилы | 📏 Измеритель | 🔗 Связи (ступеньки)';
-                showCocoon = false; showField = false;
-                interfaceGroup.visible = false; fieldGroup.visible = false;
-                if (fieldParticles) fieldParticles.visible = false;
-                dom.toggleCocoonBtn.classList.remove('active');
-                dom.toggleFieldBtn.classList.remove('active');
-                dom.toggleCocoonBtn.disabled = true;
-                dom.toggleFieldBtn.disabled = true;
-                showTau = true;
-                dom.toggleTauBtn.classList.add('active');
-                vortices.forEach(v => { if(v.filament) v.filament.visible = true; });
-                dom.measurePanel.style.display = 'block';
-                dom.measureContent.innerHTML = 'Выберите два атома кликами (Esc — сброс)';
-            } else {
-                dom.toggleModeBtn.textContent = '📚 Демо';
-                dom.toggleModeBtn.classList.add('active');
-                dom.modeBanner.textContent = '📚 ДЕМО: Вихревая Модель Материи-Пространства';
-                dom.modeBanner.className = 'mode-banner demo';
-                dom.legend.innerHTML = '🌑 Ядро | 🌀 Кокон | ✨ Поле H | 🔗 Связи | ⚡ τ-жилы | 📚 Обучение';
-                showCocoon = true; showField = true;
-                dom.toggleCocoonBtn.disabled = false; dom.toggleFieldBtn.disabled = false;
-                dom.toggleCocoonBtn.classList.add('active'); dom.toggleFieldBtn.classList.add('active');
-                dom.measurePanel.style.display = 'none';
-                resetMeasurement();
-            }
-            if (trajectoryData.length) buildFromFrame(trajectoryData[currentFrame]);
-        });
-        
         dom.toggleCocoonBtn.addEventListener('click', () => {
-            if (analysisMode) return;
             showCocoon = !showCocoon;
             interfaceGroup.visible = showCocoon;
             dom.toggleCocoonBtn.classList.toggle('active', showCocoon);
@@ -859,7 +881,6 @@
         });
         
         dom.toggleFieldBtn.addEventListener('click', () => {
-            if (analysisMode) return;
             showField = !showField;
             fieldGroup.visible = showField;
             if (fieldParticles) fieldParticles.visible = showField;
@@ -920,63 +941,32 @@
         dom.opacitySlider.addEventListener('input', debouncedUpdate);
         dom.brightnessSlider.addEventListener('input', debouncedUpdate);
         
-        // ============ РЕЖИМ ОБУЧЕНИЯ ============
-        let currentTooltip = null;
-        const tooltipsData = {
-            cocoon: { title: "🌀 КОКОН", formula: "Граница вихря. Радиус = R_ядра", desc: "Обменная сущность. При связи — гантель. В ВММП это область, где |∇H| максимален." },
-            core: { title: "🌑 ЯДРО", formula: "τ = ∮∇ψ·dl / 2π  (N ∈ ℤ)", desc: "Топологический скелет вихря. τ — целое число. Нецелые τ нарушают квантование." },
-            field: { title: "✨ ПОЛЕ H", formula: "∇⁴ψ = 0", desc: "Сверхтекучий конденсат. Пространство-время как среда. Частицы — топологические дефекты." },
-            flowline: { title: "🔗 СВЯЗЬ", formula: "Ступеньки совпадают: |d_ij − d_env| / d_env < 0.15", desc: "Связь есть только при совпадении ступенек. Не просто касание — топологический резонанс." }
-        };
-        
-        function showTooltip(type, x, y) {
-            if (!learnMode || analysisMode) return;
-            if (currentTooltip) currentTooltip.remove();
-            const data = tooltipsData[type];
-            if (!data) return;
-            const div = document.createElement('div');
-            div.className = 'learn-tooltip';
-            div.style.left = Math.min(x + 15, window.innerWidth - 280) + 'px';
-            div.style.top = Math.min(y + 15, window.innerHeight - 200) + 'px';
-            div.innerHTML = `<div class="tt-title">${data.title}</div><div class="tt-formula">📐 ${data.formula}</div><div class="tt-desc">💡 ${data.desc}</div>`;
-            document.body.appendChild(div);
-            currentTooltip = div;
-            setTimeout(() => { if (currentTooltip === div) { div.remove(); currentTooltip = null; } }, 6000);
-        }
-        
-        dom.learnModeBtn.addEventListener('click', () => {
-            learnMode = !learnMode;
-            dom.learnModeBtn.textContent = learnMode ? '📚 Обуч: Вкл' : '📚 Обучение';
-            dom.learnModeBtn.classList.toggle('learn-active', learnMode);
+        // ============ СПРАВКА ============
+        dom.helpBtn.addEventListener('click', () => {
+            dom.helpOverlay.classList.add('show');
         });
-        
-        renderer.domElement.addEventListener('mousemove', (event) => {
-            if (!learnMode || analysisMode) return;
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const objs = [...interfaceGroup.children, ...flowLinesGroup.children, ...vortexGroup.children];
-            const intersects = raycaster.intersectObjects(objs, true);
-            if (intersects.length) {
-                let type = 'core';
-                const hit = intersects[0].object;
-                if (interfaceGroup.children.some(c => c === hit || c.children.includes(hit))) type = 'cocoon';
-                else if (flowLinesGroup.children.some(c => c === hit || c.children.includes(hit))) type = 'flowline';
-                showTooltip(type, event.clientX, event.clientY);
+        dom.closeHelp.addEventListener('click', () => {
+            dom.helpOverlay.classList.remove('show');
+        });
+        dom.helpOverlay.addEventListener('click', (e) => {
+            if (e.target === dom.helpOverlay) dom.helpOverlay.classList.remove('show');
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && dom.helpOverlay.classList.contains('show')) {
+                dom.helpOverlay.classList.remove('show');
             }
         });
         
-        // ============ ДЕМО-ДАННЫЕ ============
+        // ============ ДЕМО-ДАННЫЕ (сближенные для видимости связей) ============
         const embeddedDemo = [{
-            "step": 0, "d_min": 1.45, "groups": {
-                "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.55}, {"pos":[2.2,0.6,0.3],"tau":-1,"symbol":"H","radius":0.55}],
-                "2": [{"pos":[-1.5,-0.8,0.8],"tau":1,"symbol":"He","radius":0.75}, {"pos":[1.8,-1.2,0.2],"tau":-1,"symbol":"He","radius":0.75}],
-                "3": [{"pos":[0.2,1.5,-1.0],"tau":1,"symbol":"Li","radius":0.95}, {"pos":[-1.2,0.3,1.2],"tau":-1,"symbol":"Li","radius":0.95}, {"pos":[1.8,0.9,0.8],"tau":1,"symbol":"Be","radius":1.15}],
-                "4": [{"pos":[-1.4,-1.2,-1.0],"tau":-1,"symbol":"B","radius":1.15}, {"pos":[1.5,-1.5,0.2],"tau":1,"symbol":"C","radius":1.35}],
-                "5": [{"pos":[-1.8,1.5,-0.6],"tau":-1,"symbol":"N","radius":1.35}, {"pos":[0.8,-1.8,1.5],"tau":1,"symbol":"O","radius":1.55}],
-                "6": [{"pos":[2.5,0.2,0.2],"tau":1,"symbol":"F","radius":1.55}, {"pos":[-2.2,0.1,0.2],"tau":-1,"symbol":"Ne","radius":1.75}],
-                "7": [{"pos":[0.1,-2.2,0.1],"tau":-1,"symbol":"Na","radius":1.75}, {"pos":[0.1,0.2,2.5],"tau":1,"symbol":"Mg","radius":1.75}]
+            "step": 0, "d_min": 1.52, "groups": {
+                "1": [{"pos":[0,0,0],"tau":1,"symbol":"H","radius":0.26}, {"pos":[0.8,0.4,0.2],"tau":-1,"symbol":"H","radius":0.26}],
+                "2": [{"pos":[-1.2,-0.6,0.6],"tau":1,"symbol":"He","radius":0.43}, {"pos":[1.2,-0.8,0.1],"tau":-1,"symbol":"He","radius":0.43}],
+                "3": [{"pos":[0.2,1.2,-0.7],"tau":1,"symbol":"Li","radius":0.53}, {"pos":[-0.9,0.3,0.9],"tau":-1,"symbol":"Li","radius":0.53}, {"pos":[1.3,0.7,0.6],"tau":1,"symbol":"Be","radius":0.64}],
+                "4": [{"pos":[-1.0,-0.9,-0.7],"tau":-1,"symbol":"B","radius":0.64}, {"pos":[1.2,-1.1,0.2],"tau":1,"symbol":"C","radius":0.72}],
+                "5": [{"pos":[-1.4,1.2,-0.4],"tau":-1,"symbol":"N","radius":0.72}, {"pos":[0.7,-1.4,1.2],"tau":1,"symbol":"O","radius":0.77}],
+                "6": [{"pos":[1.8,0.2,0.2],"tau":1,"symbol":"F","radius":0.77}, {"pos":[-1.7,0.1,0.2],"tau":-1,"symbol":"Ne","radius":0.84}],
+                "7": [{"pos":[0.1,-1.7,0.1],"tau":-1,"symbol":"Na","radius":0.84}, {"pos":[0.1,0.2,1.9],"tau":1,"symbol":"Mg","radius":0.84}]
             }
         }];
         
@@ -987,6 +977,12 @@
         safeEnable('frameSlider'); safeEnable('frameInput');
         safeEnable('playBtn'); safeEnable('prevFrameBtn'); safeEnable('nextFrameBtn');
         safeEnable('exportCsvBtn'); safeEnable('toggleTrailsBtn');
+        
+        // Стартуем в режиме анализа
+        showCocoon = true; showField = true; showTau = true;
+        dom.toggleCocoonBtn.classList.add('active');
+        dom.toggleFieldBtn.classList.add('active');
+        dom.toggleTauBtn.classList.add('active');
         
         buildFromFrame(trajectoryData[0]);
         loadFrame(0);
