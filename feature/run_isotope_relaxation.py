@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-run_isotope_relaxation.py — прогон изотопной конфигурации с айкидо-штормом (пятифазный пендель)
+run_isotope_relaxation.py — честный прогон изотопной конфигурации
+с фрактальным временем, 7 архитекторами и айкидо-штормом (пятифазный пендель).
 
 Вход:
   - feature/data/isotope_relaxation_frame0.json (200 вихрей, 16³ сетка)
-  
+
 Выход:
-  - feature/data/isotope_trajectories.json (каждый 10-й шаг, формат плеера)
+  - feature/data/isotope_trajectories.json (каждый save_interval шаг, формат плеера)
   - feature/data/isotope_checkpoint.json (последний шаг для возобновления)
 """
 
@@ -14,6 +15,7 @@ import json
 import sys
 import os
 import argparse
+import math
 import numpy as np
 from datetime import datetime
 
@@ -27,13 +29,22 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, 'src', 'architect'))
 from biharmonic_3d import TopologicalArchitect3D
 from thermodynamics import ThermodynamicState
 from fractal_time import FractalTimeEvolution, FractalFieldWrapper
-from adaptive_chi_tuner import AdaptiveChiTuner
 
 # ========== КОНСТАНТЫ ВММП ==========
 VMMP = {
     "d_opt_default": {1: 0.74, 2: 1.22, 3: 1.52, 4: 1.82, 5: 2.05, 6: 2.20, 7: 2.40},
     "d_env_base": 2.10,
 }
+
+# Отображение Z → фрактальный уровень (K-Q оболочки)
+def get_fractal_level(z: int) -> int:
+    if z <= 2: return 1
+    elif z <= 10: return 2
+    elif z <= 18: return 3
+    elif z <= 36: return 4
+    elif z <= 54: return 5
+    elif z <= 86: return 6
+    else: return 7
 
 # ========== СОХРАНЕНИЕ ==========
 
@@ -111,6 +122,7 @@ def apply_five_phase_pulse(thermo_state, pulse_params):
     print(f"  🌡️  Фаза 5/5: ОСТЫВАНИЕ (P={P_ambient}, T={T_ambient})")
     yield 'cooldown'
 
+
 # ========== ОСНОВНАЯ ФУНКЦИЯ ==========
 
 def main():
@@ -130,8 +142,8 @@ def main():
 
     start_time = datetime.now()
     print("=" * 70)
-    print("ИЗОТОПНАЯ РЕЛАКСАЦИЯ С ПЯТИФАЗНЫМ АЙКИДО-ПЕНДЕЛЕМ")
-    print("Модель: ВММП | Решатель: BiharmonicSolver3D")
+    print("ИЗОТОПНАЯ РЕЛАКСАЦИЯ С ФРАКТАЛЬНЫМ ВРЕМЕНЕМ И АЙКИДО-ПЕНДЕЛЕМ")
+    print("Модель: ВММП | Решатель: 7 × BiharmonicSolver3D | Честная версия")
     print("=" * 70)
 
     # Пути
@@ -144,6 +156,7 @@ def main():
     output_checkpoint = os.path.join(feature_dir, 'isotope_checkpoint.json')
 
     grid_size = 16
+    box_size = (16.0, 16.0, 16.0)
     max_steps = args.steps
     T, P = args.T, args.P
     save_interval = args.save_interval
@@ -153,12 +166,16 @@ def main():
     print(f"Сторож: окно {args.watchdog_window}, допуск {args.watchdog_tolerance*100}%")
     print(f"Сохранение: каждый {save_interval}-й шаг → {output_traj}")
 
-    # Загрузка начальной конфигурации
-    print("\n[1/4] Загрузка изотопной конфигурации...")
+    # =====================================================================
+    # [1] Загрузка начальной конфигурации
+    # =====================================================================
+    print("\n[1/5] Загрузка изотопной конфигурации...")
     frame0_data = load_json(input_file)
     frame0 = frame0_data[0]
 
-    components_meta = []  # метаданные для сохранения кадров
+    # Сортируем вихри по фрактальным уровням
+    components_by_level = {lvl: [] for lvl in range(1, 8)}
+    all_components_meta = []  # полная метаинформация для сохранения кадров
     vortex_index = 0
 
     for g_str, entries in frame0.get("groups", {}).items():
@@ -171,44 +188,67 @@ def main():
             half_life = entry.get("half_life", None)
             unstable = entry.get("unstable", False)
 
-            components_meta.append({
+            # Определяем Z по символу (упрощённо: из загруженных данных)
+            z = entry.get("Z", vortex_index + 1)
+
+            comp_meta = {
                 "charge": tau if tau != 0 else 1,
                 "position": np.array(pos, dtype=np.float64),
                 "orientation": [0, 0, 1],
                 "symbol": symbol,
-                "Z": vortex_index + 1,
+                "Z": z,
                 "tau": tau,
                 "group": g,
                 "radius": radius,
                 "half_life": half_life,
                 "unstable": unstable,
-            })
+                "index": vortex_index,
+                "level": get_fractal_level(z),
+            }
+            all_components_meta.append(comp_meta)
+            components_by_level[comp_meta["level"]].append(comp_meta)
             vortex_index += 1
 
-    n_vortices = len(components_meta)
+    n_vortices = len(all_components_meta)
     print(f"Загружено вихрей: {n_vortices}")
+    for lvl in range(1, 8):
+        n_lvl = len(components_by_level[lvl])
+        if n_lvl > 0:
+            shells = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
+            print(f"  Оболочка {shells[lvl-1]} (уровень {lvl}): {n_lvl} вихрей")
 
-    # Инициализация решателя
-    print("\n[2/4] Инициализация 3D-решателя...")
-    architect = TopologicalArchitect3D(
-        grid_shape=(grid_size, grid_size, grid_size),
-        box_size=(16.0, 16.0, 16.0)
-    )
+    # =====================================================================
+    # [2] Инициализация 7 архитекторов (по одному на уровень)
+    # =====================================================================
+    print("\n[2/5] Инициализация 7 архитекторов...")
+    architects = {}
+    for lvl in range(1, 8):
+        arch = TopologicalArchitect3D(
+            grid_shape=(grid_size, grid_size, grid_size),
+            box_size=box_size
+        )
+        for comp_meta in components_by_level[lvl]:
+            arch.add_component(comp_meta)
+        architects[lvl] = arch
+        print(f"    Уровень {lvl}: {len(arch.components)} вихрей в архитекторе")
 
-    for comp in components_meta:
-        architect.add_component(comp)
-
+    # Термодинамика (одна на всех)
     thermo_state = ThermodynamicState(T, P)
 
+    # Фрактальное время с последовательной активацией
+    level_activation = {lvl: max_steps // (2**lvl) for lvl in range(1, 8) if max_steps // (2**lvl) > 0}
+    shells = ['K', 'L', 'M', 'N', 'O', 'P', 'Q']
+    print("    Активации оболочек: " + ", ".join(
+        [f"{shells[l-1]}: шаг {level_activation[l]}" for l in sorted(level_activation)]
+    ))
+
     evolution = FractalTimeEvolution(num_levels=7, base_dt=1.0)
-    evolution.add_field(1, FractalFieldWrapper(architect, 1))
+    for lvl in range(1, 8):
+        evolution.add_field(lvl, FractalFieldWrapper(architects[lvl], lvl))
 
-    chi_tuner = None
-    elements_config_path = os.path.join(base_dir, 'data', 'field_H_elements_complete.json')
-    if os.path.exists(elements_config_path):
-        print("    Тюнер χ активирован")
-        chi_tuner = AdaptiveChiTuner(elements_config_path)
-
+    # =====================================================================
+    # [3] Переменные для эволюции
+    # =====================================================================
     energy_history = []
     min_dist_history = []
     all_trajectories = []
@@ -218,7 +258,7 @@ def main():
 
     # Сохраняем кадр 0
     groups_frame0 = {str(g): [] for g in range(1, 8)}
-    for comp in components_meta:
+    for comp in all_components_meta:
         g = str(comp["group"])
         pos = comp["position"]
         groups_frame0[g].append({
@@ -234,12 +274,13 @@ def main():
         "step": 0,
         "d_min": None,
         "groups": groups_frame0,
-        "tau_map": [comp["tau"] for comp in components_meta],
-        "symbols": [comp["symbol"] for comp in components_meta],
-        "radii": [comp["radius"] for comp in components_meta]
+        "tau_map": [comp["tau"] for comp in all_components_meta],
+        "symbols": [comp["symbol"] for comp in all_components_meta],
+        "radii": [comp["radius"] for comp in all_components_meta]
     }
     all_trajectories.append(frame0_output)
 
+    # Восстановление из чекпоинта
     if args.resume and os.path.exists(args.resume):
         print(f"[!] Восстановление из чекпоинта: {args.resume}")
         saved = load_json(args.resume)
@@ -247,61 +288,88 @@ def main():
         energy_history = saved.get("energy_history", [])
         min_dist_history = saved.get("min_dist_history", [])
         all_trajectories = saved.get("trajectories", [])
-        if "positions" in saved:
-            for i, comp in enumerate(architect.components):
-                if i < len(saved["positions"]):
-                    comp["vortex"].position = np.array(saved["positions"][i])
+        # Восстановление позиций по уровням
+        if "positions_by_level" in saved:
+            for lvl_str, positions in saved["positions_by_level"].items():
+                lvl = int(lvl_str)
+                if lvl in architects:
+                    for i, comp in enumerate(architects[lvl].components):
+                        if i < len(positions):
+                            comp["vortex"].position = np.array(positions[i])
         print(f"    Продолжаем с шага {start_step + 1}")
 
-    print(f"\n[3/4] Эволюция (шаги {start_step+1}-{max_steps})...")
+    # =====================================================================
+    # [4] Главный цикл эволюции
+    # =====================================================================
+    print(f"\n[3/5] Эволюция (шаги {start_step+1}-{max_steps})...")
     print("─" * 75)
-    header = f"{'Шаг':>6} | {'Энергия':>12} | {'d_min':>8} | {'Шторм':>5} | {'Время':>8} | {'Сохр':>5}"
+    header = f"{'Шаг':>6} | {'Энергия':>12} | {'d_min':>8} | {'Шторм':>5} | {'Активны':>10} | {'Время':>8} | {'Сохр':>5}"
     print(header)
     print("─" * 75)
 
     watchdog_counter = 0
     step = start_step
 
+    def collect_all_components():
+        """Собирает все вихри со всех архитекторов в единый список."""
+        all_comps = []
+        for lvl in range(1, 8):
+            all_comps.extend(architects[lvl].components)
+        return all_comps
+
     def make_frame(step_num, min_d):
         groups = {str(g): [] for g in range(1, 8)}
-        for comp in architect.components:
-            g = str(comp.get("group", 4))
-            pos = comp["vortex"].position
-            groups[g].append({
-                "pos": [round(float(pos[0]), 6), round(float(pos[1]), 6), round(float(pos[2]), 6)],
-                "tau": comp.get("tau", 0),
-                "symbol": comp.get("symbol", "?"),
-                "radius": comp.get("radius", 0.5),
-                "half_life": comp.get("half_life"),
-                "unstable": comp.get("unstable", False)
-            })
+        for lvl in range(1, 8):
+            for comp in architects[lvl].components:
+                g = str(comp.get("group", 4))
+                pos = comp["vortex"].position
+                groups[g].append({
+                    "pos": [round(float(pos[0]), 6), round(float(pos[1]), 6), round(float(pos[2]), 6)],
+                    "tau": comp.get("tau", 0),
+                    "symbol": comp.get("symbol", "?"),
+                    "radius": comp.get("radius", 0.5),
+                    "half_life": comp.get("half_life"),
+                    "unstable": comp.get("unstable", False)
+                })
+        all_comps = collect_all_components()
         return {
             "step": step_num,
             "d_min": round(min_d, 4) if min_d < float('inf') else None,
             "groups": groups,
-            "tau_map": [comp.get("tau", 0) for comp in architect.components],
-            "symbols": [comp.get("symbol", "?") for comp in architect.components],
-            "radii": [comp.get("radius", 0.5) for comp in architect.components]
+            "tau_map": [comp.get("tau", 0) for comp in all_comps],
+            "symbols": [comp.get("symbol", "?") for comp in all_comps],
+            "radii": [comp.get("radius", 0.5) for comp in all_comps]
         }
 
     def compute_min_dist():
         md = float('inf')
-        comps = architect.components
-        for i in range(len(comps)):
-            for j in range(i+1, len(comps)):
-                d = np.linalg.norm(comps[i]["vortex"].position - comps[j]["vortex"].position)
+        all_comps = collect_all_components()
+        for i in range(len(all_comps)):
+            for j in range(i+1, len(all_comps)):
+                d = np.linalg.norm(all_comps[i]["vortex"].position - all_comps[j]["vortex"].position)
                 if d < md:
                     md = d
         return md
 
+    def compute_total_energy():
+        e = 0.0
+        for lvl in range(1, 8):
+            if hasattr(architects[lvl], 'compute_energy'):
+                e += architects[lvl].compute_energy()
+        return e
+
     def save_checkpoint(step_num):
-        positions = [comp["vortex"].position.tolist() for comp in architect.components]
+        positions_by_level = {}
+        for lvl in range(1, 8):
+            positions_by_level[str(lvl)] = [
+                comp["vortex"].position.tolist() for comp in architects[lvl].components
+            ]
         checkpoint = {
             "step": step_num + 1,
             "energy_history": energy_history,
             "min_dist_history": min_dist_history,
             "trajectories": all_trajectories,
-            "positions": positions,
+            "positions_by_level": positions_by_level,
             "T": T,
             "P": P,
         }
@@ -326,7 +394,7 @@ def main():
                 pulse_gen = apply_five_phase_pulse(thermo_state, pulse_params)
                 for phase_name in pulse_gen:
                     evolution.evolve_step(state=thermo_state)
-                    total_energy = architect.compute_energy()
+                    total_energy = compute_total_energy()
                     energy_history.append(total_energy)
                     min_dist = compute_min_dist()
                     min_dist_history.append(min_dist)
@@ -345,7 +413,7 @@ def main():
 
         # Обычная эволюция
         evolution.evolve_step(state=thermo_state)
-        total_energy = architect.compute_energy()
+        total_energy = compute_total_energy()
         energy_history.append(total_energy)
 
         min_dist = compute_min_dist()
@@ -371,12 +439,17 @@ def main():
 
         step_time = (datetime.now() - start_time).total_seconds()
         storm_mark = "👀" if (not storm_triggered and not args.no_storm) else ("⚡" if storm_triggered else "  ")
+
+        # Какие уровни эволюционировали на этом шаге
+        evolved = [str(lvl) for lvl in range(1, 8) if evolution.should_evolve(lvl)]
+        evolved_str = ",".join(evolved) if evolved else "···"
+
         saved_mark = "💾" if (step % 1000 == 0 or watchdog_counter >= args.watchdog_window) else ""
 
         if saved_mark:
             save_checkpoint(step - 1)
 
-        print(f"{step:6} | {total_energy:12.1f} | {min_dist:8.4f} | {storm_mark:>5} | {step_time:8.1f}s | {saved_mark:>5}")
+        print(f"{step:6} | {total_energy:12.1f} | {min_dist:8.4f} | {storm_mark:>5} | {evolved_str:>10} | {step_time:8.1f}s | {saved_mark:>5}")
 
         if watchdog_counter >= args.watchdog_window:
             print(f"\n✅ СТОРОЖ: релаксация стабильна {args.watchdog_window} шагов. Останов.")
@@ -389,7 +462,7 @@ def main():
     save_checkpoint(step - 1)
 
     print("─" * 75)
-    print(f"\n[4/4] ГОТОВО")
+    print(f"\n[5/5] ГОТОВО")
     print(f"  Шагов выполнено: {step}")
     print(f"  Сохранено кадров: {len(all_trajectories)}")
     print(f"  Финальная энергия: {energy_history[-1]:.1f}" if energy_history else "  Нет данных")
