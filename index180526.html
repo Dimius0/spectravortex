@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpectraVortex — Вихревая Модель Материи-Пространства</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Courier New', monospace;
+            background: #0a0a1a;
+            color: #eee;
+            overflow-x: hidden;
+        }
+
+        /* Анимированный фон */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 30%, #0a0a2a, #050510);
+        }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ff3366, #ffaa44, #44ffaa, #3366ff);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: gradientShift 4s ease infinite;
+            letter-spacing: 3px;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #aaa;
+            max-width: 700px;
+            margin-bottom: 2rem;
+        }
+
+        .triad-showcase {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin: 3rem 0;
+            flex-wrap: wrap;
+        }
+
+        .triad-card {
+            background: rgba(10, 10, 30, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1.8rem 1.5rem;
+            border-radius: 20px;
+            width: 260px;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .triad-card:hover {
+            transform: translateY(-10px);
+            background: rgba(20, 20, 50, 0.9);
+        }
+
+        .triad-card:nth-child(1) { border-color: #ff3366; }
+        .triad-card:nth-child(2) { border-color: #44ffaa; }
+        .triad-card:nth-child(3) { border-color: #44aaff; }
+
+        .triad-card .icon { font-size: 3rem; margin-bottom: 1rem; }
+        .triad-card h3 { margin-bottom: 0.75rem; font-size: 1.3rem; }
+        .triad-card p { font-size: 0.85rem; color: #bbb; line-height: 1.4; }
+
+        .btn-group {
+            display: flex;
+            gap: 1.2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff3366, #ff6688);
+            color: white;
+            box-shadow: 0 0 20px rgba(255,51,102,0.4);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(255,51,102,0.7);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #44ffaa;
+            border: 1px solid #44ffaa;
+        }
+
+        .btn-secondary:hover {
+            background: #44ffaa;
+            color: #000;
+            box-shadow: 0 0 20px rgba(68,255,170,0.4);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #ffaa44;
+            border: 1px solid #ffaa44;
+        }
+
+        .btn-outline:hover {
+            background: #ffaa44;
+            color: #000;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            padding: 3rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature {
+            background: rgba(255,255,255,0.03);
+            padding: 1.5rem;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .feature .icon { font-size: 2rem; margin-bottom: 0.8rem; }
+        .feature h4 { margin-bottom: 0.5rem; color: #ffaa44; }
+
+        .preview {
+            background: #000;
+            margin: 2rem auto;
+            max-width: 900px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .preview img {
+            width: 100%;
+            display: block;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #555;
+            font-size: 0.8rem;
+            border-top: 1px solid #222;
+            margin-top: 2rem;
+        }
+
+        .version-badge {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #666;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.2rem; }
+            .triad-card { width: 220px; padding: 1.2rem; }
+            .btn { padding: 10px 20px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="animated-bg"></div>
+    
+    <div class="hero">
+        <h1>⚛ SPECTRA VORTEX</h1>
+        <div class="subtitle">
+            Топологическое моделирование и анализ устойчивости<br>
+            <span style="color: #ffaa44;">Вихревая Модель Материи-Пространства (ВММП)</span>
+        </div>
+
+        <div class="triad-showcase">
+            <div class="triad-card">
+                <div class="icon">🌑</div>
+                <h3>I. Вихревая сущность</h3>
+                <p>Топологический скелет. Тёмное ядро с пульсирующей τ-жилой. Носитель циркуляции и топологического заряда.</p>
+            </div>
+            <div class="triad-card">
+                <div class="icon">🌀</div>
+                <h3>II. Обменная сущность</h3>
+                <p>Интерфейс «кокон». Полупрозрачная мембрана, передающая энергию от вихря к полю. Живёт по уравнению синус-Гордона.</p>
+            </div>
+            <div class="triad-card">
+                <div class="icon">✨</div>
+                <h3>III. Полевая сущность</h3>
+                <p>Конденсатный фон. Облако частиц и волны излучения — среда распространения возмущений и «звук» вихря.</p>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" id="launchViewerBtn">🚀 ЗАПУСТИТЬ 3D-ВИЗУАЛИЗАЦИЮ</button>
+            <button class="btn btn-secondary" id="loadDemoBtn">🎬 ДЕМО-СЦЕНА</button>
+            <a href="https://github.com/Dimius0/spectravortex" class="btn btn-outline">📖 GitHub</a>
+        </div>
+
+        <div class="preview">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 400'%3E%3Crect width='800' height='400' fill='%230a0a2a'/%3E%3Ccircle cx='200' cy='200' r='80' fill='none' stroke='%23ff3366' stroke-width='2'/%3E%3Ccircle cx='400' cy='200' r='80' fill='none' stroke='%2344ffaa' stroke-width='2'/%3E%3Ccircle cx='600' cy='200' r='80' fill='none' stroke='%2344aaff' stroke-width='2'/%3E%3Ctext x='200' y='320' fill='%23ff3366' text-anchor='middle' font-size='14' font-family='monospace'%3EВихревая сущность%3C/text%3E%3Ctext x='400' y='320' fill='%2344ffaa' text-anchor='middle' font-size='14' font-family='monospace'%3EОбменная сущность%3C/text%3E%3Ctext x='600' y='320' fill='%2344aaff' text-anchor='middle' font-size='14' font-family='monospace'%3EПолевая сущность%3C/text%3E%3C/svg%3E" alt="Триада вихря">
+        </div>
+    </div>
+
+    <div class="features">
+        <div class="feature">
+            <div class="icon">🔬</div>
+            <h4>Триада каждого атома</h4>
+            <p>Каждая частица в системе — полноценная вихревая структура с ядром, коконом и полем.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">📊</div>
+            <h4>Error Hunter</h4>
+            <p>Интерактивные ползунки температуры, давления, чистоты — наблюдайте устойчивость в реальном времени.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">🔗</div>
+            <h4>Адаптивный роутинг</h4>
+            <p>Линии тока ∇H показывают естественные пути передачи энергии между компонентами.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">⚡</div>
+            <h4>Топологический заряд τ</h4>
+            <p>Цвет жилы кодирует τ = ∮∇ψ·dl / 2π — целое число, определяющее устойчивость вихря.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">🧬</div>
+            <h4>Эмерджентное время</h4>
+            <p>У каждого узла свои частота и фаза, синхронизация рождает единый ритм системы.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">🎯</div>
+            <h4>Предсказания</h4>
+            <p>Состояние Хойла, электроотрицательность, температурная зависимость распада — всё из первых принципов.</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>SpectraVortex © 2025-2026 — Открытая платформа для вихревого моделирования.<br>
+        Основано на принципах Ризомы: нет центра, нет иерархии, есть память и пульс.<br>
+        <span style="color:#444;">📦 Версия 1.0 | MIT License | Воспроизводимые научные результаты</span></p>
+    </footer>
+
+    <div class="version-badge">v3.7 | Триада | Error Hunter | τ-визуализация</div>
+
+    <script>
+        // Сохраняем демо-данные
+        const demoData = [{
+            "step": 0,
+            "d_min": 2.45,
+            "groups": {
+                "1": [[0,0,0], [2.8,1.2,0.8]],
+                "2": [[-2.0, -0.8, 1.2], [1.2, -2.0, -0.8]],
+                "3": [[0, 2.5, -1.8], [-2.2, 0, 2.0], [1.8, 1.8, 1.8]],
+                "4": [[-1.8, -1.8, -1.8], [2.2, -2.2, 0], [0, -2.2, 2.2]],
+                "5": [[-2.8, 2.2, -1.2], [1.2, -2.8, 2.2]],
+                "6": [[3.2, 0, 0], [-3.2, 0, 0], [0, 3.2, 0]],
+                "7": [[0, -3.2, 0], [0, 0, 3.2], [0, 0, -3.2]]
+            }
+        }];
+
+        // Запуск плеера
+        document.getElementById('launchViewerBtn').addEventListener('click', () => {
+            window.location.href = 'viewer.html';
+        });
+
+        // Загрузка демо
+        document.getElementById('loadDemoBtn').addEventListener('click', () => {
+            localStorage.setItem('spectravortex_demo_data', JSON.stringify(demoData));
+            window.location.href = 'viewer.html?demo=1';
+        });
+    </script>
+</body>
+</html>
