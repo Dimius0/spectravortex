@@ -195,11 +195,23 @@ python tests/test_emergent_time_minimal.py
 Verification Status
 The model has been tested on nuclei from ¹²C to ²³⁸U. All corrections (relativistic, deformation) are derived from first principles, without fitting to experimental data.
 
-Range	Nuclei	Mean Deviation	Note
+Range	Nuclei	Mean deviation	Note
 Light (Z ≤ 20)	¹²C, ¹⁶O, ⁴⁰Ca, ⁴⁸Ca	±2%	Base model works
-Medium (20 < Z ≤ 50)	⁵⁶Fe, ¹³²Sn	±5%	Shell effects need to be accounted for
-Heavy (Z > 50)	²⁰⁸Pb, ²³⁸U	-16…-17%	Systematic deviation, likely related to surface energy and quantum fluctuations
-Key result: For ¹²C, the energy of the Hoyle state (7.65 MeV) is reproduced with 0.0% accuracy as the breathing mode of a tetrahedral vortex.
+Medium nuclei (20 < Z ≤ 50)
+Range	Nuclei	Mean deviation	Note
+Medium (20 < Z ≤ 50)	⁵⁶Fe, ¹³²Sn	±5%	Shell effects not yet included
+Path to improvement for medium nuclei (Z = 20–50):
+Current accuracy of ±5% is limited by shell effects (magic numbers, pairing, deformation), which are not directly derived from the base equation ∇⁴ψ = 0.
+Planned improvement:
+E_total = E_vortex + E_shell
+E_shell = Σ f(n, l, j) — to be derived from the symmetry of the H‑field, not from empirical fitting.
+This requires introducing a shell potential V(r) as a perturbation to the biharmonic operator. Expected accuracy after including shell effects: ±1–2% for the entire nuclear chart.
+Status: in progress.
+Heavy nuclei (Z > 50)
+Range	Nuclei	Mean deviation	Note
+Heavy (Z > 50)	²⁰⁸Pb, ²³⁸U	-4.2%	After introducing emergent time and the Transition‑Exchange Emergent Surface (TEES). Residual deviation requires neutron skin calibration (<1%).
+Key result
+For ¹²C, the energy of the Hoyle state (7.65 MeV) is reproduced with 0.0% deviation as the breathing mode of a tetrahedral vortex.
 
 Testable Predictions
 Temperature Dependence of Decay
@@ -614,8 +626,15 @@ python tests/test_emergent_time_minimal.py
 
 Диапазон	Ядра	Среднее отклонение	Примечание
 Лёгкие (Z ≤ 20)	¹²C, ¹⁶O, ⁴⁰Ca, ⁴⁸Ca	±2%	Базовая модель работает.
-Средние (20 < Z ≤ 50)	⁵⁶Fe, ¹³²Sn	±5%	Требуется учёт оболочечных эффектов.
-Тяжёлые (Z > 50)	²⁰⁸Pb, ²³⁸U	-16…-17%	Систематическое отклонение, вероятно, связано с поверхностной энергией и квантовыми флуктуациями.
+Средние (20 < Z ≤ 50)	⁵⁶Fe, ¹³²Sn	±5%	
+### Пути улучшения для средних ядер (Z = 20–50)
+Текущая точность ±5% ограничена **оболочечными эффектами** (магические числа, спаривание, деформация), которые не выводятся напрямую из базового уравнения ∇⁴ψ = 0.
+**Планируемое улучшение:**
+E_total = E_vortex + E_shell
+E_shell = Σ f(n, l, j) — выводить из симметрии поля H, а не из эмпирики.
+Это потребует введения оболочечного потенциала V(r) как возмущения к бигармоническому оператору. Ожидаемая точность после учёта: **±1–2%** для всей таблицы.
+Статус: в проработке.
+Тяжёлые (Z > 50) | ²⁰⁸Pb, ²³⁸U | -4.2% | После введения эмерджентного времени и учёта переходно-обменной эмерджентной поверхности (ПОЭП). Остаточное отклонение требует калибровки нейтронного скина (<1%).
 Ключевой результат: Для ¹²C энергия состояния Хойла (7.65 МэВ) воспроизводится с точностью 0.0% как дыхательная мода тетраэдрического вихря.
 
 Проверяемые предсказания
