@@ -62,7 +62,12 @@ class TestNS1Generator:
 
     def test_energy_yield_positive(self):
         for name, mat in MATERIAL_DB.items():
-            gen = NS1Generator([mat])
+            # Создаём копию с правильной долей
+            single_mat = Material(
+                mat.name, mat.density, mat.bond_energy, 
+                mat.fractal_k, mass_fraction=1.0
+            )
+            gen = NS1Generator([single_mat])
             e_yield = gen.calculate_energy_yield()
             assert e_yield > 0, f"{name}: выход энергии = {e_yield:.4f}"
         print(f"\n  Все материалы дают положительный выход энергии")
@@ -71,7 +76,3 @@ class TestNS1Generator:
         gen1 = NS1Generator([MATERIAL_DB['древесина_сухая']])
         gen2 = NS1Generator([MATERIAL_DB['древесина_сухая']])
         assert gen1.calculate_debris_index() == gen2.calculate_debris_index()
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, '-v', '--tb=short', '--durations=10'])
