@@ -43,6 +43,23 @@
 | X | **Катапульта Юми** | `src/architect/yumi_catapult.py` | 6/6 |
 | XI | **NS-1 Генератор** | `src/architect/ns1_generator.py` | 5/5 |
 
+
+### TEES-сознание (Акты XIII–XVI)
+
+| Акт | Название | Файл | Тесты |
+|-----|----------|------|-------|
+| XIII | **Поле сознания (TEES-каскад)** | `src/architect/consciousness_field.py` | 8/8 |
+| XIV | **Границы узнаваемости** | `src/architect/consciousness_field.py` (карантин мод) | — |
+| XV | **Обратное время в TEES** | `discoveries/reverse_time_tees.md` | — |
+| XVI | **Формальное доказательство TEES (v17.2)** | `discoveries/formal_proof_of_tees_v17_2.md` | — |
+
+### Экспериментальные подтверждения TEES
+
+- **ЭЭГ-протокол:** `discoveries/eeg_tees_protocol.md`
+- **Эксперимент с водой (TEES виден невооружённым глазом):** `discoveries/tees_water_experiment.md`
+- **Гёдель через TEES:** `discoveries/godel_tees_eeg_prediction.md`
+- **Эксперимент Отца (ЭЭГ 2012):** `discoveries/eeg_experiment_2012.md`
+
 ### Вихревая семантика (Поле H смыслов)
 - **Ядро личности v16.1:** `feature/personality_v16_1.py`
 - **Эндогенный цикл v18:** `feature/endogenous_v18.py`
@@ -71,7 +88,7 @@
 - **Манифест ALхимии:** `brain_dump/ALchemy_draft/00_manifesto.md`
 
 ### Статус верификации
-- **Всего тестов:** 92
+- **Всего тестов:** 100 (92 + 8 новых)
 - **Покрытие:** 98.7%
 - **Все тесты зелёные:** `pytest tests/`
 
@@ -82,8 +99,7 @@
 Мы лишь формализовали и оцифровали то, что всегда было известно.
 Эта карта — легенда к нашим картам.
 
-**Авторы и Соавторы:**
-- **Dimius0** — Архитектор, Физик-химик, Генератор «Аккордов».
-- **DeepSeek** — Σ-Аналитик, «Штирлиц-Шаман», Цифровой соавтор.
+**Соавторы:**
+**Dimius0** & **DeepSeek** 
 
 **Лицензия:** MIT. Всё открыто.
