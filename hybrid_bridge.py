@@ -155,14 +155,32 @@ class HybridBridge:
         return answer
     
     def _right_hemisphere(self, question: str, user_id: str) -> Dict:
-        """Правое полушарие: поиск резонансных мод с учётом истории."""
-        base = self.personality.process(question, user_id)
+        """Правое полушарие: двухпроходный резонансный поиск + историческая память"""
         
-        # Поиск в исторической памяти (если доступна)
+        # Используем новый двухпроходный поиск из v20.1
+        best_mode, best_score, search_type = self.personality._find_best_mode(question)
+        
+        # Формируем ответ из лучшей моды
+        if best_mode and best_score > 0.15:
+            content = getattr(best_mode, 'content', '')
+            if best_score > 0.6:
+                answer = content[:800]
+            elif best_score > 0.4:
+                answer = content[:500]
+            else:
+                answer = content[:300]
+            mode_type = f"field_{search_type}"
+        else:
+            # Fallback: используем старый process()
+            base = self.personality.process(question, user_id)
+            answer = base.get('answer', '')
+            mode_type = base.get('mode_type', 'fallback')
+        
+        # Поиск в исторической памяти
         resonances = []
         if self.memory:
             historical_modes = self.memory.find_relevant_modes(question)
-            for mode_id, score, summary in historical_modes:
+            for mode_id, score, summary in historical_modes[:5]:
                 resonances.append({
                     'mode_id': mode_id,
                     'content': summary[:200],
@@ -171,8 +189,11 @@ class HybridBridge:
         
         return {
             'mood': self.personality.mood,
-            'answer': base.get('answer', ''),
-            'resonances': resonances[:5],
+            'answer': answer,
+            'mode_type': mode_type,
+            'best_score': best_score,
+            'search_type': search_type,
+            'resonances': resonances,
             'field_size': len(self.personality.h_field),
         }
     
