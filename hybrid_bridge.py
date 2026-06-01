@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Акт XVIII: Гибридный когнитивный контур v3.0
-============================================
-DeepSeek (логика) + LivingPersonality (интуиция) + HistoricalMemory (память)
+Акт XVIII: Гибридный когнитивный контур v3.2 (РЕЗИДЕНТНЫЙ РЕЖИМ)
+============================================================
+DeepSeek (логика) + LivingPersonality v20.2 (интуиция) + HistoricalMemory (память)
 
-Новое в v3.0:
-    - Интеграция HistoricalMemory (временная координата)
-    - Режим гипноза (hypnosis_mode) — доступ ко всей временной шкале
-    - Цикл сна (sleep_cycle) — пересборка опыта с осознанными сновидениями
-    - Исторический вес мод — часто используемые моды важнее
-    - Краткосрочный буфер — последние N сообщений
+Новое в v3.2:
+    - Резидентный режим (всегда в памяти, всегда готов к диалогу)
+    - Прямое подключение к ВММП-фильтру v20.2
+    - Интерактивный ввод с командами (/sleep, /hypnosis, /stats, /save, /exit)
+    - Автосохранение (каждые 30 мин) и Автосон (каждые 24 часа)
+    - Фоновый эндогенный рост в реальном времени
 """
 
 import sys
@@ -43,12 +43,7 @@ except ImportError:
 
 class HybridBridge:
     """
-    Гибридный когнитивный контур v3.0.
-    
-    Левое полушарие (DeepSeek): логика, структура, формализация.
-    Правое полушарие (LivingPersonality): интуиция, ассоциации, эмоции.
-    Историческая память: временная координата, гипноз, сон.
-    TEES-слой: место встречи, где рождается ответ из резонанса.
+    Гибридный когнитивный контур v3.2 (Резидентный).
     """
     
     def __init__(self, field_path: str = None):
@@ -56,13 +51,13 @@ class HybridBridge:
         if field_path:
             self.personality = LivingPersonality.load(field_path)
         else:
-            self.personality = LivingPersonality(id="hybrid_v3", name="Гибрид v3.0")
+            self.personality = LivingPersonality(id="hybrid_v3", name="Гибрид v3.2")
         
         # Левое полушарие
         self.api = DeepSeekAPI() if API_AVAILABLE else None
         
         # Историческая память
-        self.memory = HistoricalMemory(short_term_size=20) if MEMORY_AVAILABLE else None
+        self.memory = HistoricalMemory(short_term_size=30) if MEMORY_AVAILABLE else None
         if self.memory and field_path:
             self._load_history_from_field()
         
@@ -70,23 +65,23 @@ class HybridBridge:
         self.tees_events: List[Dict] = []
         self.resonance_threshold = 0.3
         
-        # Статистика сессии
-        self.session_questions: List[str] = []  # контекст для осознанных сновидений
+        # Статистика сессии (контекст для осознанных сновидений)
+        self.session_questions: List[str] = []
         
         print("=" * 60)
-        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v3.0 АКТИВИРОВАН")
+        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v3.2 АКТИВИРОВАН (Резидент)")
         print("=" * 60)
         print(f"   Левое полушарие (DeepSeek): {'✅ онлайн' if self.api else '⚠️ автономно'}")
-        print(f"   Правое полушарие (Личность): ✅ {self.personality.name}")
+        print(f"   Правое полушарие (v20.2): ✅ {self.personality.name}")
         print(f"   Историческая память: {'✅ ' + str(self.memory.get_stats()['timeline_size']) + ' записей' if self.memory else '❌ отключена'}")
-        print(f"   TEES-слой: ✅ готов к резонансу")
+        print(f"   Режим: 🌐 Всегда на связи")
         print(f"   Мод в поле: {len(self.personality.h_field)}")
     
     def _load_history_from_field(self):
         """Загружает моды из H-поля в историческую память."""
         print("   📜 Загружаю историческую память...")
         count = 0
-        for mode in self.personality.h_field[-50000:]:  # последние 50K мод
+        for mode in self.personality.h_field[-50000:]:
             content = getattr(mode, 'content', '')
             mode_id = getattr(mode, 'trace_id', '')
             themes = getattr(mode, 'themes', [])
@@ -95,25 +90,13 @@ class HybridBridge:
                     mode_id=mode_id,
                     content=content,
                     timestamp=getattr(mode, 'last_update', None) or time.time(),
-                    dialogue_id=None,
                     themes=themes if themes else None
                 )
                 count += 1
         print(f"   ✅ Загружено в историю: {count} мод")
     
-    # ========================================================================
-    #   МЫШЛЕНИЕ
-    # ========================================================================
-    
     def think(self, question: str, user_id: str = "default", mode: str = "normal") -> Dict:
-        """
-        Гибридное мышление.
-        
-        Args:
-            question: Вопрос пользователя.
-            user_id: ID пользователя.
-            mode: Режим — 'normal', 'hypnosis', 'dream'.
-        """
+        """Гибридное мышление (резидентный режим)."""
         start_time = time.time()
         
         # Сохраняем вопрос в контекст сессии
@@ -121,25 +104,23 @@ class HybridBridge:
         if len(self.session_questions) > 50:
             self.session_questions = self.session_questions[-50:]
         
-        # В режиме гипноза — отключаем фильтры
+        # Обработка командных режимов
         if mode == 'hypnosis' and self.memory:
             self.memory.set_hypnosis_mode(True)
         elif mode == 'dream':
-            # Запускаем цикл сна с контекстом сессии
             if self.memory:
                 self.memory.sleep_cycle(context=self.session_questions[-10:])
             return {
-                'answer': f"😴 Сон завершён. Пересобрано {len(self.memory.bridge_modes) if self.memory else 0} мостиков. "
-                          f"Можно задавать вопросы.",
+                'answer': f"😴 Сон завершён. Пересобрано {len(self.memory.bridge_modes) if self.memory else 0} мостиков. Можно задавать вопросы.",
                 'mode_type': 'dream',
                 'coherence': 1.0,
                 'mood': self.personality.mood,
             }
         
-        # Фаза 1: Правое полушарие — интуиция
+        # Фаза 1: Правое полушарие (ВММП-фильтр)
         intuition = self._right_hemisphere(question, user_id)
         
-        # Фаза 2: Левое полушарие — логика
+        # Фаза 2: Левое полушарие (API)
         logic = self._left_hemisphere(question, intuition)
         
         # Фаза 3: TEES-синтез
@@ -148,35 +129,29 @@ class HybridBridge:
         # Сохраняем в память
         self._remember(question, answer, time.time() - start_time)
         
-        # Возвращаем обычный режим
+        # Возвращаем обычный режим после гипноза
         if mode == 'hypnosis' and self.memory:
             self.memory.set_hypnosis_mode(False)
         
         return answer
     
     def _right_hemisphere(self, question: str, user_id: str) -> Dict:
-        """Правое полушарие: двухпроходный резонансный поиск + историческая память"""
-        
-        # Используем новый двухпроходный поиск из v20.1
+        """
+        Правое полушарие v3.2: Прямое подключение к ВММП-фильтру v20.2.
+        Использует _find_best_mode для честного резонанса.
+        """
+        # Используем новый двухпроходный поиск с холистическим фильтром
         best_mode, best_score, search_type = self.personality._find_best_mode(question)
         
-        # Формируем ответ из лучшей моды
         if best_mode and best_score > 0.15:
-            content = getattr(best_mode, 'content', '')
-            if best_score > 0.6:
-                answer = content[:800]
-            elif best_score > 0.4:
-                answer = content[:500]
-            else:
-                answer = content[:300]
-            mode_type = f"field_{search_type}"
+            answer = getattr(best_mode, 'content', '')[:800]
         else:
-            # Fallback: используем старый process()
+            # Если резонанс слабый — даем полю свободу ассоциаций
             base = self.personality.process(question, user_id)
-            answer = base.get('answer', '')
-            mode_type = base.get('mode_type', 'fallback')
-        
-        # Поиск в исторической памяти
+            answer = base.get('answer', 'Интересно...')
+            search_type = 'fallback_process'
+
+        # Собираем дополнительные данные из исторической памяти
         resonances = []
         if self.memory:
             historical_modes = self.memory.find_relevant_modes(question)
@@ -190,15 +165,14 @@ class HybridBridge:
         return {
             'mood': self.personality.mood,
             'answer': answer,
-            'mode_type': mode_type,
+            'mode_type': search_type,
             'best_score': best_score,
-            'search_type': search_type,
             'resonances': resonances,
             'field_size': len(self.personality.h_field),
         }
     
     def _left_hemisphere(self, question: str, intuition: Dict) -> Dict:
-        """Левое полушарие: структурный анализ."""
+        """Структурный анализ через DeepSeek API."""
         if self.api:
             try:
                 context = "Интуиция нашла следующие ассоциации:\n"
@@ -210,9 +184,8 @@ class HybridBridge:
                     {"role": "user", "content": f"Контекст:\n{context}\n\nВопрос: {question}\n\nДай краткий логический анализ (2-3 предложения):"}
                 ]
                 
-                api_response = self.api.chat(messages, max_tokens=200)
-                logic_text = api_response['choices'][0]['message']['content']
-                
+                response = self.api.chat(messages, max_tokens=200)
+                logic_text = response['choices'][0]['message']['content']
                 return {'source': 'deepseek_api', 'analysis': logic_text, 'available': True}
             except Exception:
                 pass
@@ -220,17 +193,17 @@ class HybridBridge:
         return {'source': 'stub', 'analysis': self._stub_analysis(question, intuition), 'available': False}
     
     def _stub_analysis(self, question: str, intuition: Dict) -> str:
-        """Заглушка для левого полушария (без API)."""
+        """Заглушка для левого полушария."""
         themes = set()
         for r in intuition.get('resonances', []):
             for t in r.get('themes', []):
                 themes.add(t)
         if themes:
-            return f"Обнаружены темы: {', '.join(list(themes)[:5])}. Вопрос требует интеграции этих контекстов."
+            return f"Обнаружены темы: {', '.join(list(themes)[:5])}. Требуется интеграция контекстов."
         return "Недостаточно данных для структурного анализа."
     
     def _tees_synthesis(self, question: str, intuition: Dict, logic: Dict) -> Dict:
-        """TEES-слой: синтез ответа из резонанса двух полушарий."""
+        """TEES-слой: синтез ответа."""
         intuition_answer = intuition.get('answer', '')
         logic_analysis = logic.get('analysis', '')
         
@@ -254,137 +227,80 @@ class HybridBridge:
             'logic_source': logic.get('source', 'unknown'),
         }
     
-    def _compute_resonance(self, question: str, mode) -> float:
-        """Вычисление резонанса между вопросом и модой."""
-        content = getattr(mode, 'content', '')
-        if not content:
-            return 0.0
-        q_words = set(question.lower().split())
-        m_words = set(content.lower().split())
-        if not q_words or not m_words:
-            return 0.0
-        intersection = q_words & m_words
-        union = q_words | m_words
-        return len(intersection) / len(union) if union else 0.0
-    
     def _compute_coherence(self, text1: str, text2: str) -> float:
-        """Оценка согласованности двух текстов."""
-        if not text1 or not text2:
-            return 0.5
+        if not text1 or not text2: return 0.5
         words1 = set(text1.lower().split())
         words2 = set(text2.lower().split())
-        if not words1 or not words2:
-            return 0.5
+        if not words1 or not words2: return 0.5
         intersection = words1 & words2
-        return len(intersection) / min(len(words1), len(words2)) if min(len(words1), len(words2)) > 0 else 0.5
-    
+        return len(intersection) / min(len(words1), len(words2))
+
     def _tees_transition(self, question: str, intuition: Dict, logic: Dict) -> str:
-        """TEES-переход при противоречии. Рождается новая аксиома."""
         intuition_answer = intuition.get('answer', '')
         logic_analysis = logic.get('analysis', '')
         
         new_content = f"TEES-синтез: {question[:100]} → интуиция: {intuition_answer[:100]} | логика: {logic_analysis[:100]}"
+        mode_id = f"tees_{hashlib.md5(new_content.encode()).hexdigest()[:8]}"
         
         mode = SpectralMode(
-            tau=25.0,
-            amplitude=0.7,
-            content=new_content[:500],
+            tau=25.0, amplitude=0.7, content=new_content[:500],
             themes=['tees_synthesis', 'hybrid', 'resonance'],
-            trace_id=f"tees_{hashlib.md5(new_content.encode()).hexdigest()[:8]}",
-            creator='hybrid_bridge_v3',
-            scale=30.0,
+            trace_id=mode_id, creator='hybrid_bridge_v3', scale=30.0,
         )
         self.personality.add_to_h_field(mode)
-        
-        # Добавляем в историческую память
-        if self.memory:
-            self.memory.add_mode(
-                mode_id=mode.trace_id,
-                content=new_content,
-                themes=['tees_synthesis', 'hybrid_v3']
-            )
+        if self.memory: self.memory.add_mode(mode_id, new_content, themes=['tees_synthesis', 'hybrid_v3'])
         
         self.tees_events.append({
-            'question': question[:100],
-            'intuition': intuition_answer[:100],
-            'logic': logic_analysis[:100],
-            'new_mode_id': mode.trace_id,
-            'timestamp': time.time(),
+            'question': question[:100], 'intuition': intuition_answer[:100],
+            'logic': logic_analysis[:100], 'mode_id': mode_id, 'timestamp': time.time(),
         })
         
-        return f"🌊 Интуиция: {intuition_answer}\n\n💡 Логика: {logic_analysis}\n\n🔮 Рождена аксиома ({mode.trace_id})"
+        return f"🌊 Интуиция: {intuition_answer}\n\n💡 Логика: {logic_analysis}\n\n🔮 Рождена аксиома ({mode_id})"
     
     def _remember(self, question: str, answer: Dict, elapsed: float):
-        """Сохраняет результат в память."""
         memory_content = f"Q: {question[:200]}\nA: {str(answer.get('answer', ''))[:200]}"
-        
         mode = SpectralMode(
-            tau=16.0,
-            amplitude=0.3,
-            content=memory_content[:500],
+            tau=16.0, amplitude=0.3, content=memory_content[:500],
             themes=['dialogue', 'hybrid_memory'],
             trace_id=f"mem_{hashlib.md5(memory_content.encode()).hexdigest()[:8]}",
-            creator='hybrid_bridge_v3',
-            scale=10.0,
+            creator='hybrid_bridge_v3', scale=10.0,
         )
         self.personality.add_to_h_field(mode)
-        
-        if self.memory:
-            self.memory.add_mode(
-                mode_id=mode.trace_id,
-                content=memory_content,
-                themes=['dialogue', 'hybrid_memory']
-            )
-    
-    # ========================================================================
-    #   КОМАНДЫ
-    # ========================================================================
-    
+        if self.memory: self.memory.add_mode(mode.trace_id, memory_content, themes=['dialogue', 'hybrid_memory'])
+
     def hypnosis(self, question: str) -> Dict:
-        """Режим гипноза: доступ ко всей временной шкале."""
         return self.think(question, mode='hypnosis')
     
     def sleep(self) -> Dict:
-        """Запускает цикл сна с осознанными сновидениями."""
         return self.think("", mode='dream')
     
     def introspect(self) -> str:
-        """Саморефлексия гибрида."""
         memory_stats = self.memory.get_stats() if self.memory else {}
         return f"""
-=== ГИБРИДНЫЙ КОНТУР v3.0: САМОРЕФЛЕКСИЯ ===
+=== ГИБРИДНЫЙ КОНТУР v3.2: САМОРЕФЛЕКСИЯ ===
 Сессия: {len(self.session_questions)} вопросов
 
 Правое полушарие: {self.personality.name}
   - Мод в поле: {len(self.personality.h_field)}
-  - Вихрей: {len(self.personality.vortices) if hasattr(self.personality, 'vortices') else '?'}
   - Настроение: {self.personality.mood:+.2f}
-  - Черты: любопытство={self.personality.traits.get('curiosity', 0):.2f}
+  - ВММП-фильтр: tau∈[5.0, 11.0]
 
 Левое полушарие: DeepSeek API
   - Статус: {'онлайн' if self.api else 'автономно'}
 
 Историческая память:
   - Записей: {memory_stats.get('timeline_size', 0)}
-  - Диалогов: {memory_stats.get('dialogue_chains', 0)}
-  - Тем: {memory_stats.get('chronology_themes', 0)}
   - Мостиков (сон): {memory_stats.get('bridge_modes', 0)}
-  - Временной охват: {memory_stats.get('time_span_hours', 0):.1f} ч
+  - Тем: {memory_stats.get('chronology_themes', 0)}
 
 TEES-слой:
   - Событий: {len(self.tees_events)}
   - Порог когерентности: {self.resonance_threshold}
-
-Последние TEES-резонансы:
-{chr(10).join([f"  [{e['timestamp']:.0f}] {e['question'][:80]}..." for e in self.tees_events[-3:]])}
 """
     
     def save(self, filepath: str):
-        """Сохраняет состояние гибрида."""
         self.personality.save(filepath)
         print(f"💾 Гибрид сохранён: {filepath}")
-        
-        # Сохраняем TEES-память отдельно
         tees_path = filepath.replace('.json', '_tees.json')
         with open(tees_path, 'w', encoding='utf-8') as f:
             json.dump(self.tees_events, f, ensure_ascii=False, indent=2)
@@ -392,48 +308,84 @@ TEES-слой:
 
 
 # ========================================================================
-#   ТЕСТ
+#   РЕЗИДЕНТНЫЙ РЕЖИМ (ВСЕГДА НА СВЯЗИ)
 # ========================================================================
-
 if __name__ == "__main__":
-    print("\n" + "=" * 60)
-    print("🧪 ТЕСТ ГИБРИДНОГО КОНТУРА v3.0")
-    print("=" * 60)
-    
     field_path = 'src/rizoma/data/personalities/p016_grown_3h.json'
     
+    print("\n" + "=" * 60)
+    print("🧠 РЕЗИДЕНТНЫЙ ГИБРИД v3.2 — ВСЕГДА НА СВЯЗИ")
+    print("=" * 60)
+    
     if os.path.exists(field_path):
-        print(f"\n📂 Загружаю поле: {field_path}")
         bridge = HybridBridge(field_path)
     else:
-        print("\n⚠️ Файл поля не найден, создаю новый гибрид")
+        print("⚠️ Файл поля не найден, создаю новый гибрид")
         bridge = HybridBridge()
     
-    # Тестовые вопросы
-    test_questions = [
-        "Что такое TEES?",
-        "Как работает эффект Юми?",
-        "Это утверждение недоказуемо",
-        "Расскажи про гравитацию",
-    ]
+    # Запускаем фоновый рост
+    bridge.personality.start_living(interval=0.5)
     
-    print("\n" + "=" * 60)
-    print("💬 НАЧАЛО ДИАЛОГА")
-    print("=" * 60)
+    last_save = time.time()
+    last_sleep = time.time()
+    SAVE_INTERVAL = 1800  # 30 минут
+    SLEEP_INTERVAL = 86400  # 24 часа
     
-    for i, q in enumerate(test_questions, 1):
-        print(f"\n{'─' * 60}")
-        print(f"[{i}] ❓ {q}")
-        result = bridge.think(q)
-        print(f"🤖 {result['answer'][:300]}")
-        print(f"   📊 Тип: {result['mode_type']} | Когерентность: {result['coherence']:.2f} | "
-              f"Резонансов: {result['intuition_resonances']} | История: {bridge.memory.get_stats()['timeline_size'] if bridge.memory else 0}")
+    print("\n📡 Гибрид слушает. Введите вопрос или команду.")
+    print("   Команды: /sleep, /hypnosis, /stats, /save, /exit")
+    print("─" * 60)
     
-    # Саморефлексия
-    print(f"\n{bridge.introspect()}")
+    while True:
+        try:
+            user_input = input("\n👤 Вы: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n🛑 Завершение работы...")
+            break
+        
+        if not user_input:
+            continue
+        
+        if user_input.lower() == '/exit':
+            print("🛑 Завершение работы...")
+            break
+        elif user_input.lower() == '/sleep':
+            print("😴 Запуск цикла сна...")
+            result = bridge.sleep()
+            print(f"🤖 {result['answer']}")
+            continue
+        elif user_input.lower() == '/hypnosis':
+            print("🧠 Режим гипноза активирован. Задайте вопрос.")
+            try:
+                hypno_q = input("👤 Гипноз: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if hypno_q:
+                result = bridge.hypnosis(hypno_q)
+                print(f"🤖 {result['answer'][:500]}")
+            continue
+        elif user_input.lower() == '/stats':
+            print(bridge.introspect())
+            continue
+        elif user_input.lower() == '/save':
+            bridge.save(field_path)
+            continue
+        
+        # Обычный вопрос
+        result = bridge.think(user_input)
+        print(f"🤖 {result['answer'][:500]}")
+        
+        # Автосохранение
+        if time.time() - last_save > SAVE_INTERVAL:
+            bridge.save(field_path)
+            last_save = time.time()
+        
+        # Автосон
+        if time.time() - last_sleep > SLEEP_INTERVAL:
+            print("\n😴 Автоматический цикл сна...")
+            bridge.sleep()
+            last_sleep = time.time()
     
-    # Сохранение
-    bridge.save('src/rizoma/data/personalities/p016_hybrid_v3.json')
-    
-    print("=" * 60)
-    print("✅ Тест гибридного контура v3.0 завершён")
+    # Завершение работы
+    bridge.personality.stop_living()
+    bridge.save(field_path)
+    print("💾 Сохранено. До связи.")
