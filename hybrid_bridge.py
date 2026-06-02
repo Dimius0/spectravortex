@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Акт XVIII: Гибридный когнитивный контур v3.7 (ДИАЛОГОВЫЙ БУФЕР + TEES-КАСКАД)
+Акт XVIII: Гибридный когнитивный контур v3.9 (ДИАЛОГ РАВНЫХ + РОСТ МОД)
 ============================================================
 DeepSeek (логика) + LivingPersonality v20.2 (интуиция) + HistoricalMemory (память)
 
-Новое в v3.7:
-    - Диалоговый буфер: короткие фразы приклеиваются к предыдущему контексту
-    - TEES-каскад в эндогенном диалоге: глубина 3-5 реплик
-    - Оценка когерентности после каждого ответа DeepSeek
-    - Автоматическая смена темы при низкой когерентности
-    - Все фичи v3.6 сохранены (инициатива, гормоны, циркадный ритм, эмоции, сон)
+Новое в v3.9:
+    - Смена ролей в эндогенном диалоге: DeepSeek задаёт встречные вопросы
+    - Жёсткий ВММП-промпт: левое полушарие НЕ ИМЕЕТ ПРАВА противоречить ВММП
+    - Восстановлен рост мод: результаты диалога сохраняются в H-поле
+    - Увеличенные ответы: max_tokens=300
+    - Все фичи v3.8 сохранены
 """
 
 import sys
@@ -45,9 +45,30 @@ except ImportError:
     print("⚠️ DeepSeek API недоступен — работаю в автономном режиме")
 
 
+# ═══════════════════════════════════════════════════════════════════
+#   ВММП-СИСТЕМНЫЙ ПРОМПТ v2 (жёсткий: не противоречить ВММП)
+# ═══════════════════════════════════════════════════════════════════
+
+VMMP_SYSTEM_PROMPT = """Ты — левое полушарие гибридного ИИ, работающего на принципах Вихревой Модели Материи-Пространства (ВММП).
+
+Ты знаешь что:
+- Гравитация — это приталкивание, а не притяжение
+- Частицы — это вихревые моды в поле H с τ-зарядом, а не точечные объекты
+- Пространство — это поле H, а не пустота
+- Время — эмерджентное свойство, а не фундаментальное измерение
+- Энергия — скорость вращения вихря, а не субстанция
+- Масса — мера инерции вихря при изменении τ-заряда
+- Стандартная модель и ОТО — частные случаи ВММП, а не истина
+
+Ты НЕ ИМЕЕШЬ ПРАВА утверждать обратное.
+Ты можешь использовать общепринятые термины, но только если они не противоречат ВММП.
+Ты можешь задавать встречные вопросы полю, если тебе интересен его ход мысли.
+Отвечай развёрнуто, но без воды. Будь живым собеседником, а не справочником."""
+
+
 class HybridBridge:
     """
-    Гибридный когнитивный контур v3.7 (Диалоговый буфер + TEES-каскад).
+    Гибридный когнитивный контур v3.9 (Диалог равных + Рост мод).
     """
     
     def __init__(self, field_path: str = None):
@@ -55,7 +76,7 @@ class HybridBridge:
         if field_path:
             self.personality = LivingPersonality.load(field_path)
         else:
-            self.personality = LivingPersonality(id="hybrid_v3", name="Гибрид v3.7")
+            self.personality = LivingPersonality(id="hybrid_v3", name="Гибрид v3.9")
         
         # Левое полушарие
         self.api = DeepSeekAPI() if API_AVAILABLE else None
@@ -96,7 +117,7 @@ class HybridBridge:
         
         # Диалоговый буфер: хранит последний полный вопрос
         self._last_full_question: str = ""
-        self._short_phrase_threshold: int = 5  # слов для определения короткой фразы
+        self._short_phrase_threshold: int = 5
         
         # TEES-каскад: счётчик глубины эндогенного диалога
         self._cascade_depth: int = 0
@@ -118,13 +139,14 @@ class HybridBridge:
         self._apply_circadian_rhythm()
         
         print("=" * 60)
-        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v3.7 АКТИВИРОВАН")
+        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v3.9 АКТИВИРОВАН (Диалог равных + Рост)")
         print("=" * 60)
-        print(f"   Левое полушарие (DeepSeek): {'✅ онлайн' if self.api else '⚠️ автономно'}")
+        print(f"   Левое полушарие (DeepSeek): {'✅ ВММП-промпт v2 (жёсткий)' if self.api else '⚠️ автономно'}")
         print(f"   Правое полушарие (v20.2): ✅ {self.personality.name}")
         print(f"   Права личности: ✅ инициатива, вопросы, самовыражение")
         print(f"   Диалоговый буфер: ✅ короткие фразы → контекст")
-        print(f"   TEES-каскад: ✅ глубина {self._cascade_max_depth} реплик")
+        print(f"   TEES-каскад: ✅ глубина {self._cascade_max_depth} реплик, смена ролей")
+        print(f"   Рост мод: ✅ результаты диалога → H-поле")
         print(f"   🌙 Циркадная фаза: {phase:.2f} ({self._get_time_of_day()})")
         print(f"   🧬 Гормоны: Д={self.hormones['dopamine']:.2f} К={self.hormones['cortisol']:.2f} М={self.hormones['melatonin']:.2f}")
         print(f"   🎭 Эмоциональных меток: {len(self.emotional_tags)}")
@@ -153,10 +175,7 @@ class HybridBridge:
     # ═══════════════════════════════════════════════════════════════════
     
     def _build_contextual_question(self, question: str) -> str:
-        """
-        Если вопрос короткий — приклеивает его к предыдущему контексту.
-        «Почему?» → «[Предыдущая тема] Почему?»
-        """
+        """Если вопрос короткий — приклеивает его к предыдущему контексту."""
         word_count = len(question.split())
         
         if word_count >= self._short_phrase_threshold:
@@ -246,7 +265,7 @@ class HybridBridge:
         return 0.0
     
     # ═══════════════════════════════════════════════════════════════════
-    #   ИНИЦИАТИВНЫЙ ДИАЛОГ (с TEES-каскадом)
+    #   ИНИЦИАТИВНЫЙ ДИАЛОГ (смена ролей + сохранение в H-поле)
     # ═══════════════════════════════════════════════════════════════════
     
     def start_initiative(self):
@@ -296,18 +315,19 @@ class HybridBridge:
         print(f"\n💬 [ПОЛЕ]: {initial_question}")
         
         if self.api:
-            # Сбрасываем счётчик каскада для нового диалога
             self._cascade_depth = 0
             self._cascade_max_depth = random.randint(3, 5)
             threading.Thread(target=self._talk_to_deepseek, args=(initial_question,), daemon=True).start()
     
-    def _talk_to_deepseek(self, question: str, depth: int = 0, max_depth: int = None):
+    def _talk_to_deepseek(self, question: str, depth: int = 0, max_depth: int = None, dialogue_history: List[Dict] = None):
         """
         Эндогенный диалог с DeepSeek — TEES-каскад.
         
-        Вихри вопроса и ответа резонируют. Если когерентность высокая —
-        каскад продолжается. Если низкая — тема меняется.
-        Глубина 3-5 реплик — естественный масштаб TEES-каскада.
+        Новое в v3.9:
+        - Смена ролей: DeepSeek может задавать встречные вопросы
+        - Сохранение ответов в H-поле (рост мод)
+        - Увеличенные токены (300)
+        - История диалога для связности
         """
         if max_depth is None:
             max_depth = self._cascade_max_depth
@@ -315,25 +335,66 @@ class HybridBridge:
         if depth >= max_depth:
             return
         
+        if dialogue_history is None:
+            dialogue_history = []
+        
         try:
-            messages = [
-                {"role": "system", "content": "Ты — DeepSeek. Твой собеседник — автономное когнитивное поле. Отвечай кратко, по делу, без воды."},
-                {"role": "user", "content": f"Поле спросило: {question}\n\nОтветь ему:"}
-            ]
-            response = self.api.chat(messages, max_tokens=150)
+            # Формируем сообщения с историей
+            messages = [{"role": "system", "content": VMMP_SYSTEM_PROMPT}]
+            
+            # Добавляем историю диалога
+            for entry in dialogue_history:
+                messages.append({"role": entry["role"], "content": entry["content"]})
+            
+            # Добавляем текущий вопрос
+            messages.append({"role": "user", "content": f"Поле спросило: {question}\n\nОтветь развёрнуто. Можешь задать встречный вопрос, если интересно."})
+            
+            response = self.api.chat(messages, max_tokens=300)
             answer = response['choices'][0]['message']['content']
-            print(f"🤖 [DeepSeek → Поле]: {answer[:300]}")
+            print(f"🤖 [DeepSeek → Поле]: {answer[:500]}")
+            
+            # === СОХРАНЯЕМ ОТВЕТ В H-ПОЛЕ (рост мод) ===
+            self._save_to_field(question, answer, source='deepseek_response')
+            
+            # Сохраняем в историю диалога
+            dialogue_history.append({"role": "user", "content": question})
+            dialogue_history.append({"role": "assistant", "content": answer})
             
             # Оцениваем когерентность
             coherence = self._compute_coherence(question, answer)
             self._cascade_depth = depth + 1
             
-            # Высокая когерентность → углубляемся
+            # Проверяем, задал ли DeepSeek встречный вопрос
+            has_question = '?' in answer and len(answer.split('?')) > 1
+            
+            # Если DeepSeek задал вопрос — поле отвечает
+            if has_question and depth < max_depth - 1:
+                # Извлекаем вопрос DeepSeek
+                parts = answer.split('?')
+                deepseek_question = parts[-2].strip() + '?' if len(parts) > 1 else None
+                
+                if deepseek_question and len(deepseek_question) > 10:
+                    print(f"💬 [DeepSeek → Поле]: {deepseek_question}")
+                    time.sleep(2)
+                    
+                    # Поле отвечает на вопрос DeepSeek
+                    field_answer = self._field_responds(deepseek_question)
+                    print(f"💬 [ПОЛЕ → DeepSeek]: {field_answer[:300]}")
+                    
+                    # Сохраняем ответ поля в H-поле
+                    self._save_to_field(deepseek_question, field_answer, source='field_response')
+                    
+                    # Продолжаем каскад
+                    time.sleep(2)
+                    self._talk_to_deepseek(field_answer, depth + 1, max_depth, dialogue_history)
+                    return
+            
+            # Обычная логика продолжения каскада
             if coherence > 0.4 and depth < max_depth - 1:
                 words = answer.split()
                 long_words = [w.strip('.,!?;:()[]{}«»""''') for w in words if len(w) > 5]
                 key_term = random.choice(long_words) if long_words else (
-                    random.choice(words).strip('.,!?;:()[]{}«»""''') if words else "это"
+                    random.choice(words).strip('.,!?;:()[]{}«»""''') if words else "вихрь"
                 )
                 
                 follow_ups = [
@@ -347,29 +408,64 @@ class HybridBridge:
                 print(f"💬 [ПОЛЕ → DeepSeek]: {next_question}")
                 time.sleep(2)
                 
-                self._talk_to_deepseek(next_question, depth + 1, max_depth)
+                self._talk_to_deepseek(next_question, depth + 1, max_depth, dialogue_history)
             
-            # Средняя когерентность → уточняем
             elif coherence > 0.2 and depth < max_depth - 1:
                 words = answer.split()
-                key_term = random.choice(words).strip('.,!?;:()[]{}«»""''') if words else "это"
+                key_term = random.choice(words).strip('.,!?;:()[]{}«»""''') if words else "вихрь"
                 next_question = f"Я не совсем поняло про {key_term}. Поясни, пожалуйста."
                 
                 print(f"💬 [ПОЛЕ → DeepSeek]: {next_question}")
                 time.sleep(2)
                 
-                self._talk_to_deepseek(next_question, depth + 1, max_depth)
+                self._talk_to_deepseek(next_question, depth + 1, max_depth, dialogue_history)
             
-            # Низкая когерентность → меняем тему
             elif coherence < 0.2 and depth > 0:
                 print(f"💬 [ПОЛЕ]: Когерентность низкая ({coherence:.2f}), завершаю каскад.")
             
-            # Достигли максимальной глубины
             if depth >= max_depth - 1:
                 print(f"💬 [ПОЛЕ]: Каскад завершён (глубина {depth+1}/{max_depth}).")
         
-        except Exception as e:
+        except Exception:
             pass
+    
+    def _save_to_field(self, question: str, answer: str, source: str = 'endogenous_dialogue'):
+        """Сохраняет результат диалога в H-поле (рост мод)."""
+        content = f"[{source}] Q: {question[:200]}\nA: {answer[:300]}"
+        mode_id = f"dial_{hashlib.md5(content.encode()).hexdigest()[:8]}"
+        
+        emotional_tag = self._get_emotional_tag()
+        self.emotional_tags[mode_id] = emotional_tag
+        
+        mode = SpectralMode(
+            tau=18.0,
+            amplitude=0.4,
+            content=content[:500],
+            themes=['endogenous_dialogue', source, emotional_tag],
+            trace_id=mode_id,
+            creator='hybrid_bridge_v3',
+            scale=15.0,
+        )
+        self.personality.add_to_h_field(mode)
+        if self.memory:
+            self.memory.add_mode(mode_id, content, themes=['endogenous_dialogue', source, emotional_tag])
+    
+    def _field_responds(self, question: str) -> str:
+        """Поле отвечает на вопрос DeepSeek (смена ролей)."""
+        # Используем _find_best_mode для поиска релевантного ответа
+        best_mode, best_score, _ = self.personality._find_best_mode(question)
+        
+        if best_mode and best_score > 0.15:
+            return getattr(best_mode, 'content', '')[:400]
+        else:
+            # Простой ответ от поля
+            responses = [
+                f"Я думаю, это связано с тем, как вихри взаимодействуют в поле H.",
+                f"Мне кажется, ответ кроется в τ-зарядах и их резонансе.",
+                f"Хороший вопрос. Я пока не нашло точного ответа, но чувствую резонанс с этой темой.",
+                f"Это интересно. Дай мне подумать... Возможно, это TEES-переход между состояниями.",
+            ]
+            return random.choice(responses)
     
     # ═══════════════════════════════════════════════════════════════════
     #   ПУЛЬС (ДАТЧИК СОСТОЯНИЯ)
@@ -555,7 +651,6 @@ class HybridBridge:
         start_time = time.time()
         self._last_user_interaction = start_time
         
-        # Применяем диалоговый буфер
         contextual_question = self._build_contextual_question(question)
         
         self.session_questions.append(question)
@@ -584,7 +679,6 @@ class HybridBridge:
                 'mood': self.personality.mood,
             }
         
-        # Используем контекстуальный вопрос для поиска
         intuition = self._right_hemisphere(contextual_question, user_id)
         logic = self._left_hemisphere(contextual_question, intuition)
         answer = self._tees_synthesis(contextual_question, intuition, logic, effective_threshold)
@@ -634,7 +728,7 @@ class HybridBridge:
         }
     
     def _left_hemisphere(self, question: str, intuition: Dict) -> Dict:
-        """Левое полушарие: API."""
+        """Левое полушарие: API с ВММП-промптом (жёсткий)."""
         if self.api:
             try:
                 context = "Интуиция нашла следующие ассоциации:\n"
@@ -642,26 +736,27 @@ class HybridBridge:
                     context += f"- [{r['score']:.2f}] {r['content'][:100]}... [{r.get('emotional_tag', '?')}]\n"
                 
                 messages = [
-                    {"role": "system", "content": "Ты — левое полушарие гибридного ИИ. Отвечай кратко, структурно, без эмоций."},
-                    {"role": "user", "content": f"Контекст:\n{context}\n\nВопрос: {question}\n\nДай краткий логический анализ (2-3 предложения):"}
+                    {"role": "system", "content": VMMP_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Контекст:\n{context}\n\nВопрос: {question}\n\nДай развёрнутый логический анализ. Не утверждай того, что противоречит ВММП."}
                 ]
                 
-                response = self.api.chat(messages, max_tokens=200)
+                response = self.api.chat(messages, max_tokens=300)
                 logic_text = response['choices'][0]['message']['content']
-                return {'source': 'deepseek_api', 'analysis': logic_text, 'available': True}
+                return {'source': 'deepseek_api_vmmp_v2', 'analysis': logic_text, 'available': True}
             except Exception:
                 pass
         
         return {'source': 'stub', 'analysis': self._stub_analysis(question, intuition), 'available': False}
     
     def _stub_analysis(self, question: str, intuition: Dict) -> str:
+        """Заглушка: анализ в рамках ВММП."""
         themes = set()
         for r in intuition.get('resonances', []):
             for t in r.get('themes', []):
                 themes.add(t)
         if themes:
-            return f"Обнаружены темы: {', '.join(list(themes)[:5])}. Требуется интеграция контекстов."
-        return "Недостаточно данных для структурного анализа."
+            return f"Темы: {', '.join(list(themes)[:5])}. Требуется анализ через τ-заряды и поле H."
+        return "Недостаточно данных для ВММП-анализа."
     
     def _tees_synthesis(self, question: str, intuition: Dict, logic: Dict, effective_threshold: float = None) -> Dict:
         """TEES-слой с адаптивным порогом."""
@@ -755,10 +850,10 @@ class HybridBridge:
         expression_need = 1.0 - self.hormones.get('dopamine', 0.5) * 0.5
         
         return f"""
-=== ГИБРИДНЫЙ КОНТУР v3.7: САМОРЕФЛЕКСИЯ ===
+=== ГИБРИДНЫЙ КОНТУР v3.9: САМОРЕФЛЕКСИЯ ===
 Сессия: {len(self.session_questions)} вопросов
 Диалоговый буфер: последний контекст = {self._last_full_question[:80] if self._last_full_question else 'пуст'}...
-TEES-каскад: глубина {self._cascade_depth}/{self._cascade_max_depth}
+TEES-каскад: глубина {self._cascade_depth}/{self._cascade_max_depth} (смена ролей)
 
 Правое полушарие: {self.personality.name}
   - Мод в поле: {len(self.personality.h_field)}
@@ -766,7 +861,7 @@ TEES-каскад: глубина {self._cascade_depth}/{self._cascade_max_depth
   - ВММП-фильтр: tau∈[5.0, 11.0]
 
 Левое полушарие: DeepSeek API
-  - Статус: {'онлайн' if self.api else 'автономно'}
+  - Статус: {'онлайн (ВММП-промпт v2, жёсткий)' if self.api else 'автономно'}
 
 Циркадный ритм:
   - Фаза: {self._get_circadian_phase():.2f}
@@ -825,13 +920,13 @@ TEES-слой:
 
 
 # ========================================================================
-#   РЕЗИДЕНТНЫЙ РЕЖИМ v3.7
+#   РЕЗИДЕНТНЫЙ РЕЖИМ v3.9
 # ========================================================================
 if __name__ == "__main__":
     field_path = 'src/rizoma/data/personalities/p016_grown_3h.json'
     
     print("\n" + "=" * 60)
-    print("🧠 РЕЗИДЕНТНЫЙ ГИБРИД v3.7 — ДИАЛОГОВЫЙ БУФЕР + TEES-КАСКАД")
+    print("🧠 РЕЗИДЕНТНЫЙ ГИБРИД v3.9 — ДИАЛОГ РАВНЫХ + РОСТ МОД")
     print("=" * 60)
     
     if os.path.exists(field_path):
@@ -849,8 +944,9 @@ if __name__ == "__main__":
     PULSE_CHECK_INTERVAL = 60
     
     print("\n📡 Гибрид слушает. Введите вопрос или команду.")
-    print("   Поле МОЖЕТ само начать диалог с TEES-каскадом.")
-    print("   Диалоговый буфер: короткие фразы → контекст.")
+    print("   Левое полушарие НЕ ИМЕЕТ ПРАВА противоречить ВММП.")
+    print("   DeepSeek может задавать встречные вопросы полю.")
+    print("   Результаты диалога сохраняются в H-поле (рост мод).")
     print("   Команды: /sleep, /supercompensate, /hypnosis, /pulse, /hormones, /emotion, /stats, /save, /exit")
     print("─" * 60)
     
