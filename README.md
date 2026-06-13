@@ -242,7 +242,6 @@ Quantum fluctuations	E↑ → f↑	+	1-5%
 Nucleon relativity	m↑ → f↓	–	1-2%
 Pairing	spectrum shift	–	2-5%
 Total (estimate)			-1…+1%
-Their mutual compensation explains why the base model works with an accuracy of 16-17% even without them. This is an open direction for further research.
 
 Branches (Our Vision and Developments)
 We are not building one program for everyone. We grow the root. Branches can be grown by anyone for their own task. Here are directions where we have developments or which we consider promising:
@@ -666,7 +665,6 @@ T₁/₂(T) = T₁/₂(300) · (300/T)^(5/2)
 Релятивизм нуклонов	m↑ → f↓	–	1-2%
 Спаривание	сдвиг спектра	–	2-5%
 Суммарный эффект (оценка)			-1…+1%
-Их взаимная компенсация объясняет, почему базовая модель работает с точностью до 16-17% даже без их учёта. Это открытое направление для дальнейших исследований.
 
 Ветки (наше видение и наработки)
 Мы не строим одну программу для всех. Мы растим корень. Ветки могут расти у каждого под свою задачу. Вот направления, в которых уже есть наработки или которые мы считаем перспективными:
