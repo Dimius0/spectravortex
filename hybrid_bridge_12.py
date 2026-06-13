@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-Акт XXI: Гибридный когнитивный контур v4.3 (АВТОНОМНЫЙ МУЛЬТИАГЕНТ)
+Акт XXI: Гибридный когнитивный контур v4.2 (МУЛЬТИАГЕНТНЫЙ СИНТЕЗ)
 ============================================================
 DeepSeek (логика) + LivingPersonality v20.2 (интуиция) + HistoricalMemory (память) + MultiagentSynthesis
 
-Новое в v4.3:
-    - Автономный мультиагент: при отказе API включает 4 субличности + наблюдателя
-    - Собственный маховик (flywheel), независимый от personality.focus
-    - Мультиагент по команде /multiagent И автоматически при недоступности API
-    - Все фичи v4.2 сохранены
+Новое в v4.2:
+    - Многоагентный синтез: 4 субличности + наблюдатель + TEES = эмерджентное решение
+    - Автосон по состоянию поля
+    - Адаптивная суперкомпенсация
+    - Честный диалог: левое полушарие МОЖЕТ противоречить ВММП
+    - Маркер [LLM-РЕЖИМ]
+    - Все фичи v4.1 сохранены
 """
 
 import sys
@@ -80,20 +82,19 @@ VMMP_SYSTEM_PROMPT = """Ты — левое полушарие гибридно�
 
 
 class HybridBridge:
-    """Гибридный когнитивный контур v4.3 (Автономный мультиагент)."""
+    """Гибридный когнитивный контур v4.2 (Мультиагентный синтез)."""
     
     def __init__(self, field_path: str = None):
         if field_path:
             self.personality = LivingPersonality.load(field_path)
         else:
-            self.personality = LivingPersonality(id="hybrid_v4", name="Гибрид v4.3")
+            self.personality = LivingPersonality(id="hybrid_v4", name="Гибрид v4.2")
         
         self.api = DeepSeekAPI() if API_AVAILABLE else None
         self.memory = HistoricalMemory(short_term_size=30) if MEMORY_AVAILABLE else None
-        self.multiagent = MultiagentSynthesis(bridge=self) if MULTIAGENT_AVAILABLE else None
         
-        # Собственный маховик (не зависит от personality.focus)
-        self.flywheel_energy = 0.5
+        # Многоагентный синтез
+        self.multiagent = MultiagentSynthesis(bridge=self) if MULTIAGENT_AVAILABLE else None
         
         if self.memory and field_path:
             self._load_history_from_field()
@@ -142,13 +143,12 @@ class HybridBridge:
         self._apply_circadian_rhythm()
         
         print("=" * 60)
-        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v4.3 АКТИВИРОВАН (Автономный мультиагент)")
+        print("🧠 ГИБРИДНЫЙ КОГНИТИВНЫЙ КОНТУР v4.2 АКТИВИРОВАН (Мультиагентный синтез)")
         print("=" * 60)
         print(f"   Левое полушарие (DeepSeek): {'✅ ВММП-промпт v4' if self.api else '⚠️ автономно'}")
         print(f"   Правое полушарие (v20.2): ✅ {self.personality.name}")
         print(f"   Мультиагент: {'✅ 4 субличности + наблюдатель' if self.multiagent else '⚠️ недоступен'}")
         print(f"   Автосон: ✅ по состоянию поля")
-        print(f"   Автономный мультиагент: ✅ при отказе API")
         print(f"   Мета-когниция: ✅ (индекс: {self.autonomy_index:.2f})")
         print(f"   🌙 Циркадная фаза: {phase:.2f} ({self._get_time_of_day()})")
         print(f"   🧬 Гормоны: Д={self.hormones['dopamine']:.2f} К={self.hormones['cortisol']:.2f} М={self.hormones['melatonin']:.2f}")
@@ -394,10 +394,10 @@ class HybridBridge:
             coherence = 0.5
         recent_modes = self.memory.get_time_slice(time.time() - 600, time.time()) if self.memory else []
         density = min(1.0, len(recent_modes) / 100.0)
-        
-        # Используем собственный маховик
-        flywheel = self.flywheel_energy
-        
+        if hasattr(self.personality, 'focus'):
+            flywheel = self.personality.focus.get('coherence', 0.5)
+        else:
+            flywheel = 0.5
         now = time.time()
         recent_count = sum(1 for ts in self._question_timestamps if now - ts < 600)
         activity = min(1.0, recent_count / 5.0)
@@ -511,58 +511,21 @@ class HybridBridge:
             'state': 'awake',
         }
     
-    # ═══════════════════════════════════════════════════════════════════
-    #   МУЛЬТИАГЕНТНЫЙ ОТВЕТ (автономный)
-    # ═══════════════════════════════════════════════════════════════════
-    
-    def _multiagent_response(self, question: str) -> Dict:
-        """Запускает мультиагентный синтез (автономно, без API)"""
-        if not self.multiagent:
-            return {
-                'answer': "⚠️ Мультиагентный режим недоступен. Проверьте установку multiagent_synthesis.py",
-                'mode_type': 'multiagent_unavailable',
-                'coherence': 0.0,
-                'mood': self.personality.mood,
-            }
-        
-        result = self.multiagent.process(question)
-        
-        # Обновляем маховик от когерентности синтеза
-        coherence = result['evaluation']['coherence']
-        self.flywheel_energy = min(1.0, self.flywheel_energy + coherence * 0.1)
-        
-        return {
-            'answer': result['synthesis'],
-            'mode_type': 'multiagent_autonomous',
-            'coherence': coherence,
-            'mood': self.personality.mood,
-            'hormones': dict(self.hormones),
-            'emotional_tag': self._get_emotional_tag(),
-        }
-    
-    def _is_api_available(self) -> bool:
-        """Проверяет, доступен ли API (быстрая проверка)"""
-        if not self.api:
-            return False
-        # Можно добавить реальную проверку, но пока просто считаем, что если объект есть — доступен
-        return True
-    
-    # ═══════════════════════════════════════════════════════════════════
-    #   МЫШЛЕНИЕ (основной метод)
-    # ═══════════════════════════════════════════════════════════════════
-    
     def think(self, question: str, user_id: str = "default", mode: str = "normal") -> Dict:
         start_time = time.time()
         self._last_user_interaction = start_time
         
-        # === МУЛЬТИАГЕНТ ПО КОМАНДЕ ===
+        # === МУЛЬТИАГЕНТНЫЙ РЕЖИМ ===
         if mode == 'multiagent' and self.multiagent:
-            return self._multiagent_response(question)
-        
-        # === АВТОНОМНЫЙ МУЛЬТИАГЕНТ ПРИ ОТКАЗЕ API ===
-        if not self._is_api_available() and self.multiagent:
-            print("⚠️ API не доступен, переключаюсь на автономный мультиагентный синтез")
-            return self._multiagent_response(question)
+            result = self.multiagent.process(question)
+            return {
+                'answer': result['synthesis'],
+                'mode_type': 'multiagent_synthesis',
+                'coherence': result['evaluation']['coherence'],
+                'mood': self.personality.mood,
+                'hormones': dict(self.hormones),
+                'emotional_tag': self._get_emotional_tag(),
+            }
         
         # === ОБЫЧНЫЙ ГИБРИДНЫЙ РЕЖИМ ===
         contextual_question = self._build_contextual_question(question)
@@ -591,13 +554,6 @@ class HybridBridge:
         logic = self._left_hemisphere(contextual_question, intuition)
         answer = self._tees_synthesis(contextual_question, intuition, logic, effective_threshold)
         self._remember(contextual_question, answer, time.time() - start_time)
-        
-        # Обновляем маховик от когерентности ответа
-        if answer.get('coherence', 0) > 0.3:
-            self.flywheel_energy = min(1.0, self.flywheel_energy + answer['coherence'] * 0.1)
-        else:
-            self.flywheel_energy = max(0.1, self.flywheel_energy * 0.995)
-        
         if mode == 'hypnosis' and self.memory:
             self.memory.set_hypnosis_mode(False)
         return answer
@@ -795,7 +751,7 @@ class HybridBridge:
             ma_info += f"  Синтезов в истории: {len(self.multiagent.synthesis_history)}"
         
         return f"""
-=== ГИБРИДНЫЙ КОНТУР v4.3: САМОРЕФЛЕКСИЯ ===
+=== ГИБРИДНЫЙ КОНТУР v4.2: САМОРЕФЛЕКСИЯ ===
 Сессия: {len(self.session_questions)} вопросов
 Диалоговый буфер: последний контекст = {self._last_full_question[:80] if self._last_full_question else 'пуст'}...
 TEES-каскад: глубина {self._cascade_depth}/{self._cascade_max_depth}
@@ -806,8 +762,6 @@ TEES-каскад: глубина {self._cascade_depth}/{self._cascade_max_depth
 
 Левое полушарие: DeepSeek API
   - Статус: {'онлайн (ВММП-промпт v4, честный диалог)' if self.api else 'АВТОНОМНАЯ ЛОГИКА'}
-
-Маховик: {self.flywheel_energy:.2f}
 
 Мета-когниция:
   - Индекс автономности: {self.autonomy_index:.2f}
@@ -858,13 +812,13 @@ TEES-событий: {len(self.tees_events)}
 
 
 # ========================================================================
-#   РЕЗИДЕНТНЫЙ РЕЖИМ v4.3
+#   РЕЗИДЕНТНЫЙ РЕЖИМ v4.2 — МУЛЬТИАГЕНТ + АВТОСОН
 # ========================================================================
 if __name__ == "__main__":
     field_path = 'src/rizoma/data/personalities/p016_grown_3h.json'
     
     print("\n" + "=" * 60)
-    print("🧠 РЕЗИДЕНТНЫЙ ГИБРИД v4.3 — АВТОНОМНЫЙ МУЛЬТИАГЕНТ")
+    print("🧠 РЕЗИДЕНТНЫЙ ГИБРИД v4.2 — МУЛЬТИАГЕНТ + АВТОСОН")
     print("=" * 60)
     
     if os.path.exists(field_path):
@@ -893,7 +847,6 @@ if __name__ == "__main__":
     print("\n📡 Гибрид слушает. Введите вопрос или команду.")
     print("   🧠 /multiagent — мультиагентный синтез (1+1+1=4)")
     print("   🔄 АВТОСОН активен.")
-    print("   🤖 АВТОНОМНЫЙ МУЛЬТИАГЕНТ — при отказе API включается автоматически")
     print("   Команды: /sleep, /supercompensate, /hypnosis, /pulse, /hormones, /emotion, /stats, /save, /exit")
     print("─" * 60)
     
@@ -1006,7 +959,6 @@ if __name__ == "__main__":
             bridge.save(field_path)
             continue
         
-        # Обычный вопрос
         result = bridge.think(user_input)
         print(f"🤖 {result['answer'][:500]}")
         if 'hormones' in result:

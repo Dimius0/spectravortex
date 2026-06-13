@@ -6,20 +6,14 @@
 import json
 import sys
 import hashlib
-import os
 from datetime import datetime
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))  # три уровня вверх от v8_sensor/src/rizoma/
+sys.path.insert(0, 'src')
+from personality_v16_1 import Personality, SpectralMode
 
-sys.path.insert(0, REPO_ROOT)
-sys.path.insert(0, os.path.join(REPO_ROOT, 'src'))
-
-from .personality_v16_1 import Personality, SpectralMode
-
-INPUT_FILE = os.path.join(REPO_ROOT, 'brain_dump', 'dialogues_json', 'conversations.json')
-BASE_FIELD = os.path.join(REPO_ROOT, 'src', 'rizoma', 'data', 'personalities', 'p016_fractal_v16_1_auto_20260403_1159.json')
-OUTPUT_FIELD = os.path.join(REPO_ROOT, 'src', 'rizoma', 'data', 'personalities', 'p016_fractal_v17_0_with_dialogues_v3.json')
+INPUT_FILE = 'brain_dump/dialogues_json/conversations.json'
+BASE_FIELD = 'src/rizoma/data/personalities/p016_fractal_v17_0.json'
+OUTPUT_FIELD = 'src/rizoma/data/personalities/p016_fractal_v17_0_with_dialogues_v3.json'
 
 print("=" * 60)
 print("📂 ЗАГРУЗКА ДИАЛОГОВ В ПОЛЕ H")
