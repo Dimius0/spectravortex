@@ -799,7 +799,16 @@ class LivingPersonality(BasePersonality):
                     # Конвертируем в dict если нужно
                     mode.tau_spectrum = {float(k): float(v) for k, v in mode.tau_spectrum.items()} if hasattr(mode.tau_spectrum, 'items') else {}
             # =============================================
-            
+            # === ФИКС: поля для coordinate_field.py ===
+            if not hasattr(mode, 'effective_energy'):
+                mode.effective_energy = getattr(mode, 'amplitude', 0.5)
+            if not hasattr(mode, 'energy'):
+                mode.energy = getattr(mode, 'amplitude', 0.5)
+            if not hasattr(mode, 'resonance_count'):
+                mode.resonance_count = 0
+            if not hasattr(mode, 'last_resonance'):
+                mode.last_resonance = 0.0
+            # ===========================================
             # Добавляем в единое поле
             self.field.add_mode(mode)
             

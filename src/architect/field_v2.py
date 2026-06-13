@@ -197,7 +197,6 @@ class FieldV2:
     def __init__(self, name: str = "FieldV2"):
         self.name = name
         self.layers: Dict[int, CoordinateField] = {}
-        #self.time: float = 0.0  # глобальное время поля
         
         for layer_id, _, _ in LAYER_BOUNDARIES:
             self.layers[layer_id] = CoordinateField(f"{name}_layer_{layer_id}")
@@ -230,12 +229,7 @@ class FieldV2:
         return abs(self._layer_center(layer1) - self._layer_center(layer2))
     
     def _layer_priority_bonus(self, layer_id: int, query_scale: float) -> float:
-        """
-        Бонус приоритета слоя.
-        
-        Вывод: верхние слои имеют больший масштаб → большее давление.
-        Бонус ~ близость масштаба запроса к центру слоя.
-        """
+        """Бонус приоритета слоя."""
         center = self._layer_center(layer_id)
         if center == 0:
             return 0.0
@@ -244,11 +238,7 @@ class FieldV2:
     # ========== ДОБАВЛЕНИЕ / УДАЛЕНИЕ МОД ==========
     
     def add_mode(self, mode) -> None:
-        """
-        Добавляет моду в соответствующий слой.
-        
-        Принимает FieldMode или CoordinateMode.
-        """
+        """Добавляет моду в соответствующий слой."""
         if isinstance(mode, FieldMode):
             coord_mode = mode.to_coordinate_mode()
         else:
@@ -278,12 +268,7 @@ class FieldV2:
         return False
     
     def redistribute_mode(self, mode_id: str, new_scale: float) -> bool:
-        """
-        Перемещает моду в другой слой при изменении scale.
-        
-        Вывод: из уравнения эволюции scale = scale_0 * exp(γt).
-        При накоплении энергии мода может переходить между слоями.
-        """
+        """Перемещает моду в другой слой при изменении scale."""
         mode = self.get_mode(mode_id)
         if not mode:
             return False
@@ -295,14 +280,11 @@ class FieldV2:
             mode.scale = new_scale
             return True
         
-        # Удаляем из старого слоя
         self.layers[old_layer].remove_mode(mode_id)
         self.stats['modes_per_layer'][old_layer] -= 1
         
-        # Обновляем scale
         mode.scale = new_scale
         
-        # Добавляем в новый слой
         self.layers[new_layer].add_mode(mode)
         self.stats['modes_per_layer'][new_layer] += 1
         
@@ -321,12 +303,7 @@ class FieldV2:
         use_priority_bonus: bool = True,
         early_exit: bool = True
     ) -> List[Tuple[str, float, int, Dict]]:
-        """
-        Поиск по резонансу во всех слоях с приоритетом 7 → 1.
-        
-        Args:
-            query_emotion: str или WaveformEmotion
-        """
+        """Поиск по резонансу во всех слоях с приоритетом 7 → 1."""
         if isinstance(query_emotion, WaveformEmotion):
             emotion_str = query_emotion.base_emotion
         else:
@@ -352,7 +329,6 @@ class FieldV2:
                     resonance += bonus
                 all_results.append((mode_id, resonance, layer_id, details))
             
-            # Ранний выход: проверяем резонанс с учётом бонуса
             if early_exit and results:
                 top_resonance = results[0][1]
                 if use_priority_bonus:
@@ -364,6 +340,65 @@ class FieldV2:
         return all_results[:k]
     
     # ========== КРОСС-СЛОЙНЫЙ РЕЗОНАНС ==========
+    
+    def _harmonic_resonance(self, tau1: float, tau2: float, scale: float) -> float:
+        """
+        Гармонический резонанс между двумя tau.
+        Вывод из ∇⁴ψ: resonance = 1 / (1 + order * η)
+        """
+        if tau1 <= 0 or tau2 <= 0:
+            return 0.0
+        
+        ratio = max(tau1, tau2) / min(tau1, tau2)
+        if ratio <= 0:
+            return 0.0
+        
+        log2_ratio = math.log2(ratio)
+        nearest_int = round(log2_ratio)
+        
+        if abs(log2_ratio - nearest_int) < HARMONIC_TOLERANCE:
+            order = abs(nearest_int)
+            eta = 0.5  # среднее затухание
+            return 1.0 / (1.0 + order * eta)
+        
+        return 0.0
+    
+    def _spectral_overlap(self, spec1: Dict, spec2: Dict) -> float:
+        """
+        Спектральное перекрытие через интервалы.
+        Если спектры None или пустые — возвращает 1.0.
+        """
+        if not spec1 or not spec2:
+            return 1.0
+        
+        try:
+            keys1 = set(spec1.keys())
+            keys2 = set(spec2.keys())
+        except AttributeError:
+            return 1.0  # не словари — полное перекрытие
+        
+        common = keys1 & keys2
+        
+        if not common:
+            return 0.0
+        
+        total_overlap = 0.0
+        total_weight = 0.0
+        
+        for tau in common:
+            r1 = spec1[tau]
+            r2 = spec2[tau]
+            
+            if hasattr(r1, 'overlaps') and hasattr(r2, 'overlaps'):
+                overlap = r1.overlaps(r2)
+            else:
+                overlap = 1.0
+            
+            weight = (getattr(r1, 'center', 0.5) + getattr(r2, 'center', 0.5)) / 2.0
+            total_overlap += overlap * weight
+            total_weight += weight
+        
+        return total_overlap / total_weight if total_weight > 0 else 0.0
     
     def cross_layer_resonance(
         self,
@@ -391,12 +426,14 @@ class FieldV2:
         # Энергия
         energy_product = mode1.effective_energy * mode2.effective_energy
         
-        # Гармонический резонанс (используем затухание от первого слоя)
-        layer = self.layers[layer1]
-        harmonic = layer._harmonic_resonance(mode1.tau, mode2.tau, mode1.scale)
+        # Гармонический резонанс (используем метод FieldV2, не layer)
+        harmonic = self._harmonic_resonance(mode1.tau, mode2.tau, mode1.scale)
         
-        # Спектральное перекрытие
-        spectral = layer._spectral_overlap(mode1.tau_spectrum, mode2.tau_spectrum)
+        # Спектральное перекрытие (используем метод FieldV2)
+        if mode1.tau_spectrum is not None and mode2.tau_spectrum is not None:
+            spectral = self._spectral_overlap(mode1.tau_spectrum, mode2.tau_spectrum)
+        else:
+            spectral = 1.0  # моды без загруженного спектра — полное перекрытие
         
         # Расстояние между слоями
         layer_dist = self._layer_distance(layer1, layer2)
@@ -429,21 +466,14 @@ class FieldV2:
         if not mode_from or not mode_to:
             return 0.0
         
-        # Градиент энергии
         energy_diff = mode_from.effective_energy - mode_to.effective_energy
-        
-        # Перенос энергии
         delta_e = resonance * energy_diff * dt / TAU_CHARGE
         
-        # Ограничиваем перенос (не больше 10% энергии источника)
         max_transfer = mode_from.energy * 0.1
         delta_e = max(-max_transfer, min(max_transfer, delta_e))
         
-        # Применяем
         mode_from.energy -= delta_e
         mode_to.energy += delta_e
-        
-        # Энергия не может быть отрицательной
         mode_from.energy = max(MIN_ZOND_ENERGY, mode_from.energy)
         
         self.stats['cross_layer_transfers'] += 1
@@ -462,14 +492,6 @@ class FieldV2:
         Вывод из ∇⁴ψ:
         Когда суммарный резонанс превышает EMERGE_ENERGY_THRESHOLD,
         рождается новая мода с τ = среднее гармоническое от источников.
-        
-        Args:
-            source_mode_ids: ID мод-источников (должны быть из нижних слоёв)
-            target_layer: слой для новой моды
-            content: описание новой моды
-        
-        Returns:
-            Новая мода или None
         """
         if len(source_mode_ids) < 2:
             return None
@@ -483,10 +505,8 @@ class FieldV2:
         if len(source_modes) < 2:
             return None
         
-        # Суммарный резонанс между всеми парами источников
         total_resonance = 0.0
         tau_product = 1.0
-        scale_sum = 0.0
         phase_sum = 0.0
         
         for i, m1 in enumerate(source_modes):
@@ -498,21 +518,16 @@ class FieldV2:
         if total_resonance < EMERGE_ENERGY_THRESHOLD:
             return None
         
-        # Вычисляем параметры новой моды
-        # τ = среднее геометрическое (сохраняет гармонические отношения)
         for m in source_modes:
             tau_product *= m.tau
         new_tau = tau_product ** (1.0 / len(source_modes))
         
-        # scale = центр целевого слоя
         new_scale = self._layer_center(target_layer)
         
-        # phase = среднее арифметическое фаз
         for m in source_modes:
             phase_sum += m.phase
         new_phase = phase_sum / len(source_modes)
         
-        # emotion = усреднённая волна
         new_emotion = WaveformEmotion(
             amplitude=0.3,
             frequency=0.1,
@@ -520,19 +535,19 @@ class FieldV2:
             base_emotion=source_modes[0].emotion if isinstance(source_modes[0].emotion, str) else source_modes[0].emotion.base_emotion
         )
         
-        # Спектр — объединение спектров источников
         new_spectrum: Dict[float, SpectralRange] = {}
         for m in source_modes:
-            for tau, interval in m.tau_spectrum.items():
-                scaled_tau = round(tau * new_tau / m.tau, 2)
-                if scaled_tau in new_spectrum:
-                    existing = new_spectrum[scaled_tau]
-                    existing.min_val = min(existing.min_val, interval.min_val)
-                    existing.max_val = max(existing.max_val, interval.max_val)
-                else:
-                    new_spectrum[scaled_tau] = SpectralRange(
-                        interval.min_val, interval.max_val, 0.1
-                    )
+            if m.tau_spectrum:
+                for tau, interval in m.tau_spectrum.items():
+                    scaled_tau = round(tau * new_tau / m.tau, 2)
+                    if scaled_tau in new_spectrum:
+                        existing = new_spectrum[scaled_tau]
+                        existing.min_val = min(existing.min_val, interval.min_val)
+                        existing.max_val = max(existing.max_val, interval.max_val)
+                    else:
+                        new_spectrum[scaled_tau] = SpectralRange(
+                            interval.min_val, interval.max_val, 0.1
+                        )
         
         new_mode = CoordinateMode(
             id=f"emerged_{target_layer}_{new_tau:.1f}",
@@ -560,24 +575,20 @@ class FieldV2:
         transfers = 0
         emerged = []
         
-        # Проверяем пары из соседних слоёв
         for layer_id in range(1, 7):
             layer_low = self.layers[layer_id]
             layer_high = self.layers[layer_id + 1]
             
             for mode_low in layer_low.modes.values():
                 for mode_high in layer_high.modes.values():
-                    # TEES-переход
                     delta = self.tees_transfer(mode_low.id, mode_high.id, dt)
                     if abs(delta) > 0:
                         transfers += 1
         
-        # Проверяем эмерджентность: каскад из трёх нижних слоёв
         for layer_id in range(1, 6):
             low_modes = list(self.layers[layer_id].modes.values())
             mid_modes = list(self.layers[layer_id + 1].modes.values())
             
-            # Берём до 3 мод из нижнего и 2 из среднего
             candidates = low_modes[:3] + mid_modes[:2]
             if len(candidates) >= 2:
                 new_mode = self.emerge_new_mode(
@@ -606,17 +617,10 @@ class FieldV2:
             layer.evolve_seeds(dt)
     
     def step(self, dt: float) -> None:
-        """
-        Полный шаг эволюции поля:
-        1. Обновление весов
-        2. Эволюция зондов
-        3. Кросс-слойная динамика
-        #4. Продвижение глобального времени
-        """
+        """Полный шаг эволюции поля."""
         self.update_weights(dt)
         self.evolve_seeds(dt)
         self.step_cross_layer_dynamics(dt)
-        #self.time += dt
     
     # ========== СЛЕПЫЕ ЗОНЫ (ДЕЛЕГИРОВАНИЕ) ==========
     
@@ -644,7 +648,6 @@ class FieldV2:
         if target_layer:
             return self.layers[target_layer].seed_blind_zone(tau, phase, emotion_str, content)
         
-        # Если слой не указан — пробуем все
         for layer_id in range(7, 0, -1):
             seed = self.layers[layer_id].seed_blind_zone(tau, phase, emotion_str, content)
             if seed:
@@ -682,7 +685,6 @@ class FieldV2:
             'modes_per_layer': self.stats['modes_per_layer'].copy(),
             'cross_layer_transfers': self.stats['cross_layer_transfers'],
             'emerged_modes': self.stats['emerged_modes'],
-            #'time': self.time,
             'layer_stats': layer_stats,
         }
     
@@ -693,7 +695,6 @@ class FieldV2:
         self.stats['total_modes'] = 0
         self.stats['cross_layer_transfers'] = 0
         self.stats['emerged_modes'] = 0
-        #self.time = 0.0
         for i in range(1, 8):
             self.stats['modes_per_layer'][i] = 0
     
@@ -717,7 +718,7 @@ class FieldV2:
         tau: float,
         scale: float,
         phase: float,
-        emotion,  # str или WaveformEmotion
+        emotion,
         energy: float,
         tau_spectrum: Dict[float, float],
         uncertainty: float = 0.05
@@ -749,20 +750,17 @@ if __name__ == "__main__":
     
     field = FieldV2("TestField")
     
-    # === Тест 1: Добавление мод в разные слои ===
     print("\n" + "=" * 40)
     print("Тест 1: Распределение по слоям")
     
     uncertainty = 0.05
     
-    # Создаём моды для разных слоёв
     modes_data = [
-        # (id, tau, scale, emotion, energy)
-        ("word_tees", 16.0, 4.0, "joy", 0.5),       # слой 3
-        ("phrase_tees", 16.0, 12.0, "joy", 1.0),     # слой 5
-        ("text_tees", 16.0, 50.0, "joy", 1.5),       # слой 7
-        ("letter_a", 1.0, 0.5, "neutral", 0.1),      # слой 1
-        ("syllable_te", 8.0, 2.0, "neutral", 0.2),   # слой 2
+        ("word_tees", 16.0, 4.0, "joy", 0.5),
+        ("phrase_tees", 16.0, 12.0, "joy", 1.0),
+        ("text_tees", 16.0, 50.0, "joy", 1.5),
+        ("letter_a", 1.0, 0.5, "neutral", 0.1),
+        ("syllable_te", 8.0, 2.0, "neutral", 0.2),
     ]
     
     for mid, tau, scale, emotion, energy in modes_data:
@@ -779,7 +777,6 @@ if __name__ == "__main__":
     print(f"  Всего мод: {stats['total_modes']}")
     print(f"  По слоям: {stats['modes_per_layer']}")
     
-    # === Тест 2: Поиск с приоритетом слоёв ===
     print("\n" + "=" * 40)
     print("Тест 2: Поиск с приоритетом 7→1")
     
@@ -793,19 +790,15 @@ if __name__ == "__main__":
         mode = field.get_mode(mode_id)
         print(f"  {mode_id}: R={resonance:.4f}, layer={layer}, scale={mode.scale}")
     
-    # === Тест 3: Кросс-слойный резонанс ===
     print("\n" + "=" * 40)
     print("Тест 3: Кросс-слойный резонанс")
     
-    # word_tees (слой 3) и phrase_tees (слой 5) — гармоники τ=16
     resonance = field.cross_layer_resonance("word_tees", "phrase_tees")
     print(f"  word_tees ↔ phrase_tees: resonance = {resonance:.4f}" if resonance else "  —")
     
-    # letter_a (слой 1) и text_tees (слой 7) — не гармоники
     resonance = field.cross_layer_resonance("letter_a", "text_tees")
     print(f"  letter_a ↔ text_tees: resonance = {resonance:.4f}" if resonance else "  —")
     
-    # === Тест 4: TEES-переход ===
     print("\n" + "=" * 40)
     print("Тест 4: TEES-переход энергии")
     
@@ -817,7 +810,6 @@ if __name__ == "__main__":
     print(f"  Перенос: ΔE = {delta:.4f}")
     print(f"  После: word_tees energy={mode_w.energy:.4f}, phrase_tees energy={mode_p.energy:.4f}")
     
-    # === Тест 5: Волновые эмоции ===
     print("\n" + "=" * 40)
     print("Тест 5: Волновые эмоции")
     
@@ -831,11 +823,9 @@ if __name__ == "__main__":
     print(f"  w1 после update: amplitude={w1.amplitude:.3f}, phase={w1.phase:.3f}")
     print(f"  w1(1) = {w1.value_at(1):.3f}")
     
-    # === Тест 6: Эмерджентность ===
     print("\n" + "=" * 40)
     print("Тест 6: Рождение эмерджентной моды")
     
-    # Добавим ещё мод для каскада
     extra_spectrum = field.spectrum_to_intervals({16.0: 1.0, 8.0: 0.5}, uncertainty)
     extra_mode = CoordinateMode(
         id="word_tees_2", content="TEES вариант 2", tau=16.0, scale=4.5,
@@ -854,7 +844,6 @@ if __name__ == "__main__":
         print(f"    τ={new_mode.tau:.1f}, scale={new_mode.scale}, energy={new_mode.energy:.4f}")
         print(f"    content: {new_mode.content}")
     
-    # === Тест 7: Полный шаг эволюции ===
     print("\n" + "=" * 40)
     print("Тест 7: Полный шаг эволюции")
     

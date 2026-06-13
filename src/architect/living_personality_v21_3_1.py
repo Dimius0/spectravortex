@@ -243,9 +243,21 @@ class TextStoreSQL:
             if row:
                 return row[0]
             text_id = f"txt_{int(time.time() * 1000):016x}"
-            self._conn.execute(
-                "INSERT INTO texts (id, hash, content, size, created_at) VALUES (?, ?, ?, ?, ?)",
-                (text_id, text_hash, text, len(text), time.time()))
+            try:
+                self._conn.execute(
+                    "INSERT INTO texts (id, hash, content, size, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (text_id, text_hash, text, len(text), time.time()))
+            except sqlite3.IntegrityError:
+                # Конфликт ID — такое бывает при быстрых вызовах, ищем существующий
+                cursor2 = self._conn.execute("SELECT id FROM texts WHERE hash = ?", (text_hash,))
+                row2 = cursor2.fetchone()
+                if row2:
+                    return row2[0]
+                # Если и этого нет — генерируем новый ID
+                text_id = f"txt_{int(time.time() * 1000)}_{hashlib.md5(text.encode()).hexdigest()[:4]}"
+                self._conn.execute(
+                    "INSERT INTO texts (id, hash, content, size, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (text_id, text_hash, text, len(text), time.time()))
             self._conn.commit()
             self._add_to_cache(text_id, text)
             return text_id
@@ -427,7 +439,7 @@ class LivingPersonality:
         Плотное поле → высокий порог (фильтруем шум).
         """
         density = self.field_density
-        threshold = MIN_ENERGY * (1 + density * 30)
+        threshold = MIN_ENERGY * (1 + density * 10)
         return max(0.03, min(0.5, threshold))
     
     @property
@@ -442,7 +454,7 @@ class LivingPersonality:
         
         success_rate = self.stats['tees_successes'] / max(self.stats['tees_attempts'], 1)
         heating_factor = TAU_CHARGE / (TAU_LIFE + TAU_CHARGE)  # ≈ 0.0909
-        threshold = MIN_ENERGY * 3 * (1 - success_rate * heating_factor * 10)
+        threshold = MIN_ENERGY * 3 * (1 - success_rate * heating_factor)
         
         debug.emerge(f"Порог фуркации: {threshold:.4f} (success_rate={success_rate:.3f})")
         return max(MIN_ENERGY, threshold)
@@ -482,7 +494,7 @@ class LivingPersonality:
     def num_scouts(self) -> int:
         n_modes = len(self._modes)
         base = self.energy * (n_modes / TAU_CHARGE) * (TAU_LIFE / TAU_CHARGE)
-        return max(1, min(int(base), max(10, n_modes // 10)))
+        return max(1, min(int(base), 1000))  # ← ограничение 1000
     
     @property
     def max_furcations(self) -> int:
@@ -686,7 +698,7 @@ class LivingPersonality:
             
             debug.emerge(f"Фуркация: {new_mode.id} τ={new_tau:.1f} scale={new_scale:.1f}")
         
-        self.energy = min(1.0, self.energy + 0.001 * dt)
+        self.energy = min(1.0, self.energy + 0.01 * dt)
         
         return {
             'transfers': transfers, 'emerged': emerged,
