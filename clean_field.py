@@ -1,26 +1,11 @@
 #!/usr/bin/env python3
 """
-clean_field.py — Чистое поле смыслов. Версия 5.0
-Новые механизмы:
-  - Логопериодическая спираль: уровни вложенности (слово → фраза → блок)
-  - Миелинизация: усиление часто используемых связей
-  - Эндогенные фуркации: рождение альтернативных узлов в точках резонанса
-  - Температура поля: энергия регулирует ветвление
-  - Метаболический пульс: нагрев → фуркации → остывание → кристаллизация
-  - Эндогенный диалог: поле задаёт вопросы самому себе в точках фуркаций
-  - Защита от зависания: max_depth в DFS и try/except на каждом тексте
-  - Отладочный лог: problematic_texts.log для текстов, вызвавших ошибки
-  - Улучшенная сборка ответа: от причины к следствию (TEES-направление)
+clean_field.py — Чистое поле смыслов. Версия 6.1
+Стековый парсер + изоморфный поиск по леммам: ответ = фрагмент скрипта с общими словами.
+Термины: τ, H, ∇H, резонанс, бифуркация, TEES-канал, проводимость, пропускная способность.
 """
 
-import json
-import glob
-import gc
-import re
-import math
-import os
-import sys
-import traceback
+import json, glob, gc, re, math, os
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Set
@@ -32,12 +17,9 @@ from datetime import datetime
 # ============================================================================
 
 THRESHOLDS = {
-    'L_max': 12,
-    'E_flow_min': 1.0, 'E_flow_max': 5.0,
-    'S_growth_min': 0.5, 'S_growth_max': 5.0,
-    'C_min': 0.1, 'C_max': 0.9,
-    'delta2w_max': 2.0,
-    'total_tau_max': 8.0
+    'L_max': 20, 'E_flow_min': 0.5, 'E_flow_max': 10.0,
+    'S_growth_min': 0.3, 'S_growth_max': 10.0,
+    'C_min': 0.05, 'C_max': 0.9, 'delta2w_max': 3.0, 'total_tau_max': 12.0
 }
 
 WH_WORDS = {
@@ -50,13 +32,13 @@ SOURCE_POS = {'NOUN', 'PROPN', 'ADJ', 'ADV', 'PRON', 'NUM', 'INTJ'}
 SINK_POS = {'VERB', 'PREP', 'AUX'}
 NEUTRAL_POS = {'CONJ', 'PUNCT', 'DET', 'PART', 'SCONJ'}
 
-MYELINATION_THRESHOLD = 3
-FURCATION_ENERGY_COST = 0.3
+CONDUCTIVITY_THRESHOLD = 3
+BIFURCATION_ENERGY_COST = 0.3
 TEMPERATURE_HIGH = 1.5
 TEMPERATURE_LOW = 0.3
 SPIRAL_LEVELS = 3
-ENDOGENOUS_DIALOG_INTERVAL = 100  # как часто поле задаёт вопрос себе
-MAX_DFS_DEPTH = 50  # защита от бесконечной рекурсии
+ENDOGENOUS_DIALOG_INTERVAL = 100
+MAX_DFS_DEPTH = 50
 
 
 # ============================================================================
@@ -107,46 +89,34 @@ def find_resonance(H: Dict[int, float], graph: Dict, tokens: List[Dict],
     current = start_node
     visited = {current}
     path = [current]
-    log = []
-
     for step in range(max_steps):
         if current not in graph:
             break
-
         neighbors = set()
         for dep in graph[current]['deps']:
             j = dep['head']
             if j not in visited and j in H:
-                pos_j = tokens[j]['pos']
-                if pos_j not in NEUTRAL_POS:
+                if tokens[j]['pos'] not in NEUTRAL_POS:
                     neighbors.add(j)
-
         if not neighbors:
             for dep in graph[current]['deps']:
                 j = dep['head']
                 if j not in visited and j in H:
                     neighbors.add(j)
-
         if not neighbors:
             break
-
         gradients = {j: H.get(j, 0.0) - H.get(current, 0.0) for j in neighbors}
-
         if step >= min_steps:
-            min_grad = min(gradients.values()) if gradients else 0.0
-            if min_grad > -resonance_threshold:
+            if min(gradients.values()) > -resonance_threshold:
                 break
-
         if any(g < 0 for g in gradients.values()):
             best_neighbor = min(gradients, key=gradients.get)
         else:
             best_neighbor = max(gradients, key=gradients.get)
-
         visited.add(best_neighbor)
         path.append(best_neighbor)
         current = best_neighbor
-
-    return current, path, log
+    return current, path, []
 
 
 # ============================================================================
@@ -202,12 +172,60 @@ class StructuralParser:
                 'token': tok['text'], 'lemma': tok['lemma'],
                 'pos': tok['pos'], 'tau': tok['tau'], 'H': 0.0, 'deps': []
             }
-            if i > 0:
-                graph[i]['deps'].append({'head': i-1, 'dep': 'left', 'label': 'adjacent'})
-            if i < n-1:
-                graph[i]['deps'].append({'head': i+1, 'dep': 'right', 'label': 'adjacent'})
-            if tok['pos'] == 'PUNCT' and i > 0:
-                graph[i]['deps'].append({'head': i-1, 'dep': 'punct', 'label': 'punctuation'})
+        operand_stack = []
+        operator_stack = []
+        pending_prep = None
+        question_node = None
+        for i, tok in enumerate(tokens):
+            tau = tok['tau']
+            pos = tok['pos']
+            if tau == 2.0:
+                question_node = i
+                if operator_stack:
+                    graph[i]['deps'].append({'head': operator_stack[-1], 'dep': 'question', 'label': 'question_to_verb'})
+                continue
+            if pos == 'PUNCT' and tok['text'] in '.!?':
+                if operator_stack:
+                    graph[i]['deps'].append({'head': operator_stack[-1], 'dep': 'punct', 'label': 'end'})
+                elif operand_stack:
+                    graph[i]['deps'].append({'head': operand_stack[-1], 'dep': 'punct', 'label': 'end'})
+                operand_stack.clear(); operator_stack.clear(); pending_prep = None
+                continue
+            if pos == 'PUNCT':
+                if operator_stack:
+                    graph[i]['deps'].append({'head': operator_stack[-1], 'dep': 'punct', 'label': 'comma'})
+                continue
+            if tau < 0 or pos == 'CONJ':
+                if pos == 'PREP':
+                    pending_prep = i
+                if operand_stack:
+                    graph[i]['deps'].append({'head': operand_stack[-1], 'dep': 'operand_to_operator', 'label': 'operand_to_operator'})
+                    graph[operand_stack[-1]]['deps'].append({'head': i, 'dep': 'operator_to_operand', 'label': 'operator_to_operand'})
+                if operator_stack and pos != 'PREP':
+                    graph[i]['deps'].append({'head': operator_stack[-1], 'dep': 'operator_chain', 'label': 'operator_chain'})
+                operator_stack.append(i)
+                continue
+            if tau > 0 or pos in SOURCE_POS:
+                if pending_prep is not None:
+                    graph[i]['deps'].append({'head': pending_prep, 'dep': 'prep_object', 'label': 'prepositional_object'})
+                    graph[pending_prep]['deps'].append({'head': i, 'dep': 'prep_head', 'label': 'prepositional_head'})
+                    pending_prep = None
+                if operator_stack:
+                    graph[i]['deps'].append({'head': operator_stack[-1], 'dep': 'verb_object', 'label': 'verb_object'})
+                    graph[operator_stack[-1]]['deps'].append({'head': i, 'dep': 'verb_head', 'label': 'verb_head'})
+                if operand_stack:
+                    prev_op = operand_stack[-1]
+                    prev_pos = tokens[prev_op]['pos']
+                    if pos == 'ADJ' and prev_pos in ('NOUN', 'PROPN'):
+                        graph[i]['deps'].append({'head': prev_op, 'dep': 'adj_to_noun', 'label': 'adjective_modifier'})
+                    elif prev_pos == 'ADJ' and pos in ('NOUN', 'PROPN'):
+                        graph[prev_op]['deps'].append({'head': i, 'dep': 'adj_to_noun', 'label': 'adjective_modifier'})
+                    elif pos == prev_pos:
+                        graph[i]['deps'].append({'head': prev_op, 'dep': 'enumeration', 'label': 'enumeration'})
+                operand_stack.append(i)
+                continue
+        if question_node is not None and operand_stack:
+            graph[question_node]['deps'].append({'head': operand_stack[-1], 'dep': 'question_to_object', 'label': 'question_to_object'})
         return graph
 
     def parse(self, text: str) -> Dict:
@@ -232,7 +250,7 @@ class StructuralParser:
 
 
 # ============================================================================
-# БЛОК 2: ФИЛЬТР (с защитой от зависания)
+# БЛОК 2: ФИЛЬТР
 # ============================================================================
 
 class StructuralFilter:
@@ -240,27 +258,31 @@ class StructuralFilter:
         self.thresholds = THRESHOLDS
 
     def compute_L(self, graph: Dict) -> int:
-        """Вычисляет максимальную глубину с защитой от бесконечной рекурсии."""
-        adj = defaultdict(list)
+        if not graph:
+            return 0
+        n = len(graph)
+        if n > 50:
+            max_degree = max((len(node['deps']) for node in graph.values()), default=0)
+            return min(max_degree * 2, MAX_DFS_DEPTH)
+        adj = defaultdict(set)
         for node_id, node_data in graph.items():
             for dep in node_data['deps']:
-                adj[node_id].append(dep['head'])
+                adj[node_id].add(dep['head'])
         max_depth = 0
-        
-        def dfs(node, depth, visited):
-            nonlocal max_depth
-            if depth > MAX_DFS_DEPTH:
+        nodes = list(graph.keys())
+        sample_nodes = nodes if n <= 20 else nodes[:20]
+        for start_node in sample_nodes:
+            visited = {start_node}
+            queue = [(start_node, 0)]
+            while queue:
+                current, depth = queue.pop(0)
                 max_depth = max(max_depth, depth)
-                return
-            if node in visited:
-                max_depth = max(max_depth, depth)
-                return
-            visited.add(node)
-            for neighbor in adj[node]:
-                dfs(neighbor, depth + 1, visited.copy())
-        
-        for node in graph:
-            dfs(node, 0, set())
+                if depth >= MAX_DFS_DEPTH:
+                    continue
+                for neighbor in adj[current]:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        queue.append((neighbor, depth + 1))
         return max_depth if max_depth > 0 else 1
 
     def compute_E_flow(self, graph: Dict) -> float:
@@ -303,8 +325,7 @@ class StructuralFilter:
         except RecursionError:
             L = MAX_DFS_DEPTH
         return {
-            'L': L,
-            'E_flow': self.compute_E_flow(graph),
+            'L': L, 'E_flow': self.compute_E_flow(graph),
             'S_growth': self.compute_S_growth(graph),
             'C': self.compute_C(graph),
             'delta2w': self.compute_delta2w(graph),
@@ -334,43 +355,36 @@ class StructuralFilter:
 
 
 # ============================================================================
-# БЛОК 3: ПОЛЕ СМЫСЛОВ 5.0
+# БЛОК 3: ПОЛЕ СМЫСЛОВ
 # ============================================================================
 
 @dataclass
-class SpiralNode:
-    token: str
-    lemma: str
-    pos: str
-    tau: float
-    H_sum: float = 0.0
-    frequency: int = 1
-    level: int = 0
-    connections_out: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    connections_in: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    myelinated_out: Set[str] = field(default_factory=set)
-    myelinated_in: Set[str] = field(default_factory=set)
-    shadow_of: Optional[str] = None
-    shadows: List[str] = field(default_factory=list)
-    last_furcation_step: int = 0
+class Node:
+    token: str; lemma: str; pos: str; tau: float
+    H_sum: float = 0.0; frequency: int = 1; level: int = 0
+    throughput_out: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    throughput_in: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    conductive_out: Set[str] = field(default_factory=set)
+    conductive_in: Set[str] = field(default_factory=set)
+    alternate_of: Optional[str] = None
+    alternants: List[str] = field(default_factory=list)
+    last_bifurcation_step: int = 0
 
 
-class StructuralFieldV5:
-    """Поле смыслов v5.0: + эндогенный диалог, защита от зависания."""
-
+class StructuralField:
     def __init__(self, debug_log: str = "problematic_texts.log"):
-        self.nodes: Dict[str, SpiralNode] = {}
+        self.nodes: Dict[str, Node] = {}
         self.edges: List[Tuple[str, str, str, float]] = []
         self.total_tokens = 0
         self.temperature = 0.3
-        self.furcations_today = 0
+        self.bifurcations_total = 0
         self.level_thresholds = [10, 100]
         self.total_steps = 0
         self.debug_log_path = debug_log
         self.dialog_log: List[Dict] = []
         self.error_count = 0
-        
-        # Очищаем лог
+        self._asked_nodes: Set[str] = set()
+        self.script_fragments: Dict[str, Dict] = {}
         with open(self.debug_log_path, 'w', encoding='utf-8') as f:
             f.write(f"=== Problematic texts log — {datetime.now()} ===\n\n")
 
@@ -378,63 +392,50 @@ class StructuralFieldV5:
         return f"{lemma}|{pos}|L{level}"
 
     def _log_problem(self, text: str, error: str):
-        """Логирует проблемный текст в файл."""
         self.error_count += 1
         with open(self.debug_log_path, 'a', encoding='utf-8') as f:
             f.write(f"[{datetime.now().strftime('%H:%M:%S')}] Error #{self.error_count}\n")
-            f.write(f"Text: {text[:200]}...\n")
-            f.write(f"Error: {error}\n")
-            f.write(f"---\n")
+            f.write(f"Text: {text[:200]}...\nError: {error}\n---\n")
 
     def _update_temperature(self, text_H_sum: float):
         self.temperature += text_H_sum * 0.01
         if self.temperature < TEMPERATURE_LOW:
             self.temperature = TEMPERATURE_LOW
 
-    def _myelinate(self, node_id: str, target_id: str, direction: str = 'out'):
+    def _update_conductivity(self, node_id: str, target_id: str, direction: str = 'out'):
         node = self.nodes[node_id]
         if direction == 'out':
-            count = node.connections_out[target_id]
-            if count >= MYELINATION_THRESHOLD and target_id not in node.myelinated_out:
-                node.myelinated_out.add(target_id)
+            if node.throughput_out[target_id] >= CONDUCTIVITY_THRESHOLD and target_id not in node.conductive_out:
+                node.conductive_out.add(target_id)
                 if target_id in self.nodes:
-                    self.nodes[target_id].myelinated_in.add(node_id)
+                    self.nodes[target_id].conductive_in.add(node_id)
         else:
-            count = node.connections_in[target_id]
-            if count >= MYELINATION_THRESHOLD and target_id not in node.myelinated_in:
-                node.myelinated_in.add(target_id)
+            if node.throughput_in[target_id] >= CONDUCTIVITY_THRESHOLD and target_id not in node.conductive_in:
+                node.conductive_in.add(target_id)
                 if target_id in self.nodes:
-                    self.nodes[target_id].myelinated_out.add(node_id)
+                    self.nodes[target_id].conductive_out.add(node_id)
 
-    def _try_furcate(self, global_id: str) -> Optional[str]:
+    def _try_bifurcate(self, global_id: str) -> Optional[str]:
         if self.temperature < TEMPERATURE_HIGH:
             return None
         node = self.nodes[global_id]
-        total_connections = len(node.connections_out) + len(node.connections_in)
-        if total_connections < 5:
+        if len(node.throughput_out) + len(node.throughput_in) < 5:
             return None
-        # Не фуркируем один узел слишком часто
-        if self.total_steps - node.last_furcation_step < 50:
+        if self.total_steps - node.last_bifurcation_step < 50:
             return None
-            
-        shadow_id = f"{node.lemma}|{node.pos}|L{node.level}|shadow{len(node.shadows)}"
-        shadow = SpiralNode(
-            token=f"~{node.token}",
-            lemma=f"~{node.lemma}",
-            pos=node.pos,
-            tau=-node.tau,
-            H_sum=node.H_sum * 0.5,
-            frequency=0,
-            level=node.level,
-            shadow_of=global_id,
-            last_furcation_step=self.total_steps
+        alt_id = f"{node.lemma}|{node.pos}|L{node.level}|alt{len(node.alternants)}"
+        alternant = Node(
+            token=f"¬{node.token}", lemma=f"¬{node.lemma}", pos=node.pos,
+            tau=-node.tau, H_sum=node.H_sum * 0.5, frequency=0,
+            level=node.level, alternate_of=global_id,
+            last_bifurcation_step=self.total_steps
         )
-        self.nodes[shadow_id] = shadow
-        node.shadows.append(shadow_id)
-        node.last_furcation_step = self.total_steps
-        self.temperature -= FURCATION_ENERGY_COST
-        self.furcations_today += 1
-        return shadow_id
+        self.nodes[alt_id] = alternant
+        node.alternants.append(alt_id)
+        node.last_bifurcation_step = self.total_steps
+        self.temperature -= BIFURCATION_ENERGY_COST
+        self.bifurcations_total += 1
+        return alt_id
 
     def _promote_level(self, global_id: str):
         node = self.nodes[global_id]
@@ -444,31 +445,27 @@ class StructuralFieldV5:
             if node.frequency >= threshold and node.level <= lvl:
                 new_id = self._node_id(node.lemma, node.pos, lvl + 1)
                 if new_id not in self.nodes:
-                    new_node = SpiralNode(
+                    self.nodes[new_id] = Node(
                         token=node.token, lemma=node.lemma, pos=node.pos,
                         tau=node.tau * 1.5, H_sum=node.H_sum * 2.0,
                         frequency=1, level=lvl + 1
                     )
-                    self.nodes[new_id] = new_node
                 else:
                     self.nodes[new_id].frequency += 1
                 node.level = lvl + 1
 
     def add_graph(self, parse_result: Dict, params: Dict):
-        """Добавляет граф с защитой от ошибок."""
         graph = parse_result['graph']
         tokens = parse_result['tokens']
         H = parse_result['H']
         local_to_global = {}
-
         text_energy = sum(abs(h) for h in H.values())
         self._update_temperature(text_energy)
-
         for node_id, node_data in graph.items():
             tok = tokens[node_id]
             global_id = self._node_id(tok['lemma'], tok['pos'], 0)
             if global_id not in self.nodes:
-                self.nodes[global_id] = SpiralNode(
+                self.nodes[global_id] = Node(
                     token=tok['text'], lemma=tok['lemma'], pos=tok['pos'],
                     tau=tok['tau'], H_sum=H.get(node_id, 0.0), level=0
                 )
@@ -477,7 +474,6 @@ class StructuralFieldV5:
                 self.nodes[global_id].H_sum += H.get(node_id, 0.0)
                 self._promote_level(global_id)
             local_to_global[node_id] = global_id
-
         for node_id, node_data in graph.items():
             u_global = local_to_global[node_id]
             u_tau = tokens[node_id]['tau']
@@ -490,108 +486,72 @@ class StructuralFieldV5:
                     grad_value = parse_result['gradient'].get((node_id, dep['head']), 0.0)
                     self.edges.append((u_global, v_global, label, grad_value))
                     if u_tau > v_tau or (u_tau == v_tau and grad_value < 0):
-                        self.nodes[u_global].connections_out[v_global] += 1
-                        self.nodes[v_global].connections_in[u_global] += 1
-                        self._myelinate(u_global, v_global, 'out')
-                        self._myelinate(v_global, u_global, 'in')
+                        self.nodes[u_global].throughput_out[v_global] += 1
+                        self.nodes[v_global].throughput_in[u_global] += 1
+                        self._update_conductivity(u_global, v_global, 'out')
+                        self._update_conductivity(v_global, u_global, 'in')
                     else:
-                        self.nodes[v_global].connections_out[u_global] += 1
-                        self.nodes[u_global].connections_in[v_global] += 1
-                        self._myelinate(v_global, u_global, 'out')
-                        self._myelinate(u_global, v_global, 'in')
-
+                        self.nodes[v_global].throughput_out[u_global] += 1
+                        self.nodes[u_global].throughput_in[v_global] += 1
+                        self._update_conductivity(v_global, u_global, 'out')
+                        self._update_conductivity(u_global, v_global, 'in')
         self.total_tokens += parse_result['num_nodes']
         self.total_steps += 1
-
+        fragment_id = f"script_{self.total_steps}"
+        self.script_fragments[fragment_id] = {'tokens': tokens, 'graph': {k: v for k, v in graph.items()}}
+        if len(self.script_fragments) > 10000:
+            del self.script_fragments[min(self.script_fragments.keys())]
         if self.temperature >= TEMPERATURE_HIGH:
             for node_id in local_to_global.values():
-                self._try_furcate(node_id)
+                self._try_bifurcate(node_id)
 
     # ========================================================================
     # ЭНДОГЕННЫЙ ДИАЛОГ
     # ========================================================================
 
     def endogenous_dialog(self, parser, verbose: bool = True) -> Optional[Dict]:
-        """
-        Поле задаёт вопрос самому себе.
-        Выбирает знаменательный узел с фуркациями.
-        """
-        # Критерии содержательности узла
-        def is_contentful(nid: str, node: SpiralNode) -> bool:
-            # Не мусорный POS
-            if node.pos in NEUTRAL_POS:
-                return False
-            # Не короткий мусор: *, #, @, в, с, и, а, ...
-            if len(node.token) <= 1 and not node.token.isalpha():
-                return False
-            # Не предлог/союз (защита от "в", "на", "с")
-            if node.pos in ('PREP', 'CONJ', 'SCONJ'):
-                return False
-            # Должен иметь тени (фуркации)
-            if not node.shadows:
-                return False
-            # Должен иметь достаточную частоту (не случайный мусор)
-            if node.frequency < 2:
-                return False
+        def is_contentful(node: Node) -> bool:
+            if node.pos in NEUTRAL_POS: return False
+            if len(node.token) <= 1 and not node.token.isalpha(): return False
+            if node.pos in ('PREP', 'CONJ', 'SCONJ'): return False
+            if not node.alternants: return False
+            if node.frequency < 2: return False
             return True
-        
-        # Ищем знаменательные узлы с тенями
         tense_nodes = []
         for nid, node in self.nodes.items():
-            if is_contentful(nid, node):
-                total_conn = len(node.connections_out) + len(node.connections_in)
-                # Вес: связи + тени*10 (тени важнее)
-                score = total_conn + len(node.shadows) * 10
+            if is_contentful(node) and nid not in self._asked_nodes:
+                score = len(node.throughput_out) + len(node.throughput_in) + len(node.alternants) * 10
                 tense_nodes.append((nid, score, node))
-        
         if not tense_nodes:
-            if verbose:
-                print(f"\n🧠 ЭНДОГЕННЫЙ ДИАЛОГ: нет знаменательных узлов с тенями")
+            self._asked_nodes.clear()
+            for nid, node in self.nodes.items():
+                if is_contentful(node):
+                    score = len(node.throughput_out) + len(node.throughput_in) + len(node.alternants) * 10
+                    tense_nodes.append((nid, score, node))
+        if not tense_nodes:
+            if verbose: print(f"\n🧠 ЭНДОГЕННЫЙ ДИАЛОГ: нет узлов с альтернантами")
             return None
-        
-        # Выбираем узел с максимальным score
         tense_nodes.sort(key=lambda x: x[1], reverse=True)
         target_id, score, node = tense_nodes[0]
-        
-        # Разнообразим вопросы: берём разные вопросительные слова
-        question_words = [
-            ("Что такое {}", "ADV"),
-            ("Как работает {}", "ADV"),
-            ("Почему {} важен", "ADV"),
-            ("Откуда возникает {}", "ADV"),
-            ("Зачем нужен {}", "ADV"),
-        ]
-        
-        # Выбираем вопрос по хешу (детерминированно, но разнообразно)
-        qw_template, _ = question_words[hash(target_id) % len(question_words)]
-        # Склоняем для женского рода
-        token = node.token
-        question = qw_template.format(token).rstrip('?') + '?'
-        
+        self._asked_nodes.add(target_id)
+        q_words = ["Что такое {}", "Как работает {}", "Почему {} важен", "Откуда возникает {}", "Зачем нужен {}"]
+        q_template = q_words[hash(target_id) % len(q_words)]
+        question = q_template.format(node.token).rstrip('?') + '?'
         if verbose:
             print(f"\n🧠 ЭНДОГЕННЫЙ ДИАЛОГ")
-            print(f"   Узел: «{token}» (τ={node.tau:.1f}, связей: {len(node.connections_out)+len(node.connections_in)}, "
-                  f"теней: {len(node.shadows)}, частота: {node.frequency})")
+            print(f"   Узел: «{node.token}» (τ={node.tau:.1f}, пропускная: {len(node.throughput_out)+len(node.throughput_in)}, "
+                  f"альтернантов: {len(node.alternants)})")
             print(f"   Вопрос: «{question}»")
-        
-        # Парсим вопрос и ищем ответ
         try:
             query_parse = parser.parse(question)
             result = self.find_resonance_and_answer(query_parse, verbose=verbose)
-            
-            dialog_entry = {
-                'question': question,
-                'node': token,
-                'tau': node.tau,
-                'temperature': round(self.temperature, 3),
-                'answer': result['answer'] if result else None,
-                'resonance': result['resonance_token'] if result else None
-            }
-            self.dialog_log.append(dialog_entry)
-            return dialog_entry
+            entry = {'question': question, 'node': node.token, 'tau': node.tau,
+                     'temperature': round(self.temperature, 3),
+                     'answer': result['answer'] if result else None}
+            self.dialog_log.append(entry)
+            return entry
         except Exception as e:
-            if verbose:
-                print(f"   ⚠️ Ошибка диалога: {e}")
+            if verbose: print(f"   ⚠️ Ошибка диалога: {e}")
             return None
 
     # ========================================================================
@@ -600,169 +560,119 @@ class StructuralFieldV5:
 
     def get_H_avg(self, global_id: str) -> float:
         node = self.nodes.get(global_id)
-        if not node or node.frequency == 0:
-            return 0.0
+        if not node or node.frequency == 0: return 0.0
         return node.H_sum / node.frequency
 
     def find_resonance_and_answer(self, query_parse: Dict, verbose: bool = True) -> Optional[Dict]:
         tokens = query_parse['tokens']
         graph = query_parse['graph']
         H = query_parse['H']
-
         start_node = query_parse.get('question_node')
         if start_node is None:
             best_tau = -999
             for i, tok in enumerate(tokens):
                 if tok['tau'] > best_tau:
-                    best_tau = tok['tau']
-                    start_node = i
+                    best_tau = tok['tau']; start_node = i
         if start_node is None:
             return None
-
-        resonance_node, path, log = find_resonance(H, graph, tokens, start_node)
+        resonance_node, path, _ = find_resonance(H, graph, tokens, start_node)
         if resonance_node is None:
             return None
-
         resonance_tok = tokens[resonance_node]
         global_id = self._node_id(resonance_tok['lemma'], resonance_tok['pos'], 0)
-
-        answer_text, answer_log = self._build_answer_v5(global_id, depth=2)
-
+        answer_text = self._find_script_fragment(query_parse)
         if not answer_text and len(path) > 1:
-            answer_text = ' '.join([tokens[p]['text'] for p in path[1:]
-                                    if tokens[p]['pos'] != 'PUNCT'])
-
-        shadows_info = []
-        if global_id in self.nodes and self.nodes[global_id].shadows:
-            for sid in self.nodes[global_id].shadows[:2]:
-                shadows_info.append(self.nodes[sid].token)
-
+            answer_text = ' '.join([tokens[p]['text'] for p in path[1:] if tokens[p]['pos'] != 'PUNCT'])
+        alternants_info = []
+        if global_id in self.nodes and self.nodes[global_id].alternants:
+            for aid in self.nodes[global_id].alternants[:2]:
+                alternants_info.append(self.nodes[aid].token)
         result = {
-            'found': True,
-            'resonance_node': global_id,
+            'found': True, 'resonance_node': global_id,
             'resonance_token': resonance_tok['text'],
             'resonance_H': H.get(resonance_node, 0.0),
             'resonance_tau': resonance_tok['tau'],
-            'path': [tokens[p]['text'] for p in path],
-            'path_length': len(path),
-            'answer': answer_text,
-            'shadows': shadows_info,
+            'path': [tokens[p]['text'] for p in path], 'path_length': len(path),
+            'answer': answer_text, 'alternants': alternants_info,
             'temperature': round(self.temperature, 3),
-            'furcations_total': self.furcations_today
+            'bifurcations_total': self.bifurcations_total
         }
-
         if verbose:
             print(f"   🎯 «{result['resonance_token']}» → «{result['answer']}»")
-            if result['shadows']:
-                print(f"   👥 Тени: {', '.join(result['shadows'])}")
-
+            if result['alternants']:
+                print(f"   ¬ Альтернанты: {', '.join(result['alternants'])}")
         return result
 
-    def _build_answer_v5(self, global_id: str, depth: int = 2) -> Tuple[str, List[str]]:
-        """
-        Сборка ответа с настраиваемой глубиной связей.
-        depth=1: только прямые связи резонансного узла.
-        depth=2: + связи ближайших соседей.
-        depth=3: + связи следующего круга.
-        """
-        if global_id not in self.nodes:
-            return '', []
-        
-        node = self.nodes[global_id]
-        answer_parts = []
-        used_nodes = {global_id}
-        log = []
-        
-        # Входящие связи = «почему» (причины)
-        myelinated_in = sorted(
-            [(tid, node.connections_in[tid]) for tid in node.myelinated_in],
-            key=lambda x: x[1], reverse=True
-        )
-        sorted_in = sorted(node.connections_in.items(), key=lambda x: x[1], reverse=True)
-        
-        in_nodes = []
-        for connected_id, _ in myelinated_in[:3]:
-            if connected_id in self.nodes and connected_id not in used_nodes:
-                in_nodes.append(connected_id)
-                used_nodes.add(connected_id)
-        for connected_id, _ in sorted_in[:3]:
-            if connected_id not in node.myelinated_in and connected_id in self.nodes and connected_id not in used_nodes:
-                in_nodes.append(connected_id)
-                used_nodes.add(connected_id)
-        
-        # Добавляем токены входящих связей
-        for nid in in_nodes:
-            answer_parts.append(self.nodes[nid].token)
-            log.append(f"←{self.nodes[nid].token}")
-        
-        # Сам резонансный узел
-        answer_parts.append(node.token)
-        
-        # Исходящие связи = «следствия»
-        myelinated_out = sorted(
-            [(tid, node.connections_out[tid]) for tid in node.myelinated_out],
-            key=lambda x: x[1], reverse=True
-        )
-        sorted_out = sorted(node.connections_out.items(), key=lambda x: x[1], reverse=True)
-        
-        out_nodes = []
-        for connected_id, _ in myelinated_out[:3]:
-            if connected_id in self.nodes and connected_id not in used_nodes:
-                out_nodes.append(connected_id)
-                used_nodes.add(connected_id)
-        for connected_id, _ in sorted_out[:3]:
-            if connected_id not in node.myelinated_out and connected_id in self.nodes and connected_id not in used_nodes:
-                out_nodes.append(connected_id)
-                used_nodes.add(connected_id)
-        
-        for nid in out_nodes:
-            answer_parts.append(self.nodes[nid].token)
-            log.append(f"→{self.nodes[nid].token}")
-        
-        # Глубина 2: связи соседей (если осталось место)
-        if depth >= 2:
-            for nid in in_nodes + out_nodes:
-                if nid in self.nodes:
-                    neighbor = self.nodes[nid]
-                    # Берём самые сильные связи соседа, не использованные ранее
-                    all_conn = sorted(
-                        list(neighbor.connections_out.items()) + list(neighbor.connections_in.items()),
-                        key=lambda x: x[1], reverse=True
-                    )
-                    added = 0
-                    for connected_id, _ in all_conn:
-                        if added >= 2:
-                            break
-                        if connected_id in self.nodes and connected_id not in used_nodes:
-                            answer_parts.append(self.nodes[connected_id].token)
-                            used_nodes.add(connected_id)
-                            log.append(f"···{self.nodes[connected_id].token}")
-                            added += 1
-        
-        # Фильтр мусорных токенов
-        stop_tokens = {',', '.', '!', '?', '—', '-', 'и', 'в', 'на', 'с', 'не', 'же', 'бы', 'ли', 'то', 'что', 'как', 'а', 'но', 'или', 'это', 'для', 'от', 'к', 'по', 'из', 'у', 'за', 'до', 'при', 'без', 'над', 'под', 'об', 'во', 'ко', 'со', 'же', 'бы'}
-        cleaned = [p for p in answer_parts if p.lower() not in stop_tokens and len(p) > 1]
-        
-        return ' '.join(cleaned), log
+    def _find_script_fragment(self, query_parse: Dict) -> str:
+        tokens = query_parse['tokens']
+        graph = query_parse['graph']
+        question_lemmas = set()
+        for node_id, node_data in graph.items():
+            tok = tokens[node_id]
+            if tok['pos'] not in NEUTRAL_POS and tok['pos'] not in ('PREP', 'CONJ', 'SCONJ', 'PUNCT'):
+                question_lemmas.add(tok['lemma'])
+        candidates = []
+        for fragment_id, fragment in self.script_fragments.items():
+            frag_tokens = fragment['tokens']
+            frag_lemmas = set()
+            for tok in frag_tokens:
+                if tok['pos'] not in NEUTRAL_POS and tok['pos'] not in ('PREP', 'CONJ', 'SCONJ', 'PUNCT'):
+                    frag_lemmas.add(tok['lemma'])
+            overlap = question_lemmas & frag_lemmas
+            if overlap:
+                score = self._fragment_score(graph, tokens, fragment['graph'], frag_tokens, overlap)
+                if score > 0:
+                    candidates.append((fragment, score, len(overlap)))
+        if not candidates:
+            return ''
+        candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
+        best_fragment = candidates[0][0]
+        frag_tokens = best_fragment['tokens']
+        frag_graph = best_fragment['graph']
+        sorted_ids = sorted(frag_graph.keys())
+        answer_tokens = [frag_tokens[sid]['text'] for sid in sorted_ids
+                         if frag_tokens[sid]['pos'] != 'PUNCT' or frag_tokens[sid]['text'] in '.!?']
+        result = ' '.join(answer_tokens)
+        stop_tokens = {',', '.', '!', '?', '—', '-', 'и', 'в', 'на', 'с', 'не', 'же', 'бы', 'ли',
+                      'то', 'что', 'как', 'а', 'но', 'или', 'это', 'для', 'от', 'к', 'по', 'из',
+                      'у', 'за', 'до', 'при', 'без', 'над', 'под', 'об', 'во', 'ко', 'со'}
+        cleaned = [t for t in result.split() if t.lower() not in stop_tokens and len(t) > 1]
+        return ' '.join(cleaned)
+
+    def _fragment_score(self, query_graph: Dict, query_tokens: List[Dict],
+                        frag_graph: Dict, frag_tokens: List[Dict],
+                        common_lemmas: Set[str]) -> float:
+        total_score = 0.0; pairs = 0
+        for lemma in common_lemmas:
+            q_nodes = [nid for nid in query_graph if query_tokens[nid]['lemma'] == lemma]
+            f_nodes = [nid for nid in frag_graph if frag_tokens[nid]['lemma'] == lemma]
+            for qn in q_nodes:
+                q_labels = set(dep['label'] for dep in query_graph[qn]['deps'])
+                for fn in f_nodes:
+                    f_labels = set(dep['label'] for dep in frag_graph[fn]['deps'])
+                    if q_labels:
+                        total_score += len(q_labels & f_labels) / len(q_labels)
+                        pairs += 1
+        return total_score / pairs if pairs > 0 else 0.0
 
     def get_stats(self) -> Dict:
-        myelinated = sum(1 for n in self.nodes.values() if n.myelinated_out or n.myelinated_in)
-        shadows_total = sum(len(n.shadows) for n in self.nodes.values())
+        conductive_count = sum(1 for n in self.nodes.values() if n.conductive_out or n.conductive_in)
+        alternants_total = sum(len(n.alternants) for n in self.nodes.values())
         level_counts = defaultdict(int)
         for n in self.nodes.values():
             level_counts[n.level] += 1
         return {
-            'num_nodes': len(self.nodes),
-            'num_edges': len(self.edges),
+            'num_nodes': len(self.nodes), 'num_edges': len(self.edges),
             'total_tokens': self.total_tokens,
             'avg_H': sum(self.get_H_avg(nid) for nid in self.nodes) / max(1, len(self.nodes)),
             'temperature': round(self.temperature, 3),
-            'furcations_total': self.furcations_today,
-            'myelinated_nodes': myelinated,
-            'shadow_nodes': shadows_total,
+            'bifurcations_total': self.bifurcations_total,
+            'conductive_nodes': conductive_count,
+            'alternants_total': alternants_total,
             'level_distribution': dict(level_counts),
             'errors': self.error_count,
-            'dialog_entries': len(self.dialog_log)
+            'dialog_entries': len(self.dialog_log),
+            'script_fragments': len(self.script_fragments)
         }
 
 
@@ -774,30 +684,21 @@ class CleanField:
     def __init__(self):
         self.parser = StructuralParser()
         self.filter = StructuralFilter()
-        self.field = StructuralFieldV5()
-        self.processed = 0
-        self.filtered_out = 0
-        self.errors = 0
+        self.field = StructuralField()
+        self.processed = 0; self.filtered_out = 0; self.errors = 0
 
     def add_text(self, text: str) -> bool:
         try:
             parse_result = self.parser.parse(text)
         except Exception as e:
-            self.errors += 1
-            self.field._log_problem(text, f"Parse error: {e}")
-            return False
-        
+            self.errors += 1; self.field._log_problem(text, f"Parse: {e}"); return False
         if parse_result['num_nodes'] < 3:
             return False
-        
         try:
             params = self.filter.compute_all(parse_result)
         except Exception as e:
-            self.errors += 1
-            self.field._log_problem(text, f"Filter error: {e}")
-            return False
-        
-        is_clean, issues = self.filter.is_clean(params)
+            self.errors += 1; self.field._log_problem(text, f"Filter: {e}"); return False
+        is_clean, _ = self.filter.is_clean(params)
         if is_clean:
             try:
                 self.field.add_graph(parse_result, params)
@@ -805,44 +706,33 @@ class CleanField:
                 if self.processed % 50 == 0:
                     stats = self.field.get_stats()
                     print(f"  ✓ [{self.processed}] T={stats['temperature']:.3f} "
-                          f"фуркаций={stats['furcations_total']} "
-                          f"миелин={stats['myelinated_nodes']} "
-                          f"ошибок={stats['errors']}")
+                          f"бифуркаций={stats['bifurcations_total']} "
+                          f"проводящих={stats['conductive_nodes']} "
+                          f"фрагментов={stats['script_fragments']}")
                 return True
             except Exception as e:
-                self.errors += 1
-                self.field._log_problem(text, f"Add graph error: {e}")
-                return False
+                self.errors += 1; self.field._log_problem(text, f"Add graph: {e}"); return False
         else:
-            self.filtered_out += 1
-            return False
+            self.filtered_out += 1; return False
 
     def build(self, texts: List[str]):
-        print(f"\n🌀 Строим поле v5.0 из {len(texts)} текстов...")
-        print(f"   Механизмы: спираль, миелинизация, фуркации, эндогенный диалог")
+        print(f"\n🌀 Строим поле v6.1 из {len(texts)} текстов...")
+        print(f"   Стековый парсер + изоморфный поиск по леммам")
         for i, text in enumerate(texts):
             if len(text.strip()) < 15:
                 continue
             self.add_text(text)
-            
             if i % 500 == 0 and i > 0:
                 stats = self.field.get_stats()
                 print(f"  [{i}/{len(texts)}] +{self.processed} (отсев:{self.filtered_out}) "
-                      f"T={stats['temperature']:.3f} ошибок={stats['errors']}")
+                      f"T={stats['temperature']:.3f}")
                 gc.collect()
-            
-            # Эндогенный диалог каждые N шагов
             if self.processed > 0 and self.processed % ENDOGENOUS_DIALOG_INTERVAL == 0:
                 self.field.endogenous_dialog(self.parser, verbose=True)
-
-        print(f"\n✅ Готово. Добавлено: {self.processed}, Отфильтровано: {self.filtered_out}, Ошибок: {self.errors}")
+        print(f"\n✅ Готово. +{self.processed} -{self.filtered_out} ошибок:{self.errors}")
         stats = self.field.get_stats()
-        print(f"📊 Поле: {stats['num_nodes']} узлов, {stats['num_edges']} рёбер")
-        print(f"   T={stats['temperature']:.3f} | Фуркаций: {stats['furcations_total']}")
-        print(f"   Миелин: {stats['myelinated_nodes']} | Теней: {stats['shadow_nodes']}")
-        print(f"   Диалогов: {stats['dialog_entries']} | Ошибок: {stats['errors']}")
-        print(f"   Уровни: {stats['level_distribution']}")
-        print(f"   Лог ошибок: {self.field.debug_log_path}")
+        print(f"📊 Поле: {stats['num_nodes']} узлов, {stats['num_edges']} рёбер, {stats['script_fragments']} фрагментов")
+        print(f"   T={stats['temperature']:.3f} | Бифуркаций: {stats['bifurcations_total']}")
 
     def query(self, question: str) -> Optional[Dict]:
         print(f"\n❓ «{question}»")
@@ -852,14 +742,13 @@ class CleanField:
             print(f"   Στ={params['total_tau']:.1f} | L={params['L']} | E={params['E_flow']:.2f}")
             return self.field.find_resonance_and_answer(parse_result)
         except Exception as e:
-            print(f"   ⚠️ Ошибка запроса: {e}")
+            print(f"   ⚠️ Ошибка: {e}")
             return {'found': False, 'error': str(e)}
 
     def run_endogenous_dialog(self, rounds: int = 3):
-        """Запускает несколько раундов эндогенного диалога."""
         print(f"\n🧠 ЭНДОГЕННЫЙ ДИАЛОГ ({rounds} раундов)")
         print("=" * 40)
-        for i in range(rounds):
+        for _ in range(rounds):
             result = self.field.endogenous_dialog(self.parser, verbose=True)
             if result:
                 print(f"   ↳ Ответ: «{result['answer']}»")
@@ -867,19 +756,16 @@ class CleanField:
 
 
 # ============================================================================
-# СБОРКА КОРПУСА (ТОЛЬКО ИЗ РЕПОЗИТОРИЯ)
+# СБОРКА КОРПУСА И ЗАПУСК
 # ============================================================================
 
 def collect_corpus(base_path: str = ".") -> List[str]:
     texts = []
-    patterns = ["discoveries/*.md", "brain_dump/**/*.md", "data/*.json", "*.md"]
-    for pattern in patterns:
+    for pattern in ["discoveries/*.md", "brain_dump/**/*.md", "data/*.json", "*.md"]:
         for fpath in glob.glob(os.path.join(base_path, pattern), recursive=True):
             try:
                 with open(fpath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    sentences = re.split(r'[.!?]+', content)
-                    for s in sentences:
+                    for s in re.split(r'[.!?]+', f.read()):
                         s = s.strip()
                         if 20 < len(s) < 500:
                             texts.append(s + '.')
@@ -888,109 +774,33 @@ def collect_corpus(base_path: str = ".") -> List[str]:
     return texts
 
 
-# ============================================================================
-# ЗАПУСК
-# ============================================================================
-
 def main():
     print("=" * 60)
-    print("ЧИСТОЕ ПОЛЕ СМЫСЛОВ v5.0 — ПОЛНЫЙ ПРОГОН")
-    print("τ, H, ∇H → резонанс → TEES → эндогенный диалог")
+    print("ЧИСТОЕ ПОЛЕ СМЫСЛОВ v6.1 — изоморфный поиск по леммам")
+    print("Стековый парсер → фрагменты скриптов → ответ с общими словами")
     print("=" * 60)
-
     cf = CleanField()
     corpus = collect_corpus()
-    print(f"\n📚 Корпус: {len(corpus)} текстов (полный)")
-
+    print(f"\n📚 Корпус: {len(corpus)} текстов")
     cf.build(corpus)
-
     stats = cf.field.get_stats()
-    print(f"\n⚠️  Поле готово: {stats['num_nodes']} узлов, {stats['errors']} ошибок")
-
-    if stats['errors'] > 0:
-        print(f"\n🔍 Проблемные тексты: {cf.field.debug_log_path}")
-        with open(cf.field.debug_log_path, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            for line in lines[:15]:
-                if line.startswith("Text:") or line.startswith("Error:"):
-                    print(f"   {line.strip()[:120]}")
-
-    # Эндогенный диалог
+    print(f"\n⚠️  Поле готово: {stats['num_nodes']} узлов, {stats['script_fragments']} фрагментов")
     cf.run_endogenous_dialog(rounds=3)
-
-    # Внешние вопросы
     questions = [
-        "Почему трава зелёная?",
-        "Что такое резонанс?",
-        "Как работает ПИД регулятор?",
-        "Где находится ближайшая звезда?",
-        "Зачем растениям нужен свет?",
-        "Кто открыл закон всемирного тяготения?",
-        "Почему вода кипит?",
-        "Что такое топологический заряд?",
-        "Как устроен атом?",
-        "Откуда берётся ветер?",
-        "Почему небо синее?",
-        "Как работает двигатель?",
-        "Что измеряет температура?",
-        "Как работает фотосинтез?",
-        "Что такое гравитация?",
-        "Почему лёд плавает?",
+        "Почему трава зелёная?", "Что такое резонанс?", "Как работает ПИД регулятор?",
+        "Где находится ближайшая звезда?", "Зачем растениям нужен свет?",
+        "Кто открыл закон всемирного тяготения?", "Почему вода кипит?",
+        "Что такое топологический заряд?", "Как устроен атом?", "Откуда берётся ветер?",
+        "Почему небо синее?", "Как работает двигатель?", "Что измеряет температура?",
+        "Как работает фотосинтез?", "Что такое гравитация?", "Почему лёд плавает?",
     ]
-
-    print("\n" + "=" * 60)
-    print("🔍 ВНЕШНИЕ ЗАПРОСЫ")
-    print("=" * 60)
-
-    results = []
-    for q in questions:
-        result = cf.query(q)
-        results.append((q, result))
-
-    # Сводка + сравнение с прошлым прогоном
-    print("\n" + "=" * 60)
-    print("📋 СВОДКА (полный корпус vs 2000)")
-    print("=" * 60)
-
+    print("\n" + "=" * 60 + "\n🔍 ВНЕШНИЕ ЗАПРОСЫ\n" + "=" * 60)
+    results = [(q, cf.query(q)) for q in questions]
+    print("\n" + "=" * 60 + "\n📋 СВОДКА\n" + "=" * 60)
     found = sum(1 for _, r in results if r and r.get('found'))
     print(f"Найдено ответов: {found}/{len(questions)}")
-
-    # Ответы с прошлого прогона (2000 текстов) для сравнения
-    old_answers = {
-        "Почему трава зелёная?": "трава зелёная",
-        "Что такое резонанс?": "резонанс",
-        "Как работает ПИД регулятор?": "работает ПИД регулятор",
-        "Где находится ближайшая звезда?": "находится ближайшая звезда",
-        "Зачем растениям нужен свет?": "растениям нужен свет",
-        "Кто открыл закон всемирного тяготения?": "открыл закон",
-        "Почему вода кипит?": "вода кипит",
-        "Что такое топологический заряд?": "такое топологический заряд",
-        "Как устроен атом?": "Представьте атом не",
-        "Откуда берётся ветер?": "берётся ветер",
-        "Почему небо синее?": "небо синее",
-        "Как работает двигатель?": "работает двигатель",
-        "Что измеряет температура?": "среды является температура является",
-        "Как работает фотосинтез?": "работает фотосинтез",
-        "Что такое гравитация?": "такое гравитация",
-        "Почему лёд плавает?": "лёд плавает",
-    }
-
-    changes = 0
     for q, r in results:
-        status = "✓" if (r and r.get('found')) else "✗"
-        new_answer = r.get('answer', '—') if r else '—'
-        old_answer = old_answers.get(q, '—')
-        changed = "🔄" if new_answer != old_answer else "  "
-        if new_answer != old_answer:
-            changes += 1
-        print(f"  {changed} {status} «{q}»")
-        print(f"     было: «{old_answer}»")
-        print(f"     стало: «{new_answer}»")
-
-    print(f"\n🔄 Изменилось ответов: {changes}/{len(questions)}")
-    print(f"📊 Узлов: {stats['num_nodes']} | Рёбер: {stats['num_edges']}")
-    print(f"   T={stats['temperature']:.3f} | Фуркаций: {stats['furcations_total']}")
-    print(f"   Диалогов: {stats['dialog_entries']} | Ошибок: {stats['errors']}")
+        print(f"  {'✓' if (r and r.get('found')) else '✗'} «{q}» → «{r.get('answer', '—') if r else '—'}»")
 
 
 if __name__ == "__main__":
