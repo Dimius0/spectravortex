@@ -395,7 +395,7 @@ class PipelineConfig:
     
     cache_size: int = 20000
     output_dir: Path = Path("./output")
-    corpus_path: Path = Path("./corpus/corpus.json")
+    corpus_path: Path = Path("./corpus")
     
     def __post_init__(self):
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -841,11 +841,59 @@ def run_pipeline(config: PipelineConfig = None):
     if not config.corpus_path.exists():
         print(f"\n❌ Корпус не найден: {config.corpus_path}")
         return None, None
-    
+
     with open(config.corpus_path, 'r', encoding='utf-8') as f:
         corpus = json.load(f)
-    
-    print(f"\n📚 Корпус: {len(corpus)} текстов")
+
+    # ЗАМЕНИТЬ НА:
+    corpus = {}
+
+    # 1. Пробуем загрузить JSON если указан
+    if config.corpus_path.suffix == '.json' and config.corpus_path.exists():
+        with open(config.corpus_path, 'r', encoding='utf-8') as f:
+            corpus = json.load(f)
+        print(f"\n📚 Загружен JSON-корпус: {len(corpus)} текстов")
+
+    # 2. Пробуем загрузить TXT из директории corpus/
+    txt_dir = Path("./corpus")
+    if txt_dir.exists():
+        txt_files = list(txt_dir.glob("*.txt"))
+        if txt_files:
+            for txt_file in txt_files:
+                try:
+                    with open(txt_file, 'r', encoding='utf-8') as f:
+                        text = f.read()
+                    if len(text.strip()) > 30:
+                        name = txt_file.stem
+                        corpus[name] = text
+                except:
+                    pass
+            if txt_files:
+                print(f"📚 Загружено TXT-файлов: {len(txt_files)}")
+
+    # 3. Пробуем загрузить из директории (если указан путь к папке)
+    if config.corpus_path.is_dir():
+        for ext in ['*.txt', '*.json']:
+            for f in config.corpus_path.glob(ext):
+                try:
+                    if ext == '*.json':
+                        with open(f, 'r', encoding='utf-8') as fp:
+                            data = json.load(fp)
+                            if isinstance(data, dict):
+                                corpus.update(data)
+                    else:
+                        with open(f, 'r', encoding='utf-8') as fp:
+                            text = fp.read()
+                        if len(text.strip()) > 30:
+                            corpus[f.stem] = text
+                except:
+                    pass
+
+    if not corpus:
+        print(f"\n❌ Корпус не найден!")
+        return None, None
+
+    print(f"\n📚 Корпус загружен: {len(corpus)} текстов")
     
     graph = VMMPGraph(config)
     checker = VMMPChecker(config)
