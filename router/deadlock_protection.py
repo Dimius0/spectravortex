@@ -25,7 +25,7 @@ class RoutingAlgorithm(Enum):
     WAVEFRONT = "wavefront"
     GEOMETRIC = "geometric"
     MAZE = "maze"
-
+    TEES = "tees"
 
 class RoutingError(Exception):
     """Base exception for routing failures"""

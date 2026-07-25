@@ -12,12 +12,24 @@ import heapq
 import logging
 from collections import deque
 import math
+try:
+    from tees_router import TEESRouter
+except ImportError:
+    from .tees_router import TEESRouter
 
-from .deadlock_protection import (
-    RoutingAlgorithm, RouteResult, TimeoutError,
-    DeadlockError, NoPathError, RoutingError,
-    timeout, CircuitBreaker, DeadlockMonitor
-)
+
+try:
+    from .deadlock_protection import (
+        RoutingAlgorithm, RouteResult, TimeoutError,
+        DeadlockError, NoPathError, RoutingError,
+        timeout, CircuitBreaker, DeadlockMonitor
+    )
+except ImportError:
+    from deadlock_protection import (
+        RoutingAlgorithm, RouteResult, TimeoutError,
+        DeadlockError, NoPathError, RoutingError,
+        timeout, CircuitBreaker, DeadlockMonitor
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -454,10 +466,12 @@ class AdaptiveRouter:
             RoutingAlgorithm.A_STAR: AStarRouter(grid_size),
             RoutingAlgorithm.WAVEFRONT: WavefrontRouter(grid_size),
             RoutingAlgorithm.GEOMETRIC: GeometricRouter(grid_size),
+            RoutingAlgorithm.TEES: TEESRouter(grid_size),
         }
         
         # Algorithm priority for fallback
         self.algorithm_priority = [
+            RoutingAlgorithm.TEES,
             RoutingAlgorithm.A_STAR,      # Fast, good for simple cases
             RoutingAlgorithm.GEOMETRIC,   # Good for sparse obstacles
             RoutingAlgorithm.WAVEFRONT,   # Guaranteed but slower
