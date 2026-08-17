@@ -254,9 +254,11 @@ class TeesCluster:
     TCP только снаружи.
     """
     
-    QUBITS_PER_CORE = 100  # Оптимум из экспериментов
+    QUBITS_PER_CORE = 250  # Оптимум из экспериментов
     
-    def __init__(self, beacon=None, cores: Optional[int] = None):
+    def __init__(self, beacon=None, cores: Optional[int] = None, qubits_per_core: Optional[int] = None):
+        if qubits_per_core is not None:
+            self.QUBITS_PER_CORE = qubits_per_core
         self.beacon = beacon
         self.cores = cores or os.cpu_count() or 1
         self.total_qubits = self.cores * self.QUBITS_PER_CORE
@@ -480,6 +482,96 @@ class TeesCluster:
             'qubits_used': len(results),
             'partitions': n_partitions
         }
+
+    def solve_tsp_massive_parallel(self, cities):
+        """
+        ⚡ Массивное параллельное TSP.
+        Все агенты решают свою часть задачи!
+        """
+        n_cities = len(cities)
+        n_agents = len(self.qubits)
+        
+        if n_cities <= 1:
+            return {'route': [], 'distance': 0.0, 'agents_used': 0}
+        
+        # Разбиваем города между агентами
+        cities_per_agent = max(2, n_cities // n_agents)
+        n_agents_used = min(n_agents, n_cities // 2)
+        
+        groups = []
+        for i in range(n_agents_used):
+            start = i * cities_per_agent
+            end = start + cities_per_agent if i < n_agents_used - 1 else n_cities
+            if start < n_cities and end > start:
+                groups.append((i, cities[start:end]))
+        
+        # Каждый агент решает свою группу
+        results = []
+        for i, group in groups:
+            if len(group) < 2:
+                continue
+            
+            qubit = self.qubits[i % len(self.qubits)]
+            
+            if hasattr(qubit, 'solve_tsp'):
+                route, dist = qubit.solve_tsp(group)
+            else:
+                route, dist = self._simple_tsp(group)
+            
+            results.append((i, route, dist))
+        
+        # Сшиваем маршруты
+        full_route = []
+        total_distance = 0.0
+        
+        for group_idx, route, dist in results:
+            offset = group_idx * cities_per_agent
+            for city_idx in route:
+                full_route.append(city_idx + offset)
+            total_distance += dist
+        
+        # Добавляем переходы между группами
+        for i in range(len(results) - 1):
+            if i + 1 < len(results):
+                last_city = results[i][1][-1] + results[i][0] * cities_per_agent
+                first_city = results[i+1][1][0] + results[i+1][0] * cities_per_agent
+                
+                if last_city < len(cities) and first_city < len(cities):
+                    dx = cities[last_city][0] - cities[first_city][0]
+                    dy = cities[last_city][1] - cities[first_city][1]
+                    total_distance += math.sqrt(dx**2 + dy**2)
+        
+        return {
+            'route': full_route,
+            'distance': total_distance,
+            'agents_used': len(results)
+        }
+    
+    def _simple_tsp(self, cities):
+        """Простой TSP для обычных агентов (nearest neighbor)."""
+        if len(cities) < 2:
+            return [], 0.0
+        
+        n = len(cities)
+        unvisited = set(range(1, n))
+        route = [0]
+        current = 0
+        
+        while unvisited:
+            next_city = min(unvisited, 
+                          key=lambda c: (cities[current][0] - cities[c][0])**2 + 
+                                       (cities[current][1] - cities[c][1])**2)
+            route.append(next_city)
+            unvisited.remove(next_city)
+            current = next_city
+        
+        dist = 0.0
+        for i in range(len(route)):
+            a = cities[route[i]]
+            b = cities[route[(i+1) % len(route)]]
+            dist += math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
+        
+        return route, dist    
     
     # ═══════════════════════════════════════════════════════════
     # 🔍 ГРОВЕР — ПОИСК
