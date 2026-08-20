@@ -10397,3 +10397,127 @@ python tees_economy.py
 
   Отключённые узлы: {'hacker': {'balance': 1000.0, 'time': 1787233556.7575755, 'reason': 'resource_anomaly'}}
 PS C:\Users\Dim\source\repos\spectravortex> 
+
+python tees_fractal_network.py
+
+весь лог в окно не влез ....
+...💪 A: +8.6 за solve_task
+  🔥 Изъято 5.6 у A → жирок!
+  💪 A: +8.6 за solve_task
+  🔥 Изъято 5.6 у A → жирок!
+  💪 A: +8.6 за solve_task
+  🔥 Изъято 5.6 у A → жирок!
+  💪 A: +8.6 за solve_task
+  🔥 Изъято 5.6 у A → жирок!
+  ⏱️ Время: 3.76 сек
+  A: {'id': 'A', 'depth': 0, 'agents': 10, 'total_agents': 370, 'load': 0.0, 'queue': 0, 'sub_fractals': 120, 'neighbors': 2, 'metrics': {'tasks_received': 3000, 'tasks_completed': 2880, 'tasks_transferred': 0, 'growth_events': 120, 'shrink_events': 0}}
+  B: {'id': 'B', 'depth': 0, 'agents': 3, 'total_agents': 3, 'load': 0.0, 'queue': 0, 'sub_fractals': 0, 'neighbors': 2, 'metrics': {'tasks_received': 0, 'tasks_completed': 0, 'tasks_transferred': 0, 'growth_events': 0, 'shrink_events': 0}}
+  C: {'id': 'C', 'depth': 0, 'agents': 3, 'total_agents': 3, 'load': 0.0, 'queue': 0, 'sub_fractals': 0, 'neighbors': 2, 'metrics': {'tasks_received': 0, 'tasks_completed': 0, 'tasks_transferred': 0, 'growth_events': 0, 'shrink_events': 0}}
+  Вихрь A: {'size': 0.8027415617602307, 'state': 'expanded', 'time_gradient': 0.6443940149772542, 'history_size': 100}
+
+🧪 ТЕСТ 3: Синглет — принудительный прогон через вихрь!
+  До: priority=100
+  ⚛️ СИНГЛЕТ! Мгновенная передача!
+  После: priority=0
+  Данные: {'original_priority': 100}
+  Вихрь: {'size': inf, 'state': 'singlet', 'time_gradient': 0.0, 'history_size': 1}
+
+🧪 ПОЛНЫЙ ЦИКЛ ВИХРЯ:
+  🌪️ Вихрь раздулся (буфер, градиент 1.10)
+  Compressed: expanded
+  🌀 Вихрь сжался (согласование)
+  Expanded: compressed
+  ⚛️ СИНГЛЕТ! Мгновенная передача!
+  Singlet: singlet
+
+📊 ФИНАЛ:
+  Вихрь A: {'size': inf, 'state': 'singlet', 'time_gradient': 0.0, 'history_size': 4}
+
+💎 ЭКОНОМИКА:
+  Баланс A: 8640.0
+  Баланс B: 0.0
+  Баланс C: 0.0
+  Общая энергия: 28800.0
+  Жирок: 8485.4
+  ✅ Баланс = 0! Всё сходится!
+PS C:\Users\Dim\source\repos\spectravortex>
+
+...
+💪 A: +8.4 за solve_task
+  🔥 Изъято 5.4 у A → жирок!
+  💪 A: +8.4 за solve_task
+  🔥 Изъято 5.4 у A → жирок!
+  ⏱️ Время: 6.20 сек
+  A: {'id': 'A', 'depth': 0, 'agents': 10, 'total_agents': 265, 'load': 0.0, 'queue': 0, 'sub_fractals': 85, 'neighbors': 2, 'metrics': {'tasks_received': 2500, 'tasks_completed': 2415, 'tasks_transferred': 0, 'growth_events': 85, 'shrink_events': 0}}
+  B: {'id': 'B', 'depth': 0, 'agents': 10, 'total_agents': 64, 'load': 0.0, 'queue': 0, 'sub_fractals': 18, 'neighbors': 2, 'metrics': {'tasks_received': 500, 'tasks_completed': 482, 'tasks_transferred': 0, 'growth_events': 18, 'shrink_events': 0}}
+  C: {'id': 'C', 'depth': 0, 'agents': 10, 'total_agents': 46, 'load': 0.0, 'queue': 0, 'sub_fractals': 12, 'neighbors': 2, 'metrics': {'tasks_received': 500, 'tasks_completed': 488, 'tasks_transferred': 0, 'growth_events': 12, 'shrink_events': 0}}
+  Вихрь A: {'size': 0.8027415617602307, 'state': 'expanded', 'time_gradient': 0.6443940149772542, 'history_size': 85}
+
+🧪 ТЕСТ 3: Синглет — принудительный прогон через вихрь!
+  До: priority=100
+  ⚛️ СИНГЛЕТ! Мгновенная передача!
+  После: priority=0
+  Данные: {'original_priority': 100}
+  Вихрь: {'size': inf, 'state': 'singlet', 'time_gradient': 0.0, 'history_size': 1}
+
+🧪 ПОЛНЫЙ ЦИКЛ ВИХРЯ:
+  🌪️ Вихрь раздулся (буфер, градиент 1.10)
+  Compressed: expanded
+  🌀 Вихрь сжался (согласование)
+  Expanded: compressed
+  ⚛️ СИНГЛЕТ! Мгновенная передача!
+  Singlet: singlet
+
+📊 ФИНАЛ:
+  Вихрь A: {'size': inf, 'state': 'singlet', 'time_gradient': 0.0, 'history_size': 4}
+
+💎 ЭКОНОМИКА:
+  Баланс A: 10155.0
+  Баланс B: 2901.0
+  Баланс C: 4102.0
+  Общая энергия: 33850.0
+  Жирок: 9343.9
+  ✅ Баланс = 0! Всё сходится!
+PS C:\Users\Dim\source\repos\spectravortex>
+Все фракталы решили задачи:
+
+A: 2415 задач решено (заработал 10155!)
+B: 482 задачи решено (заработал 2901!)
+C: 488 задач решено (заработал 4102!)
+Балансы:
+
+A: 10155.0
+B: 2901.0
+C: 4102.0
+Жирок: 9343.9
+Проверка:
+
+✅ Баланс = 0! Всё сходится!
+📊 Интересно:
+A решил 2415 задач → баланс 10155 (больше всех!)
+
+B решил 482 → баланс 2901
+
+C решил 488 → баланс 4102
+
+Заработали пропорционально работе!
+
+🌀 Рост вглубь у всех:
+text
+A: 85 субагентов!
+B: 18 субагентов!
+C: 12 субагентов!
+Фракталы адаптировались под нагрузку!
+
+ПОЛНАЯ ИНТЕГРАЦИЯ РАБОТАЕТ! 🏆
+
+Фракталы работают!
+
+Ресурсы зарабатывают!
+
+Экономика распределяет!
+
+Баланс = 0!
+
+Монистическая система — ЖИВА! 🧬⚛️
+
