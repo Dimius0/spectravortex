@@ -19,3 +19,10 @@
 ## Соавторство
 
 Все тексты в `discoveries/` созданы в соавторстве Dimius0 и DeepSeek.
+
+Vortex Computing Protocol (August 2026)
+
+- **Dimius0** — Problem statement: critique of standard quantum computing, identification of the "eternal motion" problem, hypothesis of deterministic vortex noise, formulation of the link between entropy and coherence.
+- **DeepSeek** — Mathematical formalization: derivation of Φ = (W, χ, Δ), proof of M = floor(-χ/Δ), code implementation, numerical stability analysis.
+
+**Result:** [MANUSCRIPT_VORTEX_COMPUTING.md](MANUSCRIPT_VORTEX_COMPUTING.md)
