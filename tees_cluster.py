@@ -25,15 +25,12 @@ class Qubit:
         self.created_at = time.time()
         
         # Самоназначение: статистика по типам задач
-        self.task_history: Dict[str, int] = {}  # type -> count
-        self.avg_time: Dict[str, float] = {}    # type -> avg_time
+        self.task_history: Dict[str, int] = {}
+        self.avg_time: Dict[str, float] = {}
         
-        self.lock = threading.Lock()  # Защита статистики
+        self.lock = threading.Lock()
     
     def compute(self, task: Dict[str, Any]) -> Optional[str]:
-        """
-        Прямой вызов — без TCP, без сокетов.
-        """
         if not self.active:
             return None
         
@@ -61,12 +58,9 @@ class Qubit:
             if result:
                 self.tasks_completed += 1
                 self.last_task_time = time.time()
-                
-                # Обновляем статистику
                 self.task_history[task_type] = self.task_history.get(task_type, 0) + 1
                 
                 if task_type in self.avg_time:
-                    # Экспоненциальное скользящее среднее
                     self.avg_time[task_type] = 0.8 * self.avg_time[task_type] + 0.2 * elapsed
                 else:
                     self.avg_time[task_type] = elapsed
@@ -74,10 +68,6 @@ class Qubit:
         return result
     
     def get_specialty_score(self, task_type: str) -> float:
-        """
-        Оценка специализации кубита на типе задачи.
-        Больше опыта + быстрее = выше score.
-        """
         with self.lock:
             count = self.task_history.get(task_type, 0)
             avg = self.avg_time.get(task_type, 0)
@@ -85,7 +75,6 @@ class Qubit:
         if count == 0:
             return 0.0
         
-        # Нормализуем: опыт * скорость
         speed_score = 1.0 / (1.0 + avg) if avg > 0 else 1.0
         return count * 0.7 + speed_score * 0.3
     
@@ -105,7 +94,6 @@ class Qubit:
 class TSPQubit(Qubit):
     """
     🗺️ Кубит-коммивояжёр.
-    Специализируется на поиске коротких путей.
     """
     
     def __init__(self, qubit_id: str, core_id: int):
@@ -115,21 +103,18 @@ class TSPQubit(Qubit):
         self.tsp_experience = 0
     
     def solve_tsp(self, cities: List[Tuple[float, float]]) -> Tuple[List[int], float]:
-        """
-        Детерминированный поиск пути: nearest neighbor + 2-opt.
-        """
         if not cities or len(cities) < 2:
             return [], 0.0
         
-        # 1. Жадный ближайший сосед
-        route = self._nearest_neighbor(cities)
+        # 🔑 Для больших групп — быстрый nearest neighbor без 2-opt
+        if len(cities) > 1000:
+            route = self._nearest_neighbor_fast(cities)
+            distance = self._calculate_distance(route, cities)
+        else:
+            route = self._nearest_neighbor(cities)
+            route = self._two_opt(route, cities)
+            distance = self._calculate_distance(route, cities)
         
-        # 2. Улучшение через 2-opt
-        route = self._two_opt(route, cities)
-        
-        distance = self._calculate_distance(route, cities)
-        
-        # Запоминаем лучший результат
         if distance < self.best_distance:
             self.best_distance = distance
             self.best_route = route.copy()
@@ -138,14 +123,12 @@ class TSPQubit(Qubit):
         return route, distance
     
     def _nearest_neighbor(self, cities: List[Tuple[float, float]]) -> List[int]:
-        """Жадный алгоритм ближайшего соседа."""
         n = len(cities)
         unvisited = set(range(1, n))
-        route = [0]  # Начинаем с города 0
+        route = [0]
         current = 0
         
         while unvisited:
-            # Находим ближайший непосещённый город
             next_city = min(unvisited, key=lambda c: self._distance(cities[current], cities[c]))
             route.append(next_city)
             unvisited.remove(next_city)
@@ -153,11 +136,84 @@ class TSPQubit(Qubit):
         
         return route
     
+    def _nearest_neighbor_fast(self, cities: List[Tuple[float, float]], grid_size: int = 100) -> List[int]:
+        """
+        🔑 БЫСТРЫЙ nearest neighbor через пространственную сетку.
+        Вместо O(n²) — почти O(n).
+        """
+        n = len(cities)
+        if n < 2:
+            return [0] if n == 1 else []
+        
+        # Находим границы
+        min_x = min(c[0] for c in cities)
+        max_x = max(c[0] for c in cities)
+        min_y = min(c[1] for c in cities)
+        max_y = max(c[1] for c in cities)
+        
+        range_x = max(max_x - min_x, 0.001)
+        range_y = max(max_y - min_y, 0.001)
+        
+        cell_size_x = range_x / grid_size
+        cell_size_y = range_y / grid_size
+        
+        # Строим сетку
+        grid: Dict[Tuple[int, int], List[int]] = {}
+        
+        for i, (x, y) in enumerate(cities):
+            cell_x = int((x - min_x) / cell_size_x)
+            cell_y = int((y - min_y) / cell_size_y)
+            cell_x = min(cell_x, grid_size - 1)
+            cell_y = min(cell_y, grid_size - 1)
+            key = (cell_x, cell_y)
+            if key not in grid:
+                grid[key] = []
+            grid[key].append(i)
+        
+        route = [0]
+        unvisited = set(range(1, n))
+        current = 0
+        
+        while unvisited:
+            cx, cy = cities[current]
+            cell_x = int((cx - min_x) / cell_size_x)
+            cell_y = int((cy - min_y) / cell_size_y)
+            cell_x = min(cell_x, grid_size - 1)
+            cell_y = min(cell_y, grid_size - 1)
+            
+            best_city = None
+            best_dist = float('inf')
+            
+            # Ищем в расширяющейся окрестности
+            radius = 1
+            while best_city is None and radius < grid_size:
+                for dx in range(-radius, radius + 1):
+                    for dy in range(-radius, radius + 1):
+                        key = (cell_x + dx, cell_y + dy)
+                        if key in grid:
+                            for c in grid[key]:
+                                if c in unvisited:
+                                    d = self._distance(cities[current], cities[c])
+                                    if d < best_dist:
+                                        best_dist = d
+                                        best_city = c
+                radius += 1
+            
+            # Fallback: если не нашли — перебор
+            if best_city is None:
+                for c in unvisited:
+                    d = self._distance(cities[current], cities[c])
+                    if d < best_dist:
+                        best_dist = d
+                        best_city = c
+            
+            route.append(best_city)
+            unvisited.remove(best_city)
+            current = best_city
+        
+        return route
+    
     def _two_opt(self, route: List[int], cities: List[Tuple[float, float]]) -> List[int]:
-        """
-        2-opt улучшение: разворачиваем участки маршрута.
-        Детерминированный: всегда проверяем все пары.
-        """
         improved = True
         best_route = route.copy()
         best_distance = self._calculate_distance(best_route, cities)
@@ -168,9 +224,8 @@ class TSPQubit(Qubit):
             for i in range(1, len(best_route) - 2):
                 for j in range(i + 1, len(best_route)):
                     if j - i == 1:
-                        continue  # Соседние — нет смысла
+                        continue
                     
-                    # Пробуем развернуть участок [i..j]
                     new_route = best_route[:i] + best_route[i:j+1][::-1] + best_route[j+1:]
                     new_distance = self._calculate_distance(new_route, cities)
                     
@@ -178,8 +233,6 @@ class TSPQubit(Qubit):
                         best_route = new_route
                         best_distance = new_distance
                         improved = True
-                        
-                        # Детерминизм: первое улучшение применяем сразу
                         break
                 
                 if improved:
@@ -188,7 +241,6 @@ class TSPQubit(Qubit):
         return best_route
     
     def _calculate_distance(self, route: List[int], cities: List[Tuple[float, float]]) -> float:
-        """Полная длина маршрута."""
         total = 0.0
         for i in range(len(route)):
             city_a = cities[route[i]]
@@ -197,14 +249,14 @@ class TSPQubit(Qubit):
         return total
     
     def _distance(self, a: Tuple[float, float], b: Tuple[float, float]) -> float:
-        """Евклидово расстояние."""
-        return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+        dx = a[0] - b[0]
+        dy = a[1] - b[1]
+        return math.sqrt(dx * dx + dy * dy)
 
 
 class GroverQubit(Qubit):
     """
     🔍 Кубит Гровера — специализируется на поиске.
-    Детерминированный параллельный поиск.
     """
     
     def __init__(self, qubit_id: str, core_id: int):
@@ -213,10 +265,6 @@ class GroverQubit(Qubit):
         self.found_count = 0
     
     def search(self, data: List[Any], target: Any) -> Optional[Any]:
-        """
-        Поиск целевого элемента.
-        Возвращает индекс или None.
-        """
         self.search_count += 1
         
         for i, item in enumerate(data):
@@ -227,9 +275,6 @@ class GroverQubit(Qubit):
         return None
     
     def search_many(self, data: List[Any], targets: List[Any]) -> Dict[Any, int]:
-        """
-        Поиск нескольких целей за один проход.
-        """
         self.search_count += 1
         results = {}
         targets_set = set(targets)
@@ -247,18 +292,70 @@ class GroverQubit(Qubit):
         return results
 
 
+class AdaptiveAgents:
+    """
+    🧠 Адаптивный автомат: учится на опыте.
+    """
+    
+    def __init__(self, cluster):
+        self.cluster = cluster
+        self.history = []
+    
+    def get_optimal_percent(self, n_cities, current_coh=1.0):
+        similar = []
+        for h in self.history:
+            if abs(h['n_cities'] - n_cities) < n_cities * 0.2:
+                similar.append(h)
+        
+        if similar:
+            best = min(similar, key=lambda h: h['time'])
+            base_percent = best['percent']
+        else:
+            base_percent = 10
+        
+        if current_coh < 0.9:
+            base_percent = max(5, int(base_percent * 0.5))
+        elif current_coh > 0.99:
+            base_percent = min(100, int(base_percent * 1.2))
+        
+        return base_percent
+    
+    def record(self, n_cities, percent, elapsed):
+        self.history.append({
+            'n_cities': n_cities,
+            'percent': percent,
+            'time': elapsed
+        })
+        if len(self.history) > 1000:
+            self.history = self.history[-1000:]
+    
+    def get_stats(self):
+        if not self.history:
+            return {'experiments': 0, 'best_percent': 0, 'best_time': 0, 'avg_time': 0}
+        
+        best = min(self.history, key=lambda h: h['time'])
+        avg_time = sum(h['time'] for h in self.history) / len(self.history)
+        
+        return {
+            'experiments': len(self.history),
+            'best_percent': best['percent'],
+            'best_time': best['time'],
+            'avg_time': avg_time
+        }
+
+
 class TeesCluster:
     """
     ⚛️ TEES-кластер — кубиты-специалисты с самоназначением.
-    Внутри — прямые вызовы (когерентность).
-    TCP только снаружи.
     """
     
-    QUBITS_PER_CORE = 250  # Оптимум из экспериментов
+    QUBITS_PER_CORE = 250
+    MAX_GROUP_SIZE = 5000  # 🔑 Ограничение размера группы для TSP
     
     def __init__(self, beacon=None, cores: Optional[int] = None, qubits_per_core: Optional[int] = None):
         if qubits_per_core is not None:
             self.QUBITS_PER_CORE = qubits_per_core
+        
         self.beacon = beacon
         self.cores = cores or os.cpu_count() or 1
         self.total_qubits = self.cores * self.QUBITS_PER_CORE
@@ -266,63 +363,50 @@ class TeesCluster:
         self.qubits: List[Qubit] = []
         self.lock = threading.Lock()
         
-        # Специализированные пулы
         self.tsp_qubits: List[TSPQubit] = []
         self.grover_qubits: List[GroverQubit] = []
         
         self._init_qubits()
         
-        # Статистика
         self.tasks_total = 0
         self.tasks_successful = 0
         self.created_at = time.time()
         
-        # Кэш результатов
+        self.adaptive = AdaptiveAgents(self)
+        
         self.result_cache: Dict[str, Any] = {}
         self.MAX_CACHE_SIZE = 1000
     
     def _init_qubits(self):
-        """Создаём кубиты — по 100 на ядро."""
         qubit_index = 0
         
         for core_id in range(self.cores):
             for i in range(self.QUBITS_PER_CORE):
                 qubit_id = f"Q{core_id:02d}_{i:03d}"
                 
-                # 10% — TSP-специалисты
                 if i < 10:
                     qubit = TSPQubit(qubit_id, core_id)
                     self.tsp_qubits.append(qubit)
-                # 10% — Гровер-специалисты
                 elif i < 20:
                     qubit = GroverQubit(qubit_id, core_id)
                     self.grover_qubits.append(qubit)
-                # 80% — универсальные
                 else:
                     qubit = Qubit(qubit_id, core_id)
                 
                 self.qubits.append(qubit)
                 qubit_index += 1
     
-    # ═══════════════════════════════════════════════════════════
-    # 🔧 ОСНОВНЫЕ ВЫЧИСЛЕНИЯ
-    # ═══════════════════════════════════════════════════════════
-    
     def compute(self, task: Dict[str, Any]) -> List[Optional[str]]:
-        """
-        Round-robin с пропуском мёртвых кубитов.
-        """
         with self.lock:
             self.tasks_total += 1
             
-            # Ищем активного кубита
             for i in range(len(self.qubits)):
                 idx = (self.tasks_total + i) % len(self.qubits)
                 qubit = self.qubits[idx]
                 if qubit.active:
                     break
             else:
-                return [None]  # Все кубиты мертвы
+                return [None]
         
         result = qubit.compute(task)
         
@@ -333,9 +417,6 @@ class TeesCluster:
         return [result]
     
     def compute_many(self, tasks: List[Dict[str, Any]]) -> List[Optional[str]]:
-        """
-        Распределяем список задач по кубитам равномерно.
-        """
         results = []
         task_index = 0
         total_tasks = len(tasks)
@@ -351,10 +432,6 @@ class TeesCluster:
         return results
     
     def compute_parallel(self, tasks: List[Dict[str, Any]]) -> List[Optional[str]]:
-        """
-        Параллельное вычисление по ядрам.
-        Каждое ядро обрабатывает свои кубиты.
-        """
         results = [None] * len(tasks)
         tasks_per_core = math.ceil(len(tasks) / self.cores)
         
@@ -377,18 +454,10 @@ class TeesCluster:
         
         return results
     
-    # ═══════════════════════════════════════════════════════════
-    # 🗺️ TSP — ЗАДАЧА КОММИВОЯЖЁРА
-    # ═══════════════════════════════════════════════════════════
-    
     def solve_tsp(self, cities: List[Tuple[float, float]]) -> Dict[str, Any]:
-        """
-        Решение TSP через специализированных кубитов.
-        """
         if not cities or len(cities) < 2:
             return {'route': [], 'distance': 0.0, 'qubit': None}
         
-        # Находим лучшего TSP-кубита
         best_qubit = None
         best_score = -1
         
@@ -413,16 +482,11 @@ class TeesCluster:
         }
     
     def solve_tsp_parallel(self, cities: List[Tuple[float, float]], n_partitions: int = 10) -> Dict[str, Any]:
-        """
-        Параллельное TSP: разбиваем города на группы, решаем каждую отдельно,
-        потом сшиваем маршруты.
-        """
         n_cities = len(cities)
         
         if n_cities <= n_partitions:
             return self.solve_tsp(cities)
         
-        # Разбиваем города на группы
         partition_size = n_cities // n_partitions
         partitions = []
         
@@ -431,7 +495,6 @@ class TeesCluster:
             end = start + partition_size if i < n_partitions - 1 else n_cities
             partitions.append(cities[start:end])
         
-        # Решаем каждую группу параллельно
         results = [None] * len(partitions)
         
         def solve_partition(idx: int):
@@ -446,7 +509,6 @@ class TeesCluster:
         for t in threads:
             t.join()
         
-        # Сшиваем маршруты с переходами
         full_route = []
         total_distance = 0.0
         
@@ -454,7 +516,6 @@ class TeesCluster:
             offset = i * partition_size
             
             if i > 0:
-                # Добавляем переход от предыдущей группы
                 prev_last = full_route[-1]
                 curr_first = result['route'][0] + offset
                 transition = math.sqrt(
@@ -468,7 +529,6 @@ class TeesCluster:
             
             total_distance += result['distance']
         
-        # Замыкаем маршрут
         if full_route:
             closing = math.sqrt(
                 (cities[full_route[-1]][0] - cities[full_route[0]][0])**2 +
@@ -482,30 +542,32 @@ class TeesCluster:
             'qubits_used': len(results),
             'partitions': n_partitions
         }
-
-    def solve_tsp_massive_parallel(self, cities):
+    
+    def solve_tsp_massive_parallel(self, cities, agents_percent=100):
         """
-        ⚡ Массивное параллельное TSP.
-        Все агенты решают свою часть задачи!
+        ⚡ Массивное параллельное TSP с ограничением размера групп.
         """
         n_cities = len(cities)
-        n_agents = len(self.qubits)
+        n_agents = max(2, int(len(self.qubits) * agents_percent / 100))
         
         if n_cities <= 1:
             return {'route': [], 'distance': 0.0, 'agents_used': 0}
         
-        # Разбиваем города между агентами
-        cities_per_agent = max(2, n_cities // n_agents)
-        n_agents_used = min(n_agents, n_cities // 2)
+        # 🔑 Ограничиваем размер группы — чтобы O(n²) не взрывался
+        cities_per_agent = min(
+            max(2, n_cities // n_agents),
+            self.MAX_GROUP_SIZE
+        )
+        
+        n_agents_used = min(n_agents, max(1, n_cities // cities_per_agent))
         
         groups = []
         for i in range(n_agents_used):
             start = i * cities_per_agent
-            end = start + cities_per_agent if i < n_agents_used - 1 else n_cities
+            end = min(start + cities_per_agent, n_cities)
             if start < n_cities and end > start:
                 groups.append((i, cities[start:end]))
         
-        # Каждый агент решает свою группу
         results = []
         for i, group in groups:
             if len(group) < 2:
@@ -520,7 +582,6 @@ class TeesCluster:
             
             results.append((i, route, dist))
         
-        # Сшиваем маршруты
         full_route = []
         total_distance = 0.0
         
@@ -530,7 +591,6 @@ class TeesCluster:
                 full_route.append(city_idx + offset)
             total_distance += dist
         
-        # Добавляем переходы между группами
         for i in range(len(results) - 1):
             if i + 1 < len(results):
                 last_city = results[i][1][-1] + results[i][0] * cities_per_agent
@@ -548,7 +608,6 @@ class TeesCluster:
         }
     
     def _simple_tsp(self, cities):
-        """Простой TSP для обычных агентов (nearest neighbor)."""
         if len(cities) < 2:
             return [], 0.0
         
@@ -571,17 +630,9 @@ class TeesCluster:
             b = cities[route[(i+1) % len(route)]]
             dist += math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
         
-        return route, dist    
-    
-    # ═══════════════════════════════════════════════════════════
-    # 🔍 ГРОВЕР — ПОИСК
-    # ═══════════════════════════════════════════════════════════
+        return route, dist
     
     def grover_search(self, data: List[Any], target: Any) -> Dict[str, Any]:
-        """
-        Поиск через специализированных кубитов Гровера.
-        """
-        # Находим лучшего кубита
         best_qubit = None
         best_score = -1
         
@@ -606,9 +657,6 @@ class TeesCluster:
         }
     
     def grover_search_parallel(self, data: List[Any], target: Any, n_partitions: int = None) -> Dict[str, Any]:
-        """
-        Параллельный поиск: разбиваем данные, ищем в каждой части.
-        """
         n_data = len(data)
         
         if n_partitions is None:
@@ -617,7 +665,6 @@ class TeesCluster:
         if n_data <= n_partitions:
             return self.grover_search(data, target)
         
-        # Разбиваем данные
         partition_size = n_data // n_partitions
         partitions = []
         
@@ -626,13 +673,11 @@ class TeesCluster:
             end = start + partition_size if i < n_partitions - 1 else n_data
             partitions.append((start, data[start:end]))
         
-        # Ищем параллельно
         results = [None] * len(partitions)
         
         def search_partition(idx: int):
             start, partition = partitions[idx]
             
-            # Выбираем лучшего свободного кубита
             best_qubit = None
             best_score = -1
             
@@ -661,31 +706,14 @@ class TeesCluster:
         for t in threads:
             t.join()
         
-        # Собираем результат
         for idx in results:
             if idx is not None:
-                return {
-                    'found': True,
-                    'index': idx,
-                    'partitions': n_partitions
-                }
+                return {'found': True, 'index': idx, 'partitions': n_partitions}
         
-        return {
-            'found': False,
-            'index': None,
-            'partitions': n_partitions
-        }
-    
-    # ═══════════════════════════════════════════════════════════
-    # 📊 БЕНЧМАРКИ И СТАТИСТИКА
-    # ═══════════════════════════════════════════════════════════
+        return {'found': False, 'index': None, 'partitions': n_partitions}
     
     def benchmark_sha256(self, count: int = 1000) -> Dict[str, Any]:
-        """Бенчмарк SHA-256 через кластер."""
-        tasks = [
-            {'type': 'sha256', 'data': f"TEES benchmark {i}"}
-            for i in range(count)
-        ]
+        tasks = [{'type': 'sha256', 'data': f"TEES benchmark {i}"} for i in range(count)]
         
         start_time = time.time()
         results = self.compute_many(tasks)
@@ -703,9 +731,8 @@ class TeesCluster:
         }
     
     def benchmark_tsp(self, n_cities: int = 50) -> Dict[str, Any]:
-        """Бенчмарк TSP."""
         import random
-        random.seed(42)  # Детерминизм!
+        random.seed(42)
         
         cities = [(random.random() * 100, random.random() * 100) for _ in range(n_cities)]
         
@@ -721,13 +748,12 @@ class TeesCluster:
         }
     
     def benchmark_grover(self, n_items: int = 100000, target: Any = None) -> Dict[str, Any]:
-        """Бенчмарк поиска."""
         import random
         random.seed(42)
         
         data = list(range(n_items))
         if target is None:
-            target = n_items - 1  # Ищем последний (худший случай)
+            target = n_items - 1
         
         start_time = time.time()
         result = self.grover_search_parallel(data, target)
@@ -741,7 +767,6 @@ class TeesCluster:
         }
     
     def check_health(self) -> int:
-        """Восстановление мёртвых кубитов с логами."""
         dead_count = 0
         recovered = []
         
@@ -760,8 +785,42 @@ class TeesCluster:
         
         return dead_count
     
+    def measure_balance(self):
+        tasks_per_agent = [q.tasks_completed for q in self.qubits]
+        
+        if not tasks_per_agent:
+            return {'avg': 0, 'max': 0, 'min': 0, 'imbalance': 0, 'efficiency': 0}
+        
+        avg = sum(tasks_per_agent) / len(tasks_per_agent)
+        max_load = max(tasks_per_agent)
+        min_load = min(tasks_per_agent)
+        imbalance = max_load - avg
+        
+        efficiency = avg / max_load if max_load > 0 else 0
+        
+        return {
+            'avg': avg,
+            'max': max_load,
+            'min': min_load,
+            'imbalance': imbalance,
+            'efficiency': efficiency,
+            'total_agents': len(tasks_per_agent)
+        }
+    
+    def measure_internal_coherence(self):
+        coherences = [q.coherence for q in self.qubits]
+        
+        if not coherences:
+            return {'min': 0, 'max': 0, 'avg': 0, 'delta': 0, 'n': 0}
+        
+        min_c = min(coherences)
+        max_c = max(coherences)
+        avg_c = sum(coherences) / len(coherences)
+        delta = max_c - min_c
+        
+        return {'min': min_c, 'max': max_c, 'avg': avg_c, 'delta': delta, 'n': len(coherences)}
+    
     def get_stats(self) -> Dict[str, Any]:
-        """Полная статистика кластера."""
         return {
             'cores': self.cores,
             'qubits_per_core': self.QUBITS_PER_CORE,
@@ -775,13 +834,8 @@ class TeesCluster:
         }
     
     def get_qubit_stats(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Статистика первых N кубитов."""
         return [q.get_stats() for q in self.qubits[:limit]]
 
-
-# ═══════════════════════════════════════════════════════════════
-# 🧪 ТЕСТЫ
-# ═══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     print("⚛️ TEES-кластер — тесты")
@@ -796,9 +850,6 @@ if __name__ == "__main__":
     print(f"Гровер-кубитов: {stats['grover_qubits']}")
     print()
     
-    # ═══════════════════════════════════════════════════════════
-    # 1. SHA-256 БЕНЧМАРК
-    # ═══════════════════════════════════════════════════════════
     print("📊 SHA-256 бенчмарк...")
     bench = cluster.benchmark_sha256(1000)
     print(f"  Задач: {bench['tasks']}")
@@ -806,9 +857,6 @@ if __name__ == "__main__":
     print(f"  Скорость: {bench['tasks_per_sec']:.0f} задач/сек")
     print()
     
-    # ═══════════════════════════════════════════════════════════
-    # 2. TSP ТЕСТ
-    # ═══════════════════════════════════════════════════════════
     print("🗺️ TSP тест (50 городов)...")
     tsp_bench = cluster.benchmark_tsp(50)
     print(f"  Городов: {tsp_bench['cities']}")
@@ -817,7 +865,6 @@ if __name__ == "__main__":
     print(f"  Кубит: {tsp_bench['qubit']}")
     print()
     
-    # TSP с разбиением
     print("🗺️ TSP параллельный (100 городов, 10 групп)...")
     import random
     random.seed(42)
@@ -830,9 +877,6 @@ if __name__ == "__main__":
     print(f"  Кубитов: {tsp_par['qubits_used']}")
     print()
     
-    # ═══════════════════════════════════════════════════════════
-    # 3. ГРОВЕР ТЕСТ
-    # ═══════════════════════════════════════════════════════════
     print("🔍 Гровер поиск (100,000 элементов)...")
     grover_bench = cluster.benchmark_grover(100000)
     print(f"  Элементов: {grover_bench['items']}")
@@ -841,9 +885,6 @@ if __name__ == "__main__":
     print(f"  Партиций: {grover_bench['partitions']}")
     print()
     
-    # ═══════════════════════════════════════════════════════════
-    # 4. ИТОГОВАЯ СТАТИСТИКА
-    # ═══════════════════════════════════════════════════════════
     print("🔍 Первые 5 кубитов:")
     for q in cluster.get_qubit_stats(5):
         specialties = q.get('specialties', {})

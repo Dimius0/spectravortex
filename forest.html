@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌲 Лес Знаний — TEES</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Georgia', serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Небо */
+        .sky {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, 
+                #0f0f1e 0%, 
+                #1a1a2e 40%, 
+                #16213e 100%);
+            z-index: 0;
+        }
+        
+        /* Звёзды */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        /* Основной контейнер */
+        .main-container {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        
+        /* Левая панель */
+        .panel-left {
+            width: 380px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(122, 199, 12, 0.2);
+            flex-shrink: 0;
+        }
+        
+        .search-box {
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(122, 199, 12, 0.3);
+            border-radius: 10px;
+            color: #e0e0e0;
+            outline: none;
+            font-size: 0.9em;
+        }
+        
+        .search-box input:focus {
+            border-color: #7ac70c;
+            box-shadow: 0 0 10px rgba(122, 199, 12, 0.2);
+        }
+        
+        .node-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 5px;
+        }
+        
+        .node-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .node-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+        
+        .node-list::-webkit-scrollbar-thumb {
+            background: rgba(122, 199, 12, 0.3);
+            border-radius: 3px;
+        }
+        
+        .node-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(122, 199, 12, 0.5);
+        }
+        
+        .node-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 20, 0, 0.5);
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid transparent;
+            flex-shrink: 0;
+        }
+        
+        .node-item:hover {
+            background: rgba(0, 40, 0, 0.6);
+            border-color: rgba(122, 199, 12, 0.3);
+            transform: translateX(3px);
+        }
+        
+        .node-item.selected {
+            border-color: #7ac70c;
+            background: rgba(0, 60, 0, 0.7);
+        }
+        
+        .node-emoji {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+        }
+        
+        .node-emoji.small {
+            font-size: 1.2em;
+        }
+        
+        .node-emoji.medium {
+            font-size: 1.8em;
+        }
+        
+        .node-emoji.large {
+            font-size: 2.4em;
+        }
+        
+        .node-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .node-address {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #7ac70c;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .node-stats {
+            font-size: 0.7em;
+            color: #a0a0a0;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .node-badge {
+            padding: 2px 6px;
+            background: rgba(122, 199, 12, 0.2);
+            border-radius: 8px;
+            font-size: 0.7em;
+            color: #7ac70c;
+            flex-shrink: 0;
+        }
+
+        /* Центральная панель — Лог событий */
+        .panel-center {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            overflow-y: auto;
+            min-width: 0;
+        }
+        
+        .event-log {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .event-log h3 {
+            color: #7ac70c;
+            text-align: center;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(122, 199, 12, 0.2);
+            font-size: 0.9em;
+        }
+        
+        .event-log-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .event-entry {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            font-size: 0.8em;
+            color: #c0c0c0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .event-time {
+            color: #7ac70c;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75em;
+            flex-shrink: 0;
+        }
+        
+        .event-icon {
+            flex-shrink: 0;
+        }
+        
+        /* Правая панель */
+        .panel-right {
+            width: 280px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            border-left: 1px solid rgba(122, 199, 12, 0.2);
+        }
+        
+        .panel-section {
+            margin-bottom: 15px;
+        }
+        
+        .panel-title {
+            font-size: 0.9em;
+            color: #7ac70c;
+            margin-bottom: 8px;
+            text-align: center;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(122, 199, 12, 0.2);
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-size: 0.85em;
+        }
+        
+        .stat-icon {
+            font-size: 1.2em;
+        }
+        
+        .stat-name {
+            flex: 1;
+            color: #c0c0c0;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            color: #e0e0e0;
+        }
+        
+        .capacity {
+            text-align: center;
+            padding: 10px;
+            background: rgba(122, 199, 12, 0.1);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .capacity-value {
+            font-size: 1.3em;
+            color: #7ac70c;
+            font-weight: bold;
+        }
+        
+        .capacity-label {
+            font-size: 0.75em;
+            color: #a0a0a0;
+        }
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: rgba(122, 199, 12, 0.15);
+            border: 1px solid rgba(122, 199, 12, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #e0e0e0;
+            font-size: 0.85em;
+            text-align: left;
+        }
+        
+        .action-btn:hover {
+            background: rgba(122, 199, 12, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(122, 199, 12, 0.2);
+        }
+        
+        .action-btn-icon {
+            font-size: 1.3em;
+        }
+        
+        /* Нижняя панель */
+        .bottom-panel {
+            position: relative;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(122, 199, 12, 0.3);
+            transition: all 0.3s;
+        }
+        
+        .bottom-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(122, 199, 12, 0.2);
+        }
+        
+        .bottom-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #a0a0a0;
+            font-size: 0.85em;
+            border-bottom: 2px solid transparent;
+            user-select: none;
+        }
+        
+        .bottom-tab:hover {
+            background: rgba(122, 199, 12, 0.05);
+            color: #e0e0e0;
+        }
+        
+        .bottom-tab.active {
+            color: #7ac70c;
+            border-bottom-color: #7ac70c;
+            background: rgba(122, 199, 12, 0.1);
+        }
+        
+        .bottom-panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .bottom-panel-header:hover {
+            background: rgba(122, 199, 12, 0.1);
+        }
+        
+        .bottom-panel-icon {
+            font-size: 1.2em;
+        }
+        
+        .bottom-panel-title {
+            flex: 1;
+            color: #7ac70c;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .bottom-panel-toggle {
+            transition: transform 0.3s;
+            color: #7ac70c;
+        }
+        
+        .bottom-panel-toggle.open {
+            transform: rotate(180deg);
+        }
+        
+        .bottom-panel-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s;
+        }
+        
+        .bottom-panel-content.open {
+            max-height: 33vh;
+        }
+        
+        .chat-messages {
+            padding: 15px 15px 70px 15px;
+            overflow-y: auto;
+            max-height: 300px;
+            min-height: 150px;
+            scroll-behavior: smooth;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            border-radius: 12px;
+            max-width: 70%;
+            font-size: 1em;
+        }
+        
+        .message.oracle {
+            background: rgba(122, 199, 12, 0.1);
+            margin-right: auto;
+        }
+        
+        .message.player {
+            background: rgba(255, 255, 255, 0.1);
+            margin-left: auto;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 8px;
+            padding: 10px 20px;
+            border-top: 1px solid rgba(122, 199, 12, 0.2);
+            position: sticky;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 5;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(122, 199, 12, 0.3);
+            border-radius: 10px;
+            color: #e0e0e0;
+            outline: none;
+            font-size: 1.1em;
+        }
+        
+        .chat-input button {
+            padding: 12px 20px;
+            background: #7ac70c;
+            border: none;
+            border-radius: 10px;
+            color: #1a1a2e;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .chat-input button:hover {
+            background: #8edb1f;
+            transform: scale(1.05);
+        }
+        
+        /* Хроники */
+        .chronicles {
+            padding: 15px;
+            overflow-y: auto;
+            max-height: 250px;
+            display: none;
+        }
+        
+        .chronicles.active {
+            display: block;
+        }
+        
+        .chronicle-entry {
+            margin-bottom: 6px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            font-size: 0.8em;
+            color: #c0c0c0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .chronicle-time {
+            color: #7ac70c;
+            font-family: 'Courier New', monospace;
+            font-size: 0.75em;
+            flex-shrink: 0;
+        }
+        
+        .chronicle-icon {
+            flex-shrink: 0;
+        }
+        
+        /* Модальное окно */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: rgba(0, 20, 0, 0.95);
+            border: 2px solid #7ac70c;
+            border-radius: 20px;
+            padding: 30px;
+            z-index: 101;
+            text-align: center;
+            min-width: 350px;
+            max-width: 90%;
+        }
+        
+        .modal-emoji {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+        
+        .modal-address {
+            font-family: 'Courier New', monospace;
+            color: #7ac70c;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+        
+        .modal-stats {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        
+        .modal-stats p {
+            margin-bottom: 8px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .modal-btn {
+            padding: 10px 20px;
+            background: rgba(122, 199, 12, 0.2);
+            border: 1px solid rgba(122, 199, 12, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            color: #e0e0e0;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+        
+        .modal-btn:hover {
+            background: rgba(122, 199, 12, 0.4);
+        }
+        
+        .modal-close {
+            padding: 10px 20px;
+            background: #7ac70c;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+        
+        @media (max-width: 768px) {
+            .panel-left {
+                width: 250px;
+            }
+            
+            .panel-right {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sky"></div>
+    <div class="stars" id="stars"></div>
+    
+    <div class="main-container">
+        <!-- Левая панель -->
+        <div class="panel-left">
+            <!-- Кнопка посадки дерева -->
+            <button onclick="plantTree()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: rgba(122, 199, 12, 0.2); border: 2px solid #7ac70c; border-radius: 10px; cursor: pointer; transition: all 0.3s; color: #7ac70c; font-weight: bold; font-size: 1em; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span style="font-size: 1.3em;">🌱</span>
+                <span>Посадить дерево</span>
+            </button>
+            
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="🔍 Поиск узла..." oninput="filterNodes()" />
+            </div>
+            
+            <div class="node-list" id="nodeList"></div>
+        </div>
+        
+        <!-- Центральная область — Лог событий -->
+        <div class="panel-center">
+            <div class="event-log">
+                <h3>📡 События леса</h3>
+                <div id="eventLog"></div>
+            </div>
+        </div>
+
+        <!-- Правая панель -->
+        <div class="panel-right">
+            <div class="capacity">
+                <div class="capacity-value">1 234 567</div>
+                <div class="capacity-label">Ёмкость леса</div>
+            </div>
+            
+            <div class="panel-section">
+                <div class="panel-title">💎 Ресурсы</div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">💎</span>
+                    <span class="stat-name">Мои ресурсы</span>
+                    <span class="stat-value">4 235</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">🌐</span>
+                    <span class="stat-name">Баланс сети</span>
+                    <span class="stat-value">0</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">📈</span>
+                    <span class="stat-name">Прирост</span>
+                    <span class="stat-value">+12.5/сек</span>
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <div class="panel-title">📊 Лес</div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">🌳</span>
+                    <span class="stat-name">Узлов</span>
+                    <span class="stat-value">25</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">🤝</span>
+                    <span class="stat-name">Симбиозов</span>
+                    <span class="stat-value">12</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">✨</span>
+                    <span class="stat-name">Когерентность</span>
+                    <span class="stat-value">0.998</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-name">Аптайм</span>
+                    <span class="stat-value">26ч 08м</span>
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <div class="panel-title">🔬 Задачи</div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">🧬</span>
+                    <span class="stat-name">Folding@Home</span>
+                    <span class="stat-value">12</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">🌌</span>
+                    <span class="stat-name">SETI</span>
+                    <span class="stat-value">5</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-icon">💎</span>
+                    <span class="stat-name">USPEX</span>
+                    <span class="stat-value">3</span>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-btn" onclick="showExchange()">
+                    <span class="action-btn-icon">🤝</span>
+                    <span>Обмен ресурсами</span>
+                </button>
+                
+                <button class="action-btn" onclick="showExternalSignals()">
+                    <span class="action-btn-icon">📡</span>
+                    <span>Внешний сигнал</span>
+                </button>
+
+                <button class="action-btn" onclick="showRequests()">
+                    <span class="action-btn-icon">📋</span>
+                    <span>Заявки леса</span>
+                </button>
+
+                <button class="action-btn" onclick="showFair()">
+                    <span class="action-btn-icon">🎪</span>
+                    <span>Ярмарка</span>
+                </button>
+
+                <button class="action-btn" onclick="showHelp()">
+                    <span class="action-btn-icon">❓</span>
+                    <span>Помощь</span>
+                </button>
+
+                <button class="action-btn" onclick="showTasks()">
+                    <span class="action-btn-icon">🧮</span>
+                    <span>Задачи Леса</span>
+                </button>
+
+                <button class="action-btn" onclick="showTSP()">
+                    <span class="action-btn-icon">🗺️</span>
+                    <span>Маршрут (TSP)</span>
+                </button>
+
+                <button class="action-btn" onclick="showSHA()">
+                    <span class="action-btn-icon">🔐</span>
+                    <span>Хеш (SHA-256)</span>
+                </button>
+
+                <button class="action-btn" onclick="showGrover()">
+                    <span class="action-btn-icon">🔍</span>
+                    <span>Поиск (Гровер)</span>
+                </button>
+
+                <button class="action-btn" onclick="showVortex()">
+                    <span class="action-btn-icon">🌀</span>
+                    <span>TEES-вихрь</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Нижняя панель -->
+    <div class="bottom-panel">
+        <!-- Вкладки -->
+        <div class="bottom-tabs">
+            <div class="bottom-tab active" onclick="switchTab('chat')">💬 Голос</div>
+            <div class="bottom-tab" onclick="switchTab('chronicles')">📜 Хроники</div>
+        </div>
+        
+        <div class="bottom-panel-header" onclick="toggleBottomPanel()">
+            <span class="bottom-panel-icon">💬</span>
+            <span class="bottom-panel-title">Голос Леса</span>
+            <span class="bottom-panel-toggle" id="bottomToggle">▼</span>
+        </div>
+        
+        <div class="bottom-panel-content" id="bottomContent">
+            <!-- Чат -->
+            <div id="chatTab">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message oracle">🌱 Лес пробуждается... Узлы ждут твоей заботы.</div>
+                    <div class="message player">Что мне делать?</div>
+                    <div class="message oracle">🤝 Соедини узлы в симбиозе. Мудрость потечёт к неопытности...</div>
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="chatInput" placeholder="Спроси лес..." onkeypress="handleChatKey(event)" />
+                    <button onclick="sendMessage()">→</button>
+                </div>
+            </div>
+            
+            <!-- Хроники -->
+            <div id="chroniclesTab" style="display: none;">
+                <div class="chronicles" id="chronicles">
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:34:01</span>
+                        <span class="chronicle-icon">🌱</span>
+                        <span>Узел 1GkZ... подключён к лесу</span>
+                    </div>
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:34:15</span>
+                        <span class="chronicle-icon">🤝</span>
+                        <span>Симбиоз: 1JS6... ↔ 1HEo...</span>
+                    </div>
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:35:02</span>
+                        <span class="chronicle-icon">📦</span>
+                        <span>Задача решена: SHA-256 (0.000 сек)</span>
+                    </div>
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:35:23</span>
+                        <span class="chronicle-icon">💎</span>
+                        <span>Ресурсы начислены: +12.5</span>
+                    </div>
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:36:00</span>
+                        <span class="chronicle-icon">✨</span>
+                        <span>Когерентность: 0.998 → 0.999</span>
+                    </div>
+                    <div class="chronicle-entry">
+                        <span class="chronicle-time">12:37:10</span>
+                        <span class="chronicle-icon">🍄</span>
+                        <span>Грибница активирована: 2 000 000 агентов</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Базовый URL сервера (автоматически определяется)
+        const SERVER_URL = window.location.origin;
+        // Данные узлов
+        const nodeData = [
+            { address: '1GkZf79QzzTY8ARWxT4MaMoxtiACdcy33b', coherence: 0.994, connections: 0, tasks: 0, power: 'small', emoji: '🌱' },
+            { address: '1JS6gmLKZpZkAj5Xrk3gZUiSqBVyDgUhF6', coherence: 0.996, connections: 3, tasks: 12, power: 'medium', emoji: '🌿' },
+            { address: '1HEoZDLWCLzB2GGNPDY7ff87keL1QUfLea', coherence: 0.998, connections: 7, tasks: 45, power: 'large', emoji: '🌳' },
+            { address: '1B6kqEwXfWhC...', coherence: 0.999, connections: 5, tasks: 89, power: 'medium', emoji: '🍄' },
+            { address: '1PRIZE0000000000000000000000000000000', coherence: 0.997, connections: 4, tasks: 23, power: 'small', emoji: '🌸' },
+            { address: '1A2bC3dE4fG5hI6jK7lM8nO9pQ0rS1tU2v', coherence: 0.995, connections: 2, tasks: 8, power: 'medium', emoji: '🌲' },
+            { address: '1X9yZ8wV7uT6sR5qP4oN3mL2kJ1iH0gF2e', coherence: 0.996, connections: 6, tasks: 34, power: 'large', emoji: '🌿' },
+            { address: '1QwErTyUiOpAsDfGhJkLzXcVbNm123456', coherence: 1.000, connections: 11, tasks: 156, power: 'large', emoji: '🌳' },
+            { address: '1MnBvCxZaLkJhGfDsApOiUyTrEwQ987654', coherence: 0.999, connections: 9, tasks: 234, power: 'large', emoji: '🍄' },
+            { address: '1ZxCvBnMaLkJhGfDsApOiUyTrEwQ112233', coherence: 0.993, connections: 1, tasks: 2, power: 'small', emoji: '🌱' },
+            { address: '1PoIuYtReWqAsDfGhJkLzXcVbNm445566', coherence: 0.998, connections: 8, tasks: 67, power: 'medium', emoji: '🌸' },
+            { address: '1LkJhGfDsApOiUyTrEwQMnBvCxZa778899', coherence: 1.000, connections: 15, tasks: 345, power: 'large', emoji: '🌲' }
+        ];
+        
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 150; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.opacity = Math.random() * 0.7 + 0.3;
+                starsContainer.appendChild(star);
+            }
+        }
+        
+        function createNodeList() {
+            const nodeList = document.getElementById('nodeList');
+            nodeList.innerHTML = '';
+            
+            nodeData.forEach((node, index) => {
+                const item = document.createElement('div');
+                item.className = 'node-item';
+                item.innerHTML = `
+                    <div class="node-emoji ${node.power}">${node.emoji}</div>
+                    <div class="node-info">
+                        <div class="node-address">${node.address}</div>
+                        <div class="node-stats">
+                            <span>🤝 ${node.connections}</span>
+                            <span>📊 ${node.tasks}</span>
+                        </div>
+                    </div>
+                    <span class="node-badge">${node.coherence.toFixed(3)}</span>
+                `;
+                item.onclick = () => selectNode(index);
+                item.dataset.address = node.address.toLowerCase();
+                nodeList.appendChild(item);
+            });
+        }
+
+        // Посадка дерева (создание и сборка семени)
+        async function plantTree() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🌱 Посадить дерево</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Создай семя — лес вырастит новое дерево!</p>
+                    
+                    <div style="text-align: left; margin-bottom: 20px;">
+                        <div style="margin-bottom: 10px;">
+                            <label style="color: #e0e0e0; font-size: 0.9em;">Данные для семени:</label>
+                            <textarea id="seedData" rows="3" placeholder="Любая информация для нового узла..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0; font-size: 0.9em; resize: vertical;"></textarea>
+                        </div>
+                        
+                        <button onclick="createSeed()" style="width: 100%; padding: 12px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold; font-size: 1em;">
+                            🌰 Создать семя
+                        </button>
+                    </div>
+                    
+                    <div id="seedProgress" style="display: none; margin-bottom: 15px;">
+                        <div style="color: #7ac70c; font-size: 0.9em; margin-bottom: 8px;">🌱 Прорастание:</div>
+                        <div id="seedProgressBar" style="width: 100%; height: 20px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden;">
+                            <div id="seedProgressFill" style="width: 0%; height: 100%; background: #7ac70c; transition: width 0.5s;"></div>
+                        </div>
+                        <div id="seedProgressText" style="color: #a0a0a0; font-size: 0.8em; margin-top: 5px;">0%</div>
+                    </div>
+                    
+                    <div id="seedResult" style="display: none; margin-bottom: 15px;"></div>
+                    
+                    <div style="text-align: center;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        // Создание семени
+        async function createSeed() {
+            const seedData = document.getElementById('seedData').value;
+            if (!seedData) {
+                alert('Введите данные для семени!');
+                return;
+            }
+            
+            const progressDiv = document.getElementById('seedProgress');
+            const progressFill = document.getElementById('seedProgressFill');
+            const progressText = document.getElementById('seedProgressText');
+            const resultDiv = document.getElementById('seedResult');
+            
+            progressDiv.style.display = 'block';
+            resultDiv.style.display = 'none';
+            
+            try {
+                // Создаём семя
+                const response = await fetch(SERVER_URL + '/seed/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: seedData,
+                        creator: '0x1234...abcd'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    // Показываем прогресс прорастания
+                    const pieceIds = data.manifest.piece_ids;
+                    progressFill.style.width = '30%';
+                    progressText.textContent = '🌰 Семя создано! Собираем куски...';
+                    
+                    // Проверяем прогресс
+                    const progressResponse = await fetch(SERVER_URL + '/seed/progress', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ piece_ids: pieceIds })
+                    });
+                    
+                    const progressData = await progressResponse.json();
+                    
+                    if (progressData.status === 'ok') {
+                        progressFill.style.width = progressData.progress.progress + '%';
+                        progressText.textContent = progressData.progress.stage;
+                        
+                        // Собираем семя
+                        const collectResponse = await fetch(SERVER_URL + '/seed/collect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ piece_ids: pieceIds })
+                        });
+                        
+                        const collectData = await collectResponse.json();
+                        
+                        if (collectData.status === 'ok') {
+                            progressFill.style.width = '100%';
+                            progressText.textContent = '🌟 Дерево выросло!';
+                            
+                            resultDiv.style.display = 'block';
+                            resultDiv.innerHTML = `
+                                <div style="padding: 15px; background: rgba(122,199,12,0.1); border-radius: 8px; color: #7ac70c;">
+                                    ✅ Семя посажено!<br>
+                                    📦 Кусков: ${data.manifest.total_pieces}<br>
+                                    📏 Размер: ${data.manifest.total_size} байт<br>
+                                    🔗 Hash: ${data.manifest.seed_hash.substring(0, 16)}...
+                                </div>
+                            `;
+                            
+                            addChronicle('🌱', 'Посажено новое дерево!');
+                        }
+                    }
+                } else {
+                    alert('Ошибка: ' + data.message);
+                }
+            } catch (error) {
+                alert('Сервер недоступен: ' + error);
+            }
+        }
+        
+        function filterNodes() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const items = document.querySelectorAll('.node-item');
+            
+            items.forEach(item => {
+                if (item.dataset.address.includes(searchTerm)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        function selectNode(index) {
+            document.querySelectorAll('.node-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const items = document.querySelectorAll('.node-item');
+            if (items[index]) {
+                items[index].classList.add('selected');
+            }
+            
+            const node = nodeData[index];
+            showNodeDetails(node);
+        }
+        
+        function showNodeDetails(node) {
+            const oldModal = document.querySelector('.modal-overlay');
+            if (oldModal) oldModal.remove();
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-emoji">${node.emoji}</div>
+                    <div class="modal-address">${node.address}</div>
+                    <div class="modal-stats">
+                        <p>✨ Когерентность: ${node.coherence.toFixed(4)}</p>
+                        <p>🤝 Связей: ${node.connections}</p>
+                        <p>📊 Задач решено: ${node.tasks}</p>
+                        <p>⏱️ Аптайм: ${Math.floor(Math.random() * 100)}ч</p>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn" onclick="alert('🤝 Симбиоз с узлом')">🤝 Симбиоз</button>
+                        <button class="modal-btn" onclick="alert('💬 Чат с узлом')">💬 Чат</button>
+                        <button class="modal-btn" onclick="alert('📦 Задача узлу')">📦 Задача</button>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Показ ярмарки
+        function showFair() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🎪 Ярмарка взаимопомощи</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Выставляй предложения и запросы — лес найдёт совпадения</p>
+                    
+                    <!-- Создание объявления -->
+                    <div style="margin-bottom: 20px; padding: 15px; background: rgba(122,199,12,0.05); border-radius: 10px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">📋 Новое объявление</h3>
+                        
+                        <select id="fairType" style="width: 100%; padding: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;">
+                            <option value="offer">🌳 Предлагаю</option>
+                            <option value="request">🌱 Ищу</option>
+                        </select>
+                        
+                        <input type="text" id="fairItem" placeholder="Что? (например: вычисления, ИИ-помощь, знания)" style="width: 100%; padding: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                        
+                        <input type="text" id="fairDescription" placeholder="Описание (необязательно)" style="width: 100%; padding: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                        
+                        <select id="fairCategory" style="width: 100%; padding: 8px; margin-bottom: 8px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;">
+                            <option value="общее">📦 Общее</option>
+                            <option value="знания">📚 Знания</option>
+                            <option value="ресурсы">💎 Ресурсы</option>
+                            <option value="услуги">🛠️ Услуги</option>
+                            <option value="инструменты">🔧 Инструменты</option>
+                            <option value="информация">📊 Информация</option>
+                            <option value="поддержка">🤝 Поддержка</option>
+                            <option value="связи">🔗 Связи</option>
+                        </select>
+
+                        <button onclick="createListing()" style="width: 100%; padding: 10px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">➕ Добавить</button>
+                    </div>
+                    
+                    <!-- Мои объявления -->
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">📋 Мои объявления</h3>
+                        <div id="myListings" style="max-height: 200px; overflow-y: auto;">
+                            <p style="color: #a0a0a0; font-size: 0.85em;">Загрузка...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Совпадения -->
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">✨ Совпадения</h3>
+                        <div id="fairMatches" style="max-height: 200px; overflow-y: auto;">
+                            <p style="color: #a0a0a0; font-size: 0.85em;">Нажмите "Найти совпадения"</p>
+                        </div>
+                        <button onclick="findMatches()" style="width: 100%; padding: 10px; margin-top: 8px; background: rgba(122,199,12,0.2); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c; cursor: pointer; font-weight: bold;">🔍 Найти совпадения</button>
+                    </div>
+                    
+                    <!-- Круги взаимопомощи -->
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">🔄 Круги взаимопомощи</h3>
+                        <div id="fairCircles" style="max-height: 300px; overflow-y: auto;">
+                            <p style="color: #a0a0a0; font-size: 0.85em;">Нажмите "Найти круги"</p>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 8px;">
+                            <button onclick="findCircles()" 
+                                    style="flex: 1; padding: 10px; background: rgba(122,199,12,0.2); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c; cursor: pointer; font-weight: bold;">
+                                🔄 Найти круги
+                            </button>
+                            <select id="maxDepth" 
+                                    style="padding: 10px; background: rgba(122,199,12,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c;">
+                                <option value="3">3 узла</option>
+                                <option value="4" selected>4 узла</option>
+                                <option value="5">5 узлов</option>
+                                <option value="6">6 узлов</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Гео-привязка -->
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">📍 Гео-привязка</h3>
+                        
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="geoEnabled" 
+                                       onchange="toggleGeoPrivacy()"
+                                       style="accent-color: #7ac70c;">
+                                <span style="color: #e0e0e0; font-size: 0.9em;">
+                                    Показывать моё местоположение
+                                </span>
+                            </label>
+                            <p style="color: #a0a0a0; font-size: 0.75em; margin-top: 4px;">
+                                🔒 По умолчанию — скрыто. Вы контролируете свою приватность!
+                            </p>
+                        </div>
+                        
+                        <div id="geoLocation" style="display: none;">
+                            <input type="text" id="cityInput" 
+                                   placeholder="Введите город (например: Москва)"
+                                   style="width: 100%; padding: 10px; margin-bottom: 8px; background: rgba(122,199,12,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;">
+                            
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="setLocation(true)" 
+                                        style="flex: 1; padding: 10px; background: rgba(122,199,12,0.2); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c; cursor: pointer; font-weight: bold;">
+                                    📍 Сохранить
+                                </button>
+                                <button onclick="getCurrentLocation()" 
+                                        style="flex: 1; padding: 10px; background: rgba(122,199,12,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c; cursor: pointer;">
+                                    🎯 Мои координаты
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Ближайшие узлы -->
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="color: #7ac70c; margin-bottom: 10px;">🌍 Рядом с вами</h3>
+                        <div id="nearbyNodes" style="max-height: 200px; overflow-y: auto;">
+                            <p style="color: #a0a0a0; font-size: 0.85em;">Включите гео для поиска</p>
+                        </div>
+                        <button onclick="findNearby()" 
+                                style="width: 100%; padding: 10px; margin-top: 8px; background: rgba(122,199,12,0.2); border: 1px solid #7ac70c; border-radius: 8px; color: #7ac70c; cursor: pointer; font-weight: bold;">
+                            🔍 Найти рядом
+                        </button>
+                    </div>
+
+                    <div style="text-align: center;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            
+            // Загружаем мои объявления
+            loadMyListings();
+        }
+
+        // Создание объявления
+        async function createListing() {
+            const listingType = document.getElementById('fairType').value;
+            const item = document.getElementById('fairItem').value;
+            const description = document.getElementById('fairDescription').value;
+            const category = document.getElementById('fairCategory')?.value || 'общее';  // ← НОВОЕ!
+            
+            if (!item) {
+                alert('Укажите предмет!');
+                return;
+            }
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/create_listing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',  // Пока тестовый адрес
+                        type: listingType,
+                        item: item,
+                        description: description,
+                        category: category
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    let message = data.message;
+                    
+                    // Если есть круги — добавляем информацию
+                    if (data.total_circles && data.total_circles > 0) {
+                        message += `\n🔄 Найдено кругов: ${data.total_circles}!`;
+                    }
+                    
+                    alert(message);
+                    loadMyListings();
+                    
+                    // Если есть круги — обновляем их отображение
+                    if (data.circles && data.circles.length > 0) {
+                        findCircles();
+                    }
+                    
+                    // Очищаем поля
+                    document.getElementById('fairItem').value = '';
+                    document.getElementById('fairDescription').value = '';
+                }
+                 else {
+                    alert('Ошибка: ' + data.message);
+                }
+            } catch (error) {
+                alert('Сервер недоступен: ' + error);
+            }
+        }
+
+        // Загрузка моих объявлений
+        async function loadMyListings() {
+            const container = document.getElementById('myListings');
+            if (!container) return;
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/my_listings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.listings.length > 0) {
+                    const offers = data.listings.filter(l => l.listing_type === 'offer');
+                    const requests = data.listings.filter(l => l.listing_type === 'request');
+                    
+                    let html = '';
+                    
+                    if (offers.length > 0) {
+                        html += '<div style="margin-bottom: 8px; color: #7ac70c; font-size: 0.85em; font-weight: bold;">🌳 Предлагаю:</div>';
+                        html += offers.map(listing => `
+                            <div style="padding: 8px; margin-bottom: 5px; background: rgba(122,199,12,0.08); border-radius: 8px;">
+                                <span style="color: #e0e0e0;">${listing.item}</span>
+                                <span style="color: #a0a0a0; font-size: 0.8em;">(${listing.category})</span>
+                            </div>
+                        `).join('');
+                    }
+                    
+                    if (requests.length > 0) {
+                        html += '<div style="margin: 10px 0 8px; color: #7ac70c; font-size: 0.85em; font-weight: bold;">🌱 Ищу:</div>';
+                        html += requests.map(listing => `
+                            <div style="padding: 8px; margin-bottom: 5px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                                <span style="color: #e0e0e0;">${listing.item}</span>
+                                <span style="color: #a0a0a0; font-size: 0.8em;">(${listing.category})</span>
+                            </div>
+                        `).join('');
+                    }
+                    
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p style="color: #a0a0a0;">Нет объявлений</p>';
+                }
+            } catch (error) {
+                container.innerHTML = '<p style="color: #a0a0a0;">Недоступно</p>';
+            }
+        }
+
+        // Поиск совпадений
+        async function findMatches() {
+            const container = document.getElementById('fairMatches');
+            if (!container) return;
+            
+            container.innerHTML = '<p style="color: #a0a0a0;">Поиск...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/find_match', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',
+                        limit: 10
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.matches.length > 0) {
+                    container.innerHTML = data.matches.map(match => `
+                        <div style="padding: 10px; margin-bottom: 8px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #7ac70c; font-size: 0.9em;">
+                                    ${match.type === 'offer_match' ? '🌳 Ваше предложение' : '🌱 Ваш запрос'}: ${match.my_item}
+                                </span>
+                                ${match.weight ? `<span style="color: #ffd700; font-size: 0.75em;">⚡ ${match.weight}</span>` : ''}
+                            </div>
+                            <div style="color: #e0e0e0; font-size: 0.85em; margin-top: 3px;">
+                                ↔ ${match.their_item} (${match.node_short})
+                            </div>
+                            <div style="color: #a0a0a0; font-size: 0.75em; margin-top: 3px;">
+                                Совпадение: ${Math.round(match.similarity * 100)}%
+                                ${match.reputation ? ` | Репутация: ${match.reputation}★` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<p style="color: #a0a0a0;">Совпадений пока нет</p>';
+                }
+            } catch (error) {
+                container.innerHTML = '<p style="color: #a0a0a0;">Недоступно</p>';
+            }
+        }
+
+        // Удаление объявления
+        async function removeListing(listingHash) {
+            if (!listingHash) {
+                alert('Нет ID объявления');
+                return;
+            }
+            
+            if (!confirm('Удалить это объявление?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/remove_listing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',
+                        listing_hash: listingHash
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    addChronicle('🗑️', 'Объявление удалено');
+                    loadMyListings();  // Обновляем список
+                } else {
+                    alert('Ошибка: ' + data.message);
+                }
+            } catch (error) {
+                alert('Сервер недоступен: ' + error);
+            }
+        }
+
+        // Поиск кругов взаимопомощи
+        async function findCircles() {
+            const container = document.getElementById('fairCircles');
+            if (!container) return;
+            
+            const maxDepth = document.getElementById('maxDepth')?.value || 4;
+            
+            container.innerHTML = '<p style="color: #a0a0a0;">🔍 Поиск кругов взаимопомощи...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/find_circles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',
+                        max_depth: parseInt(maxDepth)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.circles.length > 0) {
+                    const statsHtml = `
+                        <div style="margin-bottom: 10px; padding: 8px; background: rgba(122,199,12,0.1); border-radius: 6px;">
+                            <span style="color: #7ac70c; font-size: 0.8em;">
+                                Найдено кругов: ${data.count} | 
+                                Средний размер: ${data.stats.avg_circle_size} | 
+                                Участников: ${data.stats.total_participants}
+                            </span>
+                        </div>
+                    `;
+                    
+                    container.innerHTML = statsHtml + data.circles.map((circle, index) => `
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="color: #7ac70c; font-size: 0.9em; font-weight: bold;">
+                                    🔄 Круг #${index + 1} (${circle.circle_size} узла)
+                                </span>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <span style="color: #a0a0a0; font-size: 0.75em;">
+                                        ${(circle.avg_similarity * 100).toFixed(0)}% совпадение
+                                    </span>
+                                    ${circle.diversity_bonus ? 
+                                        '<span style="color: #ffd700; font-size: 0.7em;" title="В круге есть новички!">🌱 +15%</span>' : ''}
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+                                ${circle.path.map((edge, i) => `
+                                    <span style="color: #e0e0e0; font-size: 0.75em;">
+                                        ${edge.from.substring(0, 6)}...${edge.from.substring(edge.from.length - 4)}
+                                    </span>
+                                    ${i < circle.path.length - 1 ? 
+                                        `<span style="color: #7ac70c; font-size: 0.7em;">→</span>` : ''}
+                                `).join('')}
+                                <span style="color: #7ac70c; font-size: 0.7em;">→</span>
+                                <span style="color: #e0e0e0; font-size: 0.75em;">
+                                    ${circle.path[0].from.substring(0, 6)}...
+                                </span>
+                            </div>
+                            
+                            <div style="color: #c0c0c0; font-size: 0.75em; margin-top: 4px;">
+                                ${circle.items_flow.map((item, i) => 
+                                    `${i > 0 ? ' → ' : ''}${item}`
+                                ).join('')}
+                            </div>
+                            
+                            ${circle.reputations ? `
+                            <div style="color: #a0a0a0; font-size: 0.7em; margin-top: 4px;">
+                                ${Object.entries(circle.reputations).map(([node, rep]) => 
+                                    `${node}: ${rep}★`
+                                ).join(' | ')}
+                            </div>` : ''}
+                            
+                            <button onclick="completeCircle(${JSON.stringify(circle).replace(/"/g, '&quot;')})" 
+                                    style="width: 100%; padding: 8px; margin-top: 8px; background: rgba(255,215,0,0.2); border: 1px solid #ffd700; border-radius: 6px; color: #ffd700; cursor: pointer; font-size: 0.8em;">
+                                ✅ Завершить круг
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #a0a0a0;">
+                            <p style="font-size: 0.9em; margin-bottom: 8px;">🌱 Кругов пока нет</p>
+                            <p style="font-size: 0.75em;">Создайте больше объявлений для формирования кругов</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #a0a0a0;">
+                        <p style="font-size: 0.9em;">⚠️ Сервис временно недоступен</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Завершение круга взаимопомощи
+        async function completeCircle(circle) {
+            if (!circle || !circle.participants_full) return;
+            
+            if (!confirm(`Завершить круг из ${circle.circle_size} участников?\nРепутация будет начислена всем!`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/complete_circle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        circle: circle,
+                        node_address: '0x1234...abcd'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    alert(data.message);
+                    findCircles();
+                    loadMyListings();
+                } else {
+                    alert('Ошибка: ' + data.message);
+                }
+            } catch (error) {
+                alert('⚠️ Сервис временно недоступен');
+            }
+        }
+        
+        // Показ задач
+        function showTasks() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🧮 Задачи Леса</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Лес умеет считать, искать и сворачивать вихри!</p>
+                    
+                    <div style="text-align: left; margin-bottom: 20px;">
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(122,199,12,0.1); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showTSP();">
+                            <span style="font-size: 1.2em;">🗺️</span>
+                            <span style="color: #e0e0e0;">Маршрут (TSP)</span>
+                            <span style="color: #a0a0a0; font-size: 0.8em;"> — оптимизация пути</span>
+                        </div>
+                        
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showSHA();">
+                            <span style="font-size: 1.2em;">🔐</span>
+                            <span style="color: #e0e0e0;">Хеш (SHA-256)</span>
+                            <span style="color: #a0a0a0; font-size: 0.8em;"> — мгновенное хеширование</span>
+                        </div>
+                        
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showGrover();">
+                            <span style="font-size: 1.2em;">🔍</span>
+                            <span style="color: #e0e0e0;">Поиск (Гровер)</span>
+                            <span style="color: #a0a0a0; font-size: 0.8em;"> — квантовый поиск</span>
+                        </div>
+                        
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showVortex();">
+                            <span style="font-size: 1.2em;">🌀</span>
+                            <span style="color: #e0e0e0;">TEES-вихрь</span>
+                            <span style="color: #a0a0a0; font-size: 0.8em;"> — вихревое преобразование</span>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // TSP
+        function showTSP() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🗺️ Маршрут (TSP)</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Найди оптимальный путь между точками</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #e0e0e0; font-size: 0.9em;">Количество точек:</label>
+                        <input type="number" id="tspCount" value="100" min="3" max="100000" style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                    </div>
+                    
+                    <button onclick="runTSP()" style="width: 100%; padding: 12px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">🗺️ Решить</button>
+                    
+                    <div id="tspResult" style="margin-top: 15px; display: none;"></div>
+                    
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // SHA-256
+        function showSHA() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🔐 Хеш (SHA-256)</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Мгновенное хеширование через кубоагентов</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #e0e0e0; font-size: 0.9em;">Текст:</label>
+                        <textarea id="shaText" rows="3" placeholder="Введите текст..." style="width: 100%; padding: 10px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;"></textarea>
+                    </div>
+                    
+                    <button onclick="runSHA()" style="width: 100%; padding: 12px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">🔐 Хешировать</button>
+                    
+                    <div id="shaResult" style="margin-top: 15px; display: none;"></div>
+                    
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Гровер
+        function showGrover() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🔍 Поиск (Гровер)</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Квантовый поиск в массиве данных</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #e0e0e0; font-size: 0.9em;">Размер массива:</label>
+                        <input type="number" id="groverCount" value="1000" min="10" max="1000000" style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                    </div>
+                    
+                    <button onclick="runGrover()" style="width: 100%; padding: 12px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">🔍 Искать</button>
+                    
+                    <div id="groverResult" style="margin-top: 15px; display: none;"></div>
+                    
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Вихрь
+        function showVortex() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">🌀 TEES-вихрь</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Вихревое преобразование текста</p>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="color: #e0e0e0; font-size: 0.9em;">Текст:</label>
+                        <textarea id="vortexText" rows="3" placeholder="Введите текст..." style="width: 100%; padding: 10px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;"></textarea>
+                    </div>
+                    
+                    <button onclick="runVortex()" style="width: 100%; padding: 12px; background: #7ac70c; border: none; border-radius: 8px; color: #1a1a2e; cursor: pointer; font-weight: bold;">🌀 Запустить</button>
+                    
+                    <div id="vortexResult" style="margin-top: 15px; display: none;"></div>
+                    
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Запуск TSP
+        async function runTSP() {
+            const count = document.getElementById('tspCount').value;
+            const resultDiv = document.getElementById('tspResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p style="color: #a0a0a0;">🗺️ Решаем...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/task/tsp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: parseInt(count) })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = `
+                        <div style="padding: 15px; background: rgba(122,199,12,0.1); border-radius: 8px; color: #7ac70c;">
+                            ✅ Маршрут найден!<br>
+                            📏 Дистанция: ${data.distance}<br>
+                            🏙️ Точек: ${data.cities_count}<br>
+                            ⚡ Метод: ${data.method}<br>
+                            ${data.agents_used ? '🤝 Агентов: ' + data.agents_used : ''}
+                        </div>
+                    `;
+                    addChronicle('🗺️', 'Решена задача TSP');
+                } else {
+                    resultDiv.innerHTML = '<p style="color: #ff6464;">Ошибка: ' + data.message + '</p>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #ff6464;">Сервер недоступен</p>';
+            }
+        }
+
+        // Запуск SHA-256
+        async function runSHA() {
+            const text = document.getElementById('shaText').value || 'TEES Forest';
+            const resultDiv = document.getElementById('shaResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p style="color: #a0a0a0;">🔐 Хешируем...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/task/sha256', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = `
+                        <div style="padding: 15px; background: rgba(122,199,12,0.1); border-radius: 8px; color: #7ac70c;">
+                            ✅ Хеш: ${data.hash}<br>
+                            ⚡ Метод: ${data.method}
+                        </div>
+                    `;
+                    addChronicle('🔐', 'Вычислен хеш');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #ff6464;">Сервер недоступен</p>';
+            }
+        }
+
+        // Запуск Гровера
+        async function runGrover() {
+            const count = document.getElementById('groverCount').value;
+            const resultDiv = document.getElementById('groverResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p style="color: #a0a0a0;">🔍 Ищем...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/task/grover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: parseInt(count) })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = `
+                        <div style="padding: 15px; background: rgba(122,199,12,0.1); border-radius: 8px; color: #7ac70c;">
+                            ${data.found ? '✅ Найдено!' : '❌ Не найдено'}<br>
+                            📍 Индекс: ${data.index !== null ? data.index : '—'}<br>
+                            ⏱️ Время: ${data.elapsed} сек<br>
+                            📦 Размер: ${data.data_size}<br>
+                            ⚡ Метод: ${data.method}
+                        </div>
+                    `;
+                    addChronicle('🔍', 'Выполнен поиск');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #ff6464;">Сервер недоступен</p>';
+            }
+        }
+
+        // Запуск вихря
+        async function runVortex() {
+            const text = document.getElementById('vortexText').value || 'TEES Forest';
+            const resultDiv = document.getElementById('vortexResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p style="color: #a0a0a0;">🌀 Сворачиваем вихрь...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/task/tees_vortex', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    resultDiv.innerHTML = `
+                        <div style="padding: 15px; background: rgba(122,199,12,0.1); border-radius: 8px; color: #7ac70c;">
+                            ✅ Вихрь свёрнут!<br>
+                            🌀 Вихрь: ${data.vortex_hash.substring(0, 32)}...<br>
+                            🔺 Триада: ${data.triad_hash.substring(0, 32)}...
+                        </div>
+                    `;
+                    addChronicle('🌀', 'Свёрнут TEES-вихрь');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<p style="color: #ff6464;">Сервер недоступен</p>';
+            }
+        }
+
+        // Переключение приватности гео
+        function toggleGeoPrivacy() {
+            const geoEnabled = document.getElementById('geoEnabled').checked;
+            const geoLocation = document.getElementById('geoLocation');
+            
+            if (geoLocation) {
+                geoLocation.style.display = geoEnabled ? 'block' : 'none';
+            }
+            
+            // Если выключили — скрываем гео
+            if (!geoEnabled) {
+                setLocation(false);
+            }
+        }
+        
+        // Установка местоположения
+        async function setLocation(isPublic) {
+            const city = document.getElementById('cityInput')?.value || '';
+            const geoEnabled = document.getElementById('geoEnabled')?.checked || isPublic;
+            
+            if (geoEnabled && !city) {
+                alert('Введите город или используйте координаты');
+                return;
+            }
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/set_location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',
+                        city: geoEnabled ? city : '',
+                        is_public: geoEnabled
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    addChronicle('📍', data.message);
+                } else {
+                    alert(data.message || 'Ошибка установки гео');
+                }
+            } catch (error) {
+                alert('Ошибка установки гео');
+            }
+        }
+        
+        // Получение текущих координат
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        document.getElementById('cityInput').value = `Координаты: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
+                        
+                        try {
+                            const response = await fetch(SERVER_URL + '/fair/set_location', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    node_address: '0x1234...abcd',
+                                    coordinates: [latitude, longitude],
+                                    is_public: true
+                                })
+                            });
+                            
+                            const data = await response.json();
+                            addChronicle('📍', 'Координаты сохранены');
+                            alert('📍 Координаты сохранены!');
+                        } catch (error) {
+                            alert('Ошибка сохранения координат');
+                        }
+                    },
+                    (error) => {
+                        alert('Не удалось получить координаты: ' + error.message);
+                    }
+                );
+            } else {
+                alert('Геолокация не поддерживается браузером');
+            }
+        }
+        
+        // Поиск ближайших узлов
+        async function findNearby() {
+            const container = document.getElementById('nearbyNodes');
+            if (!container) return;
+            
+            container.innerHTML = '<p style="color: #a0a0a0;">🔍 Поиск ближайших узлов...</p>';
+            
+            try {
+                const response = await fetch(SERVER_URL + '/fair/find_nearby', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        node_address: '0x1234...abcd',
+                        radius_km: 50
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.nearby.length > 0) {
+                    container.innerHTML = data.nearby.map((node) => `
+                        <div style="padding: 10px; margin-bottom: 8px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #7ac70c; font-size: 0.85em; font-weight: bold;">
+                                    🌍 ${node.node_short}
+                                </span>
+                                <span style="color: #a0a0a0; font-size: 0.75em;">
+                                    ${node.distance_km > 0 ? node.distance_km + ' км' : node.city}
+                                </span>
+                            </div>
+                            <div style="color: #c0c0c0; font-size: 0.75em; margin-top: 4px;">
+                                Объявлений: ${node.active_listings} | Репутация: ${node.reputation}★
+                            </div>
+                            ${node.categories.length > 0 ? `
+                                <div style="margin-top: 4px;">
+                                    ${node.categories.map(cat => 
+                                        `<span style="display: inline-block; padding: 2px 6px; margin-right: 4px; background: rgba(122,199,12,0.1); border-radius: 4px; color: #7ac70c; font-size: 0.7em;">${cat}</span>`
+                                    ).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #a0a0a0;">
+                            <p style="font-size: 0.9em; margin-bottom: 8px;">🌱 Рядом пока нет узлов</p>
+                            <p style="font-size: 0.75em;">Включите гео и попробуйте снова</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                container.innerHTML = '<p style="color: #a0a0a0;">⚠️ Сервис недоступен</p>';
+            }
+        }
+
+        // Показ заявок леса
+        function showRequests() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">📋 Заявки леса</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Узлы просят помощи — помоги и тебе помогут</p>
+                    
+                    <div style="text-align: left; margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
+                        <div style="padding: 10px; background: rgba(122,199,12,0.1); border-radius: 8px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="font-size: 1.2em;">📦</span>
+                                <span style="font-weight: bold; color: #7ac70c;">TSP 100K городов</span>
+                            </div>
+                            <div style="font-size: 0.8em; color: #a0a0a0; margin-bottom: 8px;">
+                                От: 1GkZf79Q... | Награда: 50 ресурсов
+                            </div>
+                            <button class="modal-btn" onclick="addChronicle('🤝', 'Помощь отправлена: TSP 100K'); alert('🤝 Вы помогли с задачей!')">🤝 Помочь</button>
+                        </div>
+                        
+                        <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="font-size: 1.2em;">💎</span>
+                                <span style="font-weight: bold; color: #7ac70c;">Займ: 100 ресурсов</span>
+                            </div>
+                            <div style="font-size: 0.8em; color: #a0a0a0; margin-bottom: 8px;">
+                                От: 1JS6gmLK... | Возврат: без процентов
+                            </div>
+                            <button class="modal-btn" onclick="addChronicle('💎', 'Долг выдан: 100 ресурсов'); alert('💎 Вы дали в долг!')">💎 Дать в долг</button>
+                        </div>
+                        
+                        <div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span style="font-size: 1.2em;">🧬</span>
+                                <span style="font-weight: bold; color: #7ac70c;">Folding@Home задача</span>
+                            </div>
+                            <div style="font-size: 0.8em; color: #a0a0a0; margin-bottom: 8px;">
+                                От: 1HEoZDLW... | Награда: 30 ресурсов
+                            </div>
+                            <button class="modal-btn" onclick="addChronicle('🤝', 'Помощь отправлена: Folding@Home'); alert('🤝 Вы помогли с задачей!')">🤝 Помочь</button>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        // Переключение внешнего сигнала
+        function toggleSignal(signalId, signalName) {
+            const button = document.getElementById('signal' + signalId.charAt(0).toUpperCase() + signalId.slice(1));
+            
+            if (button.textContent === 'Вкл') {
+                button.textContent = 'Выкл';
+                button.style.background = 'rgba(255,100,100,0.3)';
+                button.style.borderColor = '#ff6464';
+                button.style.color = '#ff6464';
+                addChronicle('📡', 'Подключён источник: ' + signalName);
+            } else {
+                button.textContent = 'Вкл';
+                button.style.background = 'rgba(122,199,12,0.4)';
+                button.style.borderColor = '#7ac70c';
+                button.style.color = '#7ac70c';
+                addChronicle('📡', 'Отключён источник: ' + signalName);
+            }
+        }
+
+        // Показ внешних сигналов
+        function showExternalSignals() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px;">📡 Внешний сигнал</h2>
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Подключите источники, чтобы лес чувствовал мир</p>
+                    
+                    <div style="text-align: left; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(122,199,12,0.15); border-radius: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 1.2em;">🌐</span>
+                            <span style="flex: 1;">Слышать сеть</span>
+                            <button class="modal-btn" id="signalNetwork" onclick="toggleSignal('network', 'Сеть')" style="background: rgba(122,199,12,0.4);">Вкл</button>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 1.2em;">🧠</span>
+                            <span style="flex: 1;">Чувствовать себя</span>
+                            <button class="modal-btn" id="signalCluster" onclick="toggleSignal('cluster', 'Кластер')" style="background: rgba(122,199,12,0.4);">Вкл</button>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 1.2em;">💾</span>
+                            <span style="flex: 1;">Память леса</span>
+                            <button class="modal-btn" id="signalMemory" onclick="toggleSignal('memory', 'Память')" style="background: rgba(122,199,12,0.4);">Вкл</button>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 1.2em;">🌡️</span>
+                            <span style="flex: 1;">Сенсоры устройства</span>
+                            <button class="modal-btn" id="signalSensors" onclick="toggleSignal('sensors', 'Сенсоры')" style="background: rgba(122,199,12,0.4);">Вкл</button>
+                        </div>
+                    
+                    <div style="text-align: center;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        function showExchange() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content">
+                    <h2 style="color: #7ac70c; margin-bottom: 20px;">🤝 Обмен ресурсами</h2>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #a0a0a0;">Адрес узла:</label>
+                        <input type="text" id="exchangeAddress" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: #a0a0a0;">Количество:</label>
+                        <input type="number" id="exchangeAmount" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid #7ac70c; border-radius: 8px; color: #e0e0e0;" />
+                    </div>
+                    <div class="modal-actions">
+                        <button class="modal-btn" onclick="alert('✅ Ресурсы отправлены!')">Отправить</button>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        function showHelp() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
+                <div class="modal-content" style="text-align: left;">
+                    <h2 style="color: #7ac70c; margin-bottom: 15px; text-align: center;">❓ Помощь Леса</h2>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <p>📍 <b>Моё дерево</b> — показать адрес</p>
+                        <p>💎 <b>Ресурсы</b> — проверить баланс</p>
+                        <p>🤝 <b>Поделиться</b> — отправить ресурсы</p>
+                        <p>🌿 <b>Симбиоз</b> — соединиться с узлом</p>
+                        <p>🌳 <b>Соседи</b> — список узлов</p>
+                        <p>🔮 <b>Странник</b> — спросить совет</p>
+                        <p>🏥 <b>Здоровье</b> — состояние леса</p>
+                        <p>🏮 <b>Древо Света</b> — квантовый факел</p>
+                        <p>🧠 <b>Память</b> — фрактальная память</p>
+                        <p>🍄 <b>Грибница</b> — скрытые агенты</p>
+                        <p>🔭 <b>Звездочёт</b> — наблюдение</p>
+                        <p>⚖️ <b>Баланс</b> — экономика сети</p>
+                        <p>📦 <b>Задача</b> — отправить задачу</p>
+                        <p>📜 <b>Свиток</b> — история леса</p>
+                    </div>
+                    <div style="text-align: center; margin-top: 15px;">
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        function toggleBottomPanel() {
+            const content = document.getElementById('bottomContent');
+            const toggle = document.getElementById('bottomToggle');
+            
+            content.classList.toggle('open');
+            toggle.classList.toggle('open');
+        }
+        
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.bottom-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'chat') {
+                document.getElementById('chatTab').style.display = 'block';
+                document.getElementById('chroniclesTab').style.display = 'none';
+                tabs[0].classList.add('active');
+            } else {
+                document.getElementById('chatTab').style.display = 'none';
+                document.getElementById('chroniclesTab').style.display = 'block';
+                tabs[1].classList.add('active');
+            }
+        }
+
+        function handleChatKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const messages = document.getElementById('chatMessages');
+            
+            if (input.value.trim()) {
+                const playerMsg = document.createElement('div');
+                playerMsg.className = 'message player';
+                playerMsg.textContent = input.value;
+                messages.appendChild(playerMsg);
+                
+                const messageText = input.value;
+                input.value = '';
+                
+                // Показываем "думает..."
+                const thinkingMsg = document.createElement('div');
+                thinkingMsg.className = 'message oracle';
+                thinkingMsg.textContent = '🌿 Лес думает...';
+                thinkingMsg.id = 'thinkingMessage';
+                messages.appendChild(thinkingMsg);
+                messages.scrollTop = messages.scrollHeight;
+                
+                try {
+                    // Отправляем запрос к серверу
+                    const response = await fetch(SERVER_URL + '/oracle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            message: messageText,
+                            network_state: {
+                                nodes: 25,
+                                coherence: 0.998,
+                                symbiosis: 12,
+                                resources: 4235
+                            }
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    // Убираем "думает..."
+                    const thinking = document.getElementById('thinkingMessage');
+                    if (thinking) thinking.remove();
+                    
+                    // Показываем ответ
+                    const oracleMsg = document.createElement('div');
+                    oracleMsg.className = 'message oracle';
+                    oracleMsg.textContent = data.response;
+                    messages.appendChild(oracleMsg);
+                    messages.scrollTop = messages.scrollHeight;
+                    
+                } catch (error) {
+                    // Если сервер недоступен
+                    const thinking = document.getElementById('thinkingMessage');
+                    if (thinking) thinking.remove();
+                    
+                    const oracleMsg = document.createElement('div');
+                    oracleMsg.className = 'message oracle';
+                    oracleMsg.textContent = '🌿 Лес временно не слышит... Запустите forest_server.py';
+                    messages.appendChild(oracleMsg);
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            }
+        }
+        
+        // Добавление записей в хронику
+        function addChronicle(icon, text) {
+            const chronicles = document.getElementById('chronicles');
+            const entry = document.createElement('div');
+            entry.className = 'chronicle-entry';
+            entry.innerHTML = `
+                <span class="chronicle-time">${new Date().toLocaleTimeString()}</span>
+                <span class="chronicle-icon">${icon}</span>
+                <span>${text}</span>
+            `;
+            chronicles.appendChild(entry);
+            chronicles.scrollTop = chronicles.scrollHeight;
+        }
+
+        // Лог событий
+        const eventLog = [];
+        
+        function addEvent(icon, text) {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            
+            eventLog.push({ icon, text, time: timeStr });
+            
+            // Ограничиваем лог 50 событиями
+            if (eventLog.length > 50) {
+                eventLog.shift();
+            }
+            
+            updateEventLog();
+        }
+        
+        function updateEventLog() {
+            const container = document.getElementById('eventLog');
+            if (!container) return;
+            
+            container.innerHTML = eventLog.map(event => `
+                <div class="event-entry">
+                    <span class="event-time">${event.time}</span>
+                    <span class="event-icon">${event.icon}</span>
+                    <span>${event.text}</span>
+                </div>
+            `).join('');
+            
+            // Прокрутка вниз
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Загружаем события с сервера
+        async function loadEvents() {
+            try {
+                const response = await fetch(SERVER_URL + '/events');
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.events.length > 0) {
+                    data.events.forEach(event => {
+                        addEvent(event.icon || '📡', event.text || '');
+                    });
+                }
+            } catch (error) {
+                // Сервер недоступен — показываем локальные события
+            }
+        }
+        
+        // Обновляем события каждые 3 секунды
+        setInterval(loadEvents, 3000);
+        
+        // Добавляем первые события
+        addEvent('🌱', 'Лес пробуждается...');
+        addEvent('📡', 'Журнал событий активирован');
+        
+        // Инициализация
+        createStars();
+        createNodeList();
+        toggleBottomPanel();        
+        
+    </script>
+</body>
+</html>

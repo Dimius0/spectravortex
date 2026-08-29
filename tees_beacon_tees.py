@@ -10,6 +10,7 @@ import socket
 import struct
 import threading
 import time
+import math
 import signal
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -26,6 +27,7 @@ from tees_healer_tees import SelfHealingMesh
 from tees_stranger_tees import Stranger
 from tees_cluster import TeesCluster
 from tees_astronomer import AstroModule
+from tees_economy import TEESEconomy
 
 
 class QuantumTorch:
@@ -494,6 +496,29 @@ class PerformanceMetrics:
             'samples': len(self.tick_times)
         }
 
+class ExternalSignal:
+    """
+    🌍 Внешний сигнал — голос реальности.
+    Любой сигнал не шум, а потенциальная информация.
+    """
+    def __init__(self, source: str, frequency: float, intensity: float = 0.5):
+        self.source = source          # откуда: mouse, network, em_field, unknown
+        self.frequency = frequency    # частота (0..1)
+        self.intensity = intensity    # сила (0..1)
+        self.pattern = None           # распознанный паттерн (если есть)
+        self.is_hostile = False       # враждебность (определяется позже)
+        self.repeat_count = 1         # сколько раз повторялся
+        self.received_at = time.time()
+    
+    def get_info(self):
+        return {
+            'source': self.source,
+            'frequency': self.frequency,
+            'intensity': self.intensity,
+            'pattern': self.pattern,
+            'is_hostile': self.is_hostile,
+            'repeat_count': self.repeat_count
+        }
 
 class Beacon:
     """
@@ -553,6 +578,14 @@ class Beacon:
         self.symbiosis = SymbiosisCalculator()
         self.symbiosis_connections = []  # Горячие связи для быстрого доступа
         self.symbiosis_memory = FractalMemory(max_level_0=100)  # 🌀 Фрактал
+
+        # 🌍 Внешнее восприятие
+        self.external_echoes = []          # Эхо внешних сигналов
+        self.external_signals = []         # Последние сигналы
+        self.MAX_EXTERNAL_ECHOES = 100     # Ограничение памяти
+        self.signal_repeat_count = {}      # Счётчик повторов по частотам
+        self._recognized_patterns = set()  # Частоты, о которых уже печатали
+
         self.MAX_HOT_CONNECTIONS = 100  # Максимум горячих связей в RAM
         self.MAX_CHAT_MESSAGES = 50
         self.invited_by = None
@@ -595,12 +628,16 @@ class Beacon:
         # Самовосстановление
         self.healer = SelfHealingMesh(self)
 
-        # ⚛️ TEES-кластер — вычислительное ядро
-        self.cluster = TeesCluster(beacon=self, qubits_per_core=500000)
+        # ⚛️ TEES-кластер — вычислительное ядро - кубы на ядро
+        self.cluster = TeesCluster(beacon=self, qubits_per_core=750000) 
         
         # 🔭 Звездочёт — модуль управления
         self.astronomer = AstroModule(self)
-        
+
+        # 💎 TEES-экономика
+        self.economy = TEESEconomy()
+        self.economy_node_id = self.beacon_id  # Маяк = узел!
+              
         if self.lock_file.exists() and not test_mode:
             try:
                 old_pid = int(self.lock_file.read_text().strip())
@@ -909,6 +946,10 @@ class Beacon:
                 self.symbiosis_connections = self.symbiosis_connections[-self.MAX_HOT_CONNECTIONS:]
             
             self.network_reward(reward, reason=f"symbiosis_{result.get('rarity', 'common')}")
+
+            # 💎 Экономика: симбиоз = связь!
+            if self.economy:
+                self.economy.accrue(self, 'establish_connection')
             
             for neighbor in self.neighbors[:1]:
                 neighbor_id = neighbor.split(':')[0] if ':' in neighbor else neighbor
@@ -991,6 +1032,9 @@ class Beacon:
         self.mine_reward(block_reward, block_height=block['height'])
         
         print(f"⛏️ Глыба #{block['height']} добыта! +{block_reward:.1f} ресурса [{block['hash'][:8]}]")
+        # 💎 Экономика: майнинг = работа!
+        if self.economy:
+            self.economy.accrue(self, 'solve_task')
         self._save_map()
         
         self._broadcast({
@@ -1348,6 +1392,12 @@ class Beacon:
 ║  фрактал      — Фрактальная память                          ║
 ║  кластер      — TEES-кластер                                ║
 ║  звездочёт    — Модуль управления                           ║
+║  датчик       — Балансировка и когерентность ядра           ║
+║  экономика    — TEES-экономика маяка                        ║
+║  охота        — Поиск аномалий в сети                       ║
+║  эхо          — Внешние сигналы и паттерны                  ║
+║  обучение     — Адаптивный автомат агентов                  ║
+║  гровер       — Квантовый поиск по N элементам              ║
 ║  задача       — Отправить задачу                            ║
 ║  отмена       — Отменить задачу                             ║
 ║  свиток       — Показать свиток                             ║
@@ -1516,6 +1566,139 @@ class Beacon:
      RAM: {sky['ram_mb']:.1f} MB
      Кластер: {sky['cluster_stats']['total_qubits']} агентов
                     """)
+
+                elif action in ['датчик', 'sensor']:
+                    balance = self.cluster.measure_balance()
+                    coh = self.cluster.measure_internal_coherence()
+                    
+                    print(f"""
+  📊 Датчик балансировки:
+     Всего агентов: {balance['total_agents']}
+     Средняя нагрузка: {balance['avg']:.2f} задач/агент
+     Максимум: {balance['max']}
+     Минимум: {balance['min']}
+     Дисбаланс: {balance['imbalance']:.2f}
+     Эффективность: {balance['efficiency']*100:.1f}%
+     
+  🔬 Внутренняя когерентность:
+     Агентов: {coh['n']}
+     Средняя: {coh['avg']:.6f}
+     Мин: {coh['min']:.4f}
+     Макс: {coh['max']:.4f}
+     Δ: {coh['delta']:.6f}
+                    """)
+
+                elif action in ['экономика', 'economy']:
+                    if self.economy:
+                        balance = self.economy.get_balance(self)
+                        stats = self.economy.get_stats()
+                        
+                        print(f"""
+  💎 TEES-экономика:
+     Баланс маяка: {balance:.1f}
+     Общая энергия: {stats['total_energy']:.1f}
+     Жирок: {stats['fat_reserves']:.1f}
+     Образование: {stats.get('education', 0):.1f}
+     Социалка: {stats.get('social_fund', 0):.1f}
+     Наука: {stats.get('science', 0):.1f}
+     Эффективность: {stats.get('efficiency', 1.0):.3f}
+     Узлов: {stats['active_nodes']}
+                        """)
+                        
+                        if hasattr(self.economy, 'transaction_memory') and self.economy.transaction_memory:
+                            print(f"  📜 Фрактальная память транзакций:")
+                            print(f"     Глубина: {self.economy.transaction_memory.get_depth()}")
+                            print(f"     Свежих: {len(self.economy.transaction_memory.level_0)}")
+                        
+                        self.economy.verify_balance()                       
+
+                elif action in ['охота', 'hunt']:
+                    anomalies = []
+                    
+                    # Проверяем агентов (первые 1000 для скорости)
+                    for q in self.cluster.qubits[:1000]:
+                        if q.tasks_completed == 0 and q.active:
+                            anomalies.append(f"Агент {q.id}: нет задач")
+                        if q.coherence < 0.9:
+                            anomalies.append(f"Агент {q.id}: низкая когерентность {q.coherence:.4f}")
+                    
+                    # Проверяем очередь задач
+                    stuck_tasks = [t for t in self.astronomer.tasks_queue if t['status'] != 'pending']
+                    if stuck_tasks:
+                        anomalies.append(f"Зависших задач: {len(stuck_tasks)}")
+                    
+                    # Проверяем балансировку
+                    balance = self.cluster.measure_balance()
+                    if balance['efficiency'] < 0.5:
+                        anomalies.append(f"Плохая балансировка: {balance['efficiency']*100:.1f}%")
+                    
+                    if anomalies:
+                        print(f"  🔍 Охотник нашёл {len(anomalies)} аномалий:")
+                        for a in anomalies[:10]:
+                            print(f"    {a}")
+                    else:
+                        print(f"  🔍 Охотник: всё чисто! Аномалий нет.")
+
+                elif action in ['эхо', 'echo']:
+                    print(f"""
+  🌍 Внешние сигналы:
+     Всего эхо: {len(self.external_echoes)}
+     Последних сигналов: {len(self.external_signals)}
+     Распознано паттернов: {sum(1 for e in self.external_echoes if e.get('pattern') is not None)}
+     
+  📜 Последние сигналы:
+                    """)
+                    
+                    for sig in self.external_signals[-10:]:
+                        pattern_note = " ✅" if sig.pattern is not None else ""
+                        print(f"    {sig.source}: {sig.frequency:.2f} (повторов: {sig.repeat_count}){pattern_note}")
+                    
+                    if self.external_echoes:
+                        print(f"\n  🔊 Эхо в памяти:")
+                        for echo in self.external_echoes[-5:]:
+                            print(f"    {echo['source']}: {echo['frequency']:.2f} (интенсивность: {echo['intensity']:.2f})")        
+
+                elif action in ['обучение', 'learn']:
+                    stats = self.cluster.adaptive.get_stats()
+                    
+                    print(f"""
+  🧠 Адаптивный автомат:
+     Экспериментов: {stats['experiments']}
+     Лучший процент агентов: {stats['best_percent']}%
+     Лучшее время: {stats['best_time']:.3f} сек
+     Среднее время: {stats['avg_time']:.3f} сек
+                    """)
+                    
+                    if stats['experiments'] > 0:
+                        print(f"  📜 История (последние 10):")
+                        for h in self.cluster.adaptive.history[-10:]:
+                            print(f"    {h['n_cities']:>8d} городов | {h['percent']:3d}% агентов | {h['time']:.3f} сек")        
+
+                elif action in ['гровер', 'grover']:
+                    if len(cmd) < 2:
+                        print("  🔍 Использование: гровер <элементов>")
+                    else:
+                        try:
+                            n_items = int(cmd[1])
+                            target = n_items - 1  # Ищем последний (худший случай)
+                            data = list(range(n_items))
+                            
+                            print(f"  🔍 Поиск {target} среди {n_items} элементов...")
+                            
+                            import time as time_grover
+                            start_time = time_grover.time()
+                            
+                            result = self.cluster.grover_search_parallel(data, target)
+                            
+                            elapsed = time_grover.time() - start_time
+                            
+                            if result['found']:
+                                print(f"  ✅ Найден на индексе {result['index']} за {elapsed:.4f} сек")
+                                print(f"  📊 Партиций: {result.get('partitions', 1)}")
+                            else:
+                                print(f"  ❌ Не найден за {elapsed:.4f} сек")
+                        except ValueError:
+                            print("  ❌ Нужно число!")                
                 
                 elif action in ['задача', 'task']:
                     if len(cmd) < 2:
@@ -1539,6 +1722,7 @@ class Beacon:
                                 n_cities = int(cmd[3]) if len(cmd) > 3 else 10
                                 cities = [(random.random() * 100, random.random() * 100) for _ in range(n_cities)]
                                 task = {'type': 'tsp', 'cities': cities}
+                                
                             else:
                                 print(f"  ❌ Неизвестный тип: {task_type}")
                                 task = None
@@ -1590,6 +1774,18 @@ class Beacon:
                             task = {'type': 'tsp', 'cities': cities}
                             task_id = self.astronomer.receive_task(task, self.portal)
                             print(f"  📦 TSP задача ({n_cities} городов): {task_id[:8]}...")
+
+                        elif task_type == 'grover':
+                                n_items = int(cmd[2]) if len(cmd) > 2 else 100000
+                                target = int(cmd[3]) if len(cmd) > 3 else n_items - 1
+                                
+                                task = {
+                                    'type': 'grover',
+                                    'n_items': n_items,
+                                    'target': target
+                                }
+                                task_id = self.astronomer.receive_task(task, self.portal)
+                                print(f"  📦 Grover задача ({n_items} элементов, цель {target}): {task_id[:8]}...")    
                         
                         else:
                             print(f"  ❌ Неизвестный тип задачи: {task_type}")
@@ -1771,9 +1967,14 @@ class Beacon:
         last_auto_scale = 0
         last_virtual_tick = 0
         last_astronomer_tick = 0
+        last_external_listen = 0
+        
         
         self._last_power = self.get_power()
         self._last_power_time = time.time()
+        self._last_neighbors_count = 0
+        self._last_blocks_count = 0
+        self._last_glow = 0.0
         
         # Базовый интервал — увеличен для экономии CPU
         BASE_SLEEP = 2
@@ -1810,8 +2011,13 @@ class Beacon:
                 self._auto_scale()
                 last_auto_scale = current_time
 
+            # 🌍 Прослушивание внешнего мира — раз в 15 секунд
+            #if current_time - last_external_listen >= 15:
+            #    self._listen_external_world()
+            #   last_external_listen = current_time    
+
             # 🔭 Звездочёт — раз в 30 секунд
-            if current_time - last_astronomer_tick >= 30:
+            if current_time - last_astronomer_tick >= 3:
                 self.astronomer.tick()
                 last_astronomer_tick = current_time    
             
@@ -1830,21 +2036,32 @@ class Beacon:
             # Быстрый статус — раз в 30 секунд
             if current_time - last_quick_status >= 30:
                 power = self.get_power()
-                elapsed = current_time - self._last_power_time
-                rate = (power - self._last_power) / elapsed if elapsed > 0 else 0
                 
-                mem_stats = self.memory_optimizer.get_stats()
-                mem_note = ""
-                if mem_stats['optimization_active']:
-                    mem_note = f" | 🧠 -{mem_stats['saved_total']:.1f}MB"
+                # Проверяем: изменилось ли что-то?
+                if (power != self._last_power or
+                    len(self.neighbors) != self._last_neighbors_count or
+                    len(self.adventure_map) != self._last_blocks_count or
+                    abs(self.glow - self._last_glow) > 0.0001):
+                    
+                    elapsed = current_time - self._last_power_time
+                    rate = (power - self._last_power) / elapsed if elapsed > 0 else 0
+                    
+                    mem_stats = self.memory_optimizer.get_stats()
+                    mem_note = ""
+                    if mem_stats['optimization_active']:
+                        mem_note = f" | 🧠 -{mem_stats['saved_total']:.1f}MB"
+                    
+                    print(f"  ⚡ Ресурс: {power:.1f} (+{rate:.1f}/сек) | "
+                          f"Соседей: {len(self.neighbors)} | "
+                          f"Глыб: {len(self.adventure_map)} | "
+                          f"Свечение: {self.glow:.4f}{mem_note}")
+                    
+                    self._last_power = power
+                    self._last_neighbors_count = len(self.neighbors)
+                    self._last_blocks_count = len(self.adventure_map)
+                    self._last_glow = self.glow
+                    self._last_power_time = current_time
                 
-                print(f"  ⚡ Ресурс: {power:.1f} (+{rate:.1f}/сек) | "
-                      f"Соседей: {len(self.neighbors)} | "
-                      f"Глыб: {len(self.adventure_map)} | "
-                      f"Свечение: {self.glow:.4f}{mem_note}")
-                
-                self._last_power = power
-                self._last_power_time = current_time
                 last_quick_status = current_time
             
             # Полный статус — раз в 5 минут
@@ -2217,6 +2434,133 @@ class Beacon:
         total_nodes = neighbors_count + 1
         self.quantum_torch.check(total_nodes, self.glow)
 
+    def _listen_external_world(self):
+        """
+        🌍 Прослушивание внешнего мира.
+        В реальной TEES — это TCP, сенсоры, мышь, ЭМ-поля.
+        В тестовом режиме — детерминированный сигнал + системные метрики.
+        """
+        # 1. Детерминированный внешний сигнал (не случайный!)
+        # Используем время и состояние сети для генерации
+        deterministic_freq = math.sin(time.time() * 0.5) * 0.5 + 0.5
+        self.receive_external_signal(
+            source='deterministic_world',
+            frequency=deterministic_freq,
+            intensity=0.4
+        )
+        
+        # 2. Сигнал от соседей (если есть)
+        if self.neighbors:
+            neighbors_freq = min(1.0, len(self.neighbors) / 50.0)
+            self.receive_external_signal(
+                source='network_activity',
+                frequency=neighbors_freq,
+                intensity=0.6
+            )
+        
+        # 3. Сигнал от кластера (внутренняя активность)
+        if hasattr(self, 'cluster') and self.cluster:
+            cluster_load = min(1.0, self.cluster.tasks_total / 100.0)
+            self.receive_external_signal(
+                source='cluster_activity',
+                frequency=cluster_load,
+                intensity=0.5
+            )
+        
+        # 4. Сигнал от памяти (самонаблюдение)
+        if self.memory_optimizer:
+            mem_stats = self.memory_optimizer.get_stats()
+            mem_pressure = min(1.0, mem_stats['current'] / 2000.0)
+            self.receive_external_signal(
+                source='memory_pressure',
+                frequency=mem_pressure,
+                intensity=0.3
+            )    
+
+    # Константы
+    MAX_SIGNALS = 50
+    FREQUENCY_TOLERANCE = 0.05
+    PATTERN_THRESHOLD = 3
+    ECHO_INTENSITY_INCREMENT = 0.1
+    MAX_ECHO_INTENSITY = 1.0
+    INITIAL_ECHO_MULTIPLIER = 0.3
+    
+    def receive_external_signal(self, source: str, frequency: float, intensity: float = 0.5):
+        """🌍 Приём внешнего сигнала. Любой сигнал ценен — сохраняем ВСЁ!"""
+        # Валидация
+        if not source:
+            return None
+        if not 0 <= frequency <= 1:
+            frequency = max(0, min(1, frequency))
+        if not 0 <= intensity <= 1:
+            intensity = max(0, min(1, intensity))
+        
+        signal = ExternalSignal(source, frequency, intensity)
+        
+        # 1. Сохраняем сигнал
+        self.external_signals.append(signal)
+        if len(self.external_signals) > self.MAX_SIGNALS:
+            self.external_signals.pop(0)
+        
+        # 2. Обновляем счётчик частоты
+        freq_key = round(frequency, 2)
+        self.signal_repeat_count[freq_key] = self.signal_repeat_count.get(freq_key, 0) + 1
+        
+        # 3. Ищем или создаём эхо
+        echo = self._find_or_create_echo(signal, freq_key)
+        
+        # 4. Обновляем интенсивность
+        echo['intensity'] = min(
+            self.MAX_ECHO_INTENSITY,
+            echo.get('intensity', 0.3) + self.ECHO_INTENSITY_INCREMENT
+        )
+        echo['repeat_count'] = self.signal_repeat_count[freq_key]
+        
+        # 5. Управляем памятью
+        if len(self.external_echoes) > self.MAX_EXTERNAL_ECHOES:
+            self._compress_old_echoes()
+        
+        # 6. Проверяем паттерн (печатаем только при ПЕРВОМ распознавании!)
+        if self.signal_repeat_count[freq_key] >= self.PATTERN_THRESHOLD:
+            signal.pattern = freq_key
+            # Печатаем только если раньше не печатали для этой частоты
+            if freq_key not in self._recognized_patterns:
+                print(f"  🌍 Паттерн распознан: {source} (частота {frequency:.2f}, повторов: {self.signal_repeat_count[freq_key]})")
+                self._recognized_patterns.add(freq_key)
+        
+        return signal
+    
+    def _find_or_create_echo(self, signal, freq_key):
+        """Ищем эхо или создаём новое."""
+        for echo in self.external_echoes:
+            if abs(echo.get('frequency', 0) - signal.frequency) < self.FREQUENCY_TOLERANCE:
+                signal.repeat_count = self.signal_repeat_count[freq_key]
+                return echo
+        
+        echo = {
+            'source': signal.source,
+            'frequency': signal.frequency,
+            'intensity': signal.intensity * self.INITIAL_ECHO_MULTIPLIER,
+            'first_seen': time.time(),
+            'repeat_count': self.signal_repeat_count[freq_key],
+            'pattern': None
+        }
+        self.external_echoes.append(echo)
+        return echo
+    
+    def _compress_old_echoes(self):
+        """Сворачиваем старые эхо в архетипы."""
+        old = self.external_echoes[:20]
+        archetype = {
+            'source': 'archetype',
+            'frequency': sum(e['frequency'] for e in old) / len(old),
+            'intensity': 0.5,
+            'first_seen': time.time(),
+            'repeat_count': max(e['repeat_count'] for e in old),
+            'pattern': 'archetype'
+        }
+        self.external_echoes = [archetype] + self.external_echoes[20:]    
+
     def _auto_symbiosis(self):
         """
         Авто-поддержка выживания: помогаем набрать минимум 3 связи.
@@ -2431,12 +2775,28 @@ if __name__ == "__main__":  # ← БЕЗ отступа!
     test_mode = True
     
     # Если переданы аргументы
+    bootstrap = None
+    
     if len(sys.argv) > 1:
-        scroll = sys.argv[1]
+        if sys.argv[1].isdigit():
+            port = int(sys.argv[1])
+        else:
+            scroll = sys.argv[1]
+    
     if len(sys.argv) > 2:
-        port = int(sys.argv[2])
+        if sys.argv[2].isdigit():
+            port = int(sys.argv[2])
+        else:
+            bootstrap = sys.argv[2]
+    
+    if len(sys.argv) > 3:
+        bootstrap = sys.argv[3]
     
     print(f"🏮 Запуск маяка: scroll={scroll[:8]}..., port={port}")
+
+    # Если порт не 8333 — подключаемся к первому маяку!
+    if port != 8333 and bootstrap is None:
+        bootstrap = "127.0.0.1:8333"
     
-    beacon = Beacon(scroll, port=port, test_mode=test_mode)
+    beacon = Beacon(scroll, port=port, bootstrap=bootstrap, test_mode=test_mode)
     beacon.light()                

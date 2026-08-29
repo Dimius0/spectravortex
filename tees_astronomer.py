@@ -4,6 +4,7 @@
 import hashlib
 import time
 
+
 class AstroModule:
     """
     🔭 Звездочёт — модуль управления.
@@ -18,9 +19,9 @@ class AstroModule:
         self.results_cache = {}  # Кэш результатов
         self.decision_history = []  # История решений
     
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     # 🔍 НАБЛЮДЕНИЕ
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     
     def look_at_sky(self):
         """Посмотреть на сеть — что видно?"""
@@ -36,9 +37,9 @@ class AstroModule:
         self.observations.append(sky)
         return sky
     
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     # 🧠 РЕШЕНИЯ
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     
     def decide(self):
         """Самоназначение: что делать дальше?"""
@@ -58,14 +59,14 @@ class AstroModule:
         self.mode = 'observation'
         return {'action': 'observe'}
     
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     # 📦 ЗАДАЧИ
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     
     def receive_task(self, task, from_portal=None):
         """Принять задачу от сети."""
         task_id = hashlib.sha256(
-            f"{task.get('type')}:{task.get('data')}:{time.time()}".encode()
+            f"{task.get('type')}:{task.get('data', task.get('n_items', ''))}:{time.time()}".encode()
         ).hexdigest()[:16]
         
         self.tasks_queue.append({
@@ -90,15 +91,37 @@ class AstroModule:
             
             # Выбираем метод в зависимости от типа задачи
             if task.get('type') == 'sha256':
-                result = self.cluster.benchmark_sha256(1)
+                data = task.get('data', 'TEES task')
+                result = hashlib.sha256(data.encode()).hexdigest()
+                task_entry['result'] = {'hash': result}
+                task_entry['status'] = 'completed'
+
+            elif task.get('type') == 'grover':
+                n_items = task.get('n_items', 100000)
+                target = task.get('target', n_items - 1)
+                
+                data = list(range(n_items))
+                
+                result = self.cluster.grover_search_parallel(data, target)
+                
                 task_entry['result'] = result
                 task_entry['status'] = 'completed'
+
             elif task.get('type') == 'tsp':
                 cities = task.get('cities', [])
                 n_cities = len(cities)
                 
                 if n_cities > 100:
-                    result = self.cluster.solve_tsp_massive_parallel(cities)
+                    # 🧠 Спросим автомат, сколько агентов использовать
+                    optimal_percent = self.cluster.adaptive.get_optimal_percent(
+                        n_cities, 
+                        current_coh=self.beacon.glow
+                    )
+                    
+                    result = self.cluster.solve_tsp_massive_parallel(
+                        cities, 
+                        agents_percent=optimal_percent
+                    )
                 elif n_cities > 50:
                     result = self.cluster.solve_tsp_parallel(cities, n_partitions=10)
                 else:
@@ -113,21 +136,23 @@ class AstroModule:
             elapsed = time.time() - start_time
             task_entry['elapsed'] = elapsed
             
+            # Записываем в адаптивный автомат для TSP
+            if task.get('type') == 'tsp' and task_entry['status'] == 'completed':
+                n_cities = len(cities)
+                if n_cities > 100:
+                    optimal_percent = self.cluster.adaptive.get_optimal_percent(n_cities)
+                    self.cluster.adaptive.record(n_cities, optimal_percent, elapsed)
+            
             results.append(task_entry)
-        
-        # Убираем обработанные из очереди (ПОСЛЕ цикла!)
-        self.tasks_queue = [t for t in self.tasks_queue if t['status'] == 'pending']
-        
-        return results
         
         # Убираем обработанные из очереди
         self.tasks_queue = [t for t in self.tasks_queue if t['status'] == 'pending']
         
         return results
     
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     # 🌐 СЕТЬ
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     
     def share_results(self):
         """Поделиться результатами с сетью."""
@@ -143,9 +168,9 @@ class AstroModule:
                 'from': self.beacon.portal
             })
     
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     # 📊 СТАТИСТИКА
-    # ═══════════════════════════════════════════
+    # ═══════════════════════════════════════
     
     def get_stats(self):
         """Статистика Звездочёта."""
@@ -170,7 +195,20 @@ class AstroModule:
                     task_type = r['task'].get('type', '?')
                     elapsed = r.get('elapsed', 0)
                     status = r.get('status', '?')
-                    print(f"    ⏱️ {task_type}: {elapsed:.3f} сек ({status})")
+                    
+                    if task_type == 'grover' and status == 'completed':
+                        gr = r.get('result', {})
+                        found = "✅ найден" if gr.get('found') else "❌ не найден"
+                        idx = gr.get('index', -1)
+                        print(f"    🔍 grover: {found} (индекс {idx}) за {elapsed:.4f} сек")
+                    elif task_type == 'sha256' and status == 'completed':
+                        h = r.get('result', {}).get('hash', '')[:16]
+                        print(f"    🔐 sha256: {h}... за {elapsed:.4f} сек")
+                    elif task_type == 'tsp' and status == 'completed':
+                        d = r.get('result', {}).get('distance', 0)
+                        print(f"    🗺️ tsp: дистанция {d:.2f} за {elapsed:.3f} сек")
+                    else:
+                        print(f"    ⏱️ {task_type}: {elapsed:.3f} сек ({status})")
         
         elif decision['action'] == 'guide':
             # Помогаем сети — запускаем симбиоз
@@ -183,7 +221,7 @@ class AstroModule:
         })
         
         return decision
-
+    
     def cancel_task(self, task_id):
         """Отменить задачу по ID."""
         for task_entry in self.tasks_queue:
@@ -191,4 +229,4 @@ class AstroModule:
                 self.tasks_queue.remove(task_entry)
                 task_entry['status'] = 'cancelled'
                 return True
-        return False    
+        return False
