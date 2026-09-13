@@ -25,6 +25,9 @@ class SelfHealingMesh:
         self.watchlist = {}       # beacon_id -> время последнего heartbeat
         self.replicated = []      # список восстановленных маяков
         self.fragments = {}       # beacon_id -> список фрагментов
+        # 🧬 Кэш фракталов от соседей (для сетевого поиска)
+        self.fractal_cache = {}   # beacon_id -> {'fractals': [...], 'updated_at': ts}
+        self.FRACTAL_TTL = 3600   # 1 час
         self.lock = threading.Lock()  # ✅ Блокировка для потокобезопасности
     
     def heartbeat(self, beacon_id: str):
@@ -111,6 +114,10 @@ class SelfHealingMesh:
             # Храним только последние N фрагментов (триаду)
             if len(self.fragments[beacon_id]) > self.MAX_FRAGMENTS:
                 self.fragments[beacon_id] = self.fragments[beacon_id][-self.MAX_FRAGMENTS:]
+
+            # 🧬 Если в данных есть фракталы — сохраняем в кэш
+            if 'fractals' in data:
+                self._store_fractals(beacon_id, data['fractals'])    
             
             # ✅ Ограничиваем общее количество фрагментов
             total_fragments = sum(len(f) for f in self.fragments.values())
@@ -126,6 +133,29 @@ class SelfHealingMesh:
                 
                 if oldest_beacon:
                     del self.fragments[oldest_beacon]
+
+    def _store_fractals(self, beacon_id: str, fractals: list):
+        """🧬 Сохранить фракталы соседа в кэш для сетевого поиска.
+        
+        ВАЖНО: вызывается из store_fragment, который УЖЕ держит self.lock.
+        Не берём lock повторно — это deadlock!
+        """
+        if not fractals or not isinstance(fractals, list):
+            return
+        
+        self.fractal_cache[beacon_id] = {
+            'fractals': fractals,
+            'updated_at': time.time()
+        }
+        
+        # Чистим устаревшие записи
+        now = time.time()
+        expired = [
+            bid for bid, entry in self.fractal_cache.items()
+            if now - entry.get('updated_at', 0) > self.FRACTAL_TTL
+        ]
+        for bid in expired:
+            del self.fractal_cache[bid]                
     
     def heal(self, lost_beacon_id: str):
         # ✅ Не пытаемся лечить себя

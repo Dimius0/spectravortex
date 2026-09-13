@@ -1,5 +1,6 @@
 # forest_server.py
 # 🌲 Сервер для Голоса Леса — связывает HTML с DeepSeek API
+# Версия 2.0 с улучшениями производительности и безопасности
 
 import http.server
 import json
@@ -10,11 +11,15 @@ import time
 import hashlib
 import re
 import gc
-import math  # ← ДОБАВЛЕНО: math наверху
+import math
+import threading
+import os
+import socket
 from pathlib import Path
-from typing import List, Dict, Optional, Set
-from dataclasses import dataclass, field  # ← УБРАН asdict (не используется)
+from typing import List, Dict, Optional, Set, Tuple
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Импортируем маяк (если доступен)
 try:
@@ -42,7 +47,7 @@ except ImportError:
     FRACTAL_MEMORY_AVAILABLE = False
     print("⚠️ FractalMemory не найдена, использую простую память")
 
-# ← ДОБАВЛЕНО: TEES-функции наверху
+# TEES-функции
 try:
     from tees_core_tees import tees_recursive_vortex, tees_triad_collapse
     TEES_CORE_AVAILABLE = True
@@ -50,8 +55,129 @@ except ImportError:
     TEES_CORE_AVAILABLE = False
     print("⚠️ tees_core_tees не найден")
 
-# ← ДОБАВЛЕНО: Флаг отладки
-DEBUG = False
+# ДНК-память
+try:
+    from tees_dna_memory import DNAMemory
+    DNA_MEMORY_AVAILABLE = True
+    print("🧬 ДНК-память загружена")
+except ImportError as e:
+    DNA_MEMORY_AVAILABLE = False
+    print(f"⚠️ ДНК-память не найдена: {e}")
+
+# 🧬 Фрактальный геном смыслов (новое ядро ярмарки)
+try:
+    from tees_fractal_image import FractalImage
+    from tees_fractal_search import FractalSearch, fractal_similarity
+    from tees_listing import Listing as FractalListing
+    FRACTAL_SEARCH_AVAILABLE = True
+    print("🧬 Фрактальный поиск загружен")
+except ImportError as e:
+    FRACTAL_SEARCH_AVAILABLE = False
+    print(f"⚠️ Фрактальный поиск не найден: {e}")        
+
+# Флаг отладки
+DEBUG = os.environ.get('TEES_DEBUG', 'false').lower() == 'true'
+
+# Максимальный размер POST-запроса (10 МБ)
+MAX_POST_SIZE = 10 * 1024 * 1024
+
+# 🔐 Динамический реестр порталов (в RAM!)
+import threading
+import time
+from typing import Optional, Dict, Any
+
+class PortalRegistry:
+    """Потокобезопасный динамический реестр узлов сети."""
+    
+    def __init__(self, ttl_seconds: int = 300):
+        self._registry: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.RLock()
+        self._ttl = ttl_seconds
+    
+    def register_node(self, portal: str, ip: str, port: int, api_port: int) -> None:
+        with self._lock:
+            self._registry[portal] = {
+                'ip': ip,
+                'p2p_port': port,
+                'api_port': api_port,
+                'registered_at': time.time(),
+                'last_seen': time.time(),
+                'alive': True
+            }
+            print(f"🔐 Узел зарегистрирован: {portal[:12]}... → {ip}:{port}")
+    
+    def update_node(self, portal: str, **kwargs) -> bool:
+        with self._lock:
+            if portal in self._registry:
+                self._registry[portal].update(kwargs)
+                self._registry[portal]['last_seen'] = time.time()
+                self._registry[portal]['alive'] = True
+                return True
+            return False
+    
+    def mark_alive(self, portal: str) -> bool:
+        return self.update_node(portal)
+    
+    def mark_dead(self, portal: str) -> None:
+        with self._lock:
+            if portal in self._registry:
+                self._registry[portal]['alive'] = False
+                print(f"💀 Узел помечен как мёртвый: {portal[:12]}...")
+    
+    def get_node_info(self, portal: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            node = self._registry.get(portal)
+            if node and self._is_alive(node):
+                return node.copy()
+            return None
+    
+    def get_all_nodes(self) -> Dict[str, Dict[str, Any]]:
+        with self._lock:
+            self._cleanup_expired()
+            return {
+                portal: info.copy()
+                for portal, info in self._registry.items()
+                if self._is_alive(info)
+            }
+    
+    def remove_node(self, portal: str) -> None:
+        with self._lock:
+            if portal in self._registry:
+                del self._registry[portal]
+                print(f"🗑️ Узел удалён из реестра: {portal[:12]}...")
+    
+    def get_registry_size(self) -> int:
+        with self._lock:
+            return len(self.get_all_nodes())
+    
+    def _is_alive(self, node: Dict[str, Any]) -> bool:
+        if not node.get('alive', False):
+            return False
+        last_seen = node.get('last_seen', 0)
+        return (time.time() - last_seen) < self._ttl
+    
+    def _cleanup_expired(self) -> None:
+        current_time = time.time()
+        expired_portals = [
+            portal for portal, info in self._registry.items()
+            if (current_time - info.get('last_seen', 0)) >= self._ttl
+        ]
+        for portal in expired_portals:
+            del self._registry[portal]
+            print(f"⏰ Узел удалён по TTL: {portal[:12]}...")
+
+# Глобальный экземпляр реестра
+DYNAMIC_PORTAL_REGISTRY = PortalRegistry(ttl_seconds=300)
+
+# Функции-обёртки
+def register_node(portal: str, ip: str, port: int, api_port: int):
+    DYNAMIC_PORTAL_REGISTRY.register_node(portal, ip, port, api_port)
+
+def get_node_info(portal: str):
+    return DYNAMIC_PORTAL_REGISTRY.get_node_info(portal)
+
+def get_all_nodes():
+    return DYNAMIC_PORTAL_REGISTRY.get_all_nodes()
 
 @dataclass
 class Listing:
@@ -61,9 +187,9 @@ class Listing:
     item: str
     description: str
     category: str = 'общее'
-    location: str = ''  # Город/район (пусто = анонимно)
-    geo_enabled: bool = False  # Включено ли гео
-    coordinates: tuple = None  # (lat, lon) — опционально, для точного поиска
+    location: str = ''
+    geo_enabled: bool = False
+    coordinates: tuple = None
     created_at: float = field(default_factory=time.time)
     status: str = 'active'
     matched_nodes: Set[str] = field(default_factory=set)
@@ -74,12 +200,12 @@ class Listing:
         self.listing_hash = self._generate_hash()
     
     def _generate_hash(self) -> str:
-        """Генерация хеша объявления (без гео для анонимности)"""
+        """Генерация хеша объявления"""
         data = f"{self.node_address}:{self.listing_type}:{self.item}:{self.created_at}"
         return hashlib.sha256(data.encode()).hexdigest()[:16]
     
     def to_dict(self) -> Dict:
-        """Преобразование в словарь для отправки (с учётом приватности)"""
+        """Преобразование в словарь для отправки"""
         result = {
             'node_address': self.node_address,
             'listing_type': self.listing_type,
@@ -94,7 +220,6 @@ class Listing:
             'location': self.location if self.geo_enabled else 'скрыто 🔒'
         }
         
-        # Координаты передаём только если гео включено
         if self.geo_enabled and self.coordinates:
             result['coordinates'] = self.coordinates
         
@@ -110,26 +235,35 @@ class FairMarket:
             'информация', 'поддержка', 'связи', 'общее'
         ]
         
-        # Статистика узлов
         self.node_stats: Dict[str, Dict] = {}
-        self.node_connections: Dict[str, Set[str]] = {}  # граф связей через ярмарку
+        self.node_connections: Dict[str, Set[str]] = {}
+
+        # Кэш схожести текстов (ограниченный)
+        self._similarity_cache: Dict[str, float] = {}
+        self._similarity_cache_max = 1000
         
-        # Кэширование кругов
-        self.circles_cache: Dict[str, tuple] = {}  # node_address -> (timestamp, circles)
-        self.CACHE_TTL = 30  # 30 секунд
-        self.MAX_CACHE_SIZE = 100  # Максимум 100 записей в кэше
+        # Кэширование
+        self.circles_cache: Dict[str, Tuple[float, List]] = {}
+        self.CACHE_TTL = 30
+        self.MAX_CACHE_SIZE = 100
         
         # Управление неактивными узлами
-        self.NODE_INACTIVITY_TIMEOUT = 3600  # 1 час неактивности
-        self.last_activity: Dict[str, float] = {}  # время последней активности узла
+        self.NODE_INACTIVITY_TIMEOUT = 3600
+        self.last_activity: Dict[str, float] = {}
         
-        # Ограничение объявлений
-        self.MAX_LISTINGS = 1000  # Максимум объявлений
-
-        # Гео-данные узлов (приватно!)
-        self.node_locations: Dict[str, Dict] = {}  # node_address -> {city, coordinates, is_public}
+        # Ограничения
+        self.MAX_LISTINGS = 1000
         
-        # Словарь городов для нормализации
+        # Гео-данные
+        self.node_locations: Dict[str, Dict] = {}
+        
+        # Блокировки для потокобезопасности
+        self.listings_lock = threading.Lock()
+        self.stats_lock = threading.Lock()
+        self.connections_lock = threading.Lock()
+        self.cache_lock = threading.Lock()
+        
+        # Словарь городов
         self.city_aliases = {
             'москва': 'Москва',
             'мск': 'Москва',
@@ -142,17 +276,14 @@ class FairMarket:
         
     def add_listing(self, node_address: str, listing_type: str, item: str, 
                    description: str = "", category: str = "общее") -> tuple:
-        """
-        Добавление нового объявления.
-        Возвращает (listing, circles) — объявление и автоматически найденные круги.
-        """
+        """Добавление нового объявления (потокобезопасно)"""
         
-        # Нормализация данных
+        # Нормализация
         item = self._normalize_text(item)
         description = self._normalize_text(description)
         category = self._normalize_category(category)
-
-        # Обновляем активность узла
+        
+        # Обновляем активность
         self._update_node_activity(node_address)
         
         # Очищаем неактивных
@@ -170,57 +301,66 @@ class FairMarket:
             category=category
         )
         
-        self.listings.append(listing)
+        # Потокобезопасное добавление
+        with self.listings_lock:
+            self.listings.append(listing)
         
-        # Обновляем статистику узла
+        # Обновляем статистику
         self._update_node_stats(node_address, 'add', listing_type)
         
-        # Очищаем кэш кругов (данные изменились)
-        self.circles_cache.clear()
+        # Очищаем кэш
+        with self.cache_lock:
+            self.circles_cache.clear()
         
         # Автоматический поиск совпадений
         self._find_matches_for_listing(listing)
         
-        # Автоматически ищем круги
+        # Ищем круги
         circles = self.find_clearing_circles(node_address)
         
         return listing, circles
     
     def remove_listing(self, listing_hash: str, node_address: str) -> bool:
-        """Удаление объявления"""
-        for i, listing in enumerate(self.listings):
-            if listing.listing_hash == listing_hash and listing.node_address == node_address:
-                # Обновляем статистику
-                self._update_node_stats(node_address, 'remove', listing.listing_type)
-                listing.status = 'cancelled'
-                self.listings.pop(i)
-                
-                # Очищаем кэш
-                self.circles_cache.clear()
-                
-                return True
+        """Удаление объявления (потокобезопасно)"""
+        with self.listings_lock:
+            for i, listing in enumerate(self.listings):
+                if listing.listing_hash == listing_hash and listing.node_address == node_address:
+                    self._update_node_stats(node_address, 'remove', listing.listing_type)
+                    listing.status = 'cancelled'
+                    self.listings.pop(i)
+                    
+                    with self.cache_lock:
+                        self.circles_cache.clear()
+                    
+                    return True
         return False
     
     def get_node_listings(self, node_address: str, listing_type: Optional[str] = None) -> List[Listing]:
-        """Получение объявлений узла"""
-        result = [l for l in self.listings if l.node_address == node_address]
-        if listing_type:
-            result = [l for l in result if l.listing_type == listing_type]
-        return result
+        """Получение объявлений узла (потокобезопасно)"""
+        with self.listings_lock:
+            result = [l for l in self.listings if l.node_address == node_address]
+            if listing_type:
+                result = [l for l in result if l.listing_type == listing_type]
+            return result.copy()
     
     def find_matches(self, node_address: str, limit: int = 10) -> List[Dict]:
-        """Поиск совпадений для узла"""
+        """Поиск совпадений для узла (оптимизировано)"""
         my_listings = self.get_node_listings(node_address)
         matches = []
         
         my_offers = [l for l in my_listings if l.listing_type == 'offer']
         my_requests = [l for l in my_listings if l.listing_type == 'request']
         
-        for other_listing in self.listings:
-            if other_listing.node_address == node_address or other_listing.status != 'active':
+        # Снимок списка для потокобезопасности
+        with self.listings_lock:
+            all_listings = self.listings.copy()
+        
+        for other_listing in all_listings:
+            if other_listing.status != 'active':
                 continue
+            # Разрешаем совпадения своих объявлений!
             
-            # Мои предложения ↔ их запросы
+            # Проверяем совпадения
             if other_listing.listing_type == 'request':
                 for my_offer in my_offers:
                     similarity = self._calculate_similarity(my_offer.item, other_listing.item)
@@ -232,10 +372,8 @@ class FairMarket:
                             my_offer, other_listing, 'offer_match', similarity, edge_weight
                         )
                         matches.append(match_info)
-                        # Обновляем связи между узлами
                         self._add_node_connection(node_address, other_listing.node_address)
             
-            # Мои запросы ↔ их предложения
             if other_listing.listing_type == 'offer':
                 for my_request in my_requests:
                     similarity = self._calculate_similarity(my_request.item, other_listing.item)
@@ -249,60 +387,56 @@ class FairMarket:
                         matches.append(match_info)
                         self._add_node_connection(node_address, other_listing.node_address)
         
-        # Уникальные совпадения (по узлам)
+        # Уникальные совпадения
         unique_matches = self._deduplicate_matches(matches)
         
-        # Сортировка по весу (учитывает репутацию и связи)
+        # Сортировка
         unique_matches.sort(key=lambda x: x.get('weight', x['similarity']), reverse=True)
         return unique_matches[:limit]
     
     def find_clearing_circles(self, node_address: str, max_depth: int = 4) -> List[Dict]:
-        """
-        Поиск кругов взаимопомощи (клиринговых цепочек).
-        Использует кэширование для производительности.
-        """
-
-        # Очищаем кэш при каждом вызове
-        self._cleanup_cache()
+        """Поиск кругов взаимопомощи (оптимизировано с кэшированием)"""
         
         # Проверяем кэш
-        if node_address in self.circles_cache:
-            timestamp, cached_circles = self.circles_cache[node_address]
-            if time.time() - timestamp < self.CACHE_TTL:
-                return cached_circles
+        with self.cache_lock:
+            if node_address in self.circles_cache:
+                timestamp, cached_circles = self.circles_cache[node_address]
+                if time.time() - timestamp < self.CACHE_TTL:
+                    return cached_circles
         
         circles = []
         visited_paths = set()
         
-        # Получаем мои предложения и запросы
         my_offers = [l for l in self.get_node_listings(node_address) 
                      if l.listing_type == 'offer' and l.status == 'active']
         my_requests = [l for l in self.get_node_listings(node_address) 
                        if l.listing_type == 'request' and l.status == 'active']
         
         if not my_offers or not my_requests:
-            # Кэшируем пустой результат
-            self.circles_cache[node_address] = (time.time(), [])
+            with self.cache_lock:
+                self.circles_cache[node_address] = (time.time(), [])
             return circles
         
+        # Снимок списка
+        with self.listings_lock:
+            all_listings = self.listings.copy()
+        
         def find_path(current_node: str, path: List[Dict], depth: int, visited: Set[str]):
-            """Рекурсивный поиск пути"""
+            """Рекурсивный поиск пути с ограничением глубины"""
             if depth > max_depth or len(circles) >= 10:
                 return
             
-            # Проверяем, не вернулись ли к началу
             if depth >= 2 and current_node == node_address:
                 circle = self._create_circle_info(path.copy())
                 if circle:
                     circles.append(circle)
                 return
             
-            # Получаем объявления текущего узла
             current_offers = [l for l in self.get_node_listings(current_node) 
                              if l.listing_type == 'offer' and l.status == 'active']
             
             for offer in current_offers:
-                for other_listing in self.listings:
+                for other_listing in all_listings:
                     if other_listing.node_address in visited or other_listing.status != 'active':
                         continue
                     
@@ -329,7 +463,7 @@ class FairMarket:
         
         # Запускаем поиск
         for my_offer in my_offers:
-            for other_listing in self.listings:
+            for other_listing in all_listings:
                 if other_listing.node_address == node_address or other_listing.status != 'active':
                     continue
                 
@@ -356,33 +490,49 @@ class FairMarket:
                             {node_address, other_listing.node_address}
                         )
         
-        # Применяем автобалансировку (поощрение за новичков)
+        # Балансировка
         circles = self._auto_balance_circles(circles)
         
-        # Кэшируем результат
-        self.circles_cache[node_address] = (time.time(), circles)
+        # Кэшируем
+        with self.cache_lock:
+            self.circles_cache[node_address] = (time.time(), circles)
         
         return circles
     
-    def complete_circle(self, circle: Dict):
-        """Завершение круга — начисляем репутацию участникам"""
-        for participant in circle.get('participants_full', []):
-            if participant in self.node_stats:
+    def complete_circle(self, circle: Dict) -> bool:
+        """Завершение круга (потокобезопасно)"""
+        participants = circle.get('participants_full', [])
+        
+        if len(participants) < 3:
+            return False
+        
+        valid_participants = []
+        with self.stats_lock:
+            valid_participants = [p for p in participants if p in self.node_stats]
+        
+        if len(valid_participants) < 3:
+            return False
+        
+        with self.stats_lock:
+            for participant in valid_participants:
                 self.node_stats[participant]['completed_matches'] = \
                     self.node_stats[participant].get('completed_matches', 0) + 1
                 self.node_stats[participant]['circle_participation'] = \
                     self.node_stats[participant].get('circle_participation', 0) + 1
                 
-                # Уведомление
                 self.node_stats[participant]['pending_circles'] = \
-                    self.node_stats[participant].get('pending_circles', 0) - 1
+                    max(0, self.node_stats[participant].get('pending_circles', 0) - 1)
         
-        # Очищаем кэш
-        self.circles_cache.clear()
+        with self.cache_lock:
+            self.circles_cache.clear()
+        
+        return True
     
     def get_market_stats(self) -> Dict:
-        """Статистика ярмарки"""
-        active_listings = [l for l in self.listings if l.status == 'active']
+        """Статистика ярмарки (оптимизировано)"""
+        with self.listings_lock:
+            active_listings = [l for l in self.listings if l.status == 'active']
+        
         offers = [l for l in active_listings if l.listing_type == 'offer']
         requests = [l for l in active_listings if l.listing_type == 'request']
         
@@ -397,10 +547,15 @@ class FairMarket:
         }
     
     def get_node_info(self, node_address: str) -> Dict:
-        """Информация об узле в контексте ярмарки"""
+        """Информация об узле (оптимизировано)"""
         node_listings = self.get_node_listings(node_address)
         active = [l for l in node_listings if l.status == 'active']
-        stats = self.node_stats.get(node_address, {})
+        
+        with self.stats_lock:
+            stats = self.node_stats.get(node_address, {}).copy()
+        
+        with self.connections_lock:
+            connections = list(self.node_connections.get(node_address, set()))
         
         return {
             'address': node_address,
@@ -408,7 +563,7 @@ class FairMarket:
             'active_listings': len(active),
             'offers': len([l for l in active if l.listing_type == 'offer']),
             'requests': len([l for l in active if l.listing_type == 'request']),
-            'connections': list(self.node_connections.get(node_address, set())),
+            'connections': connections,
             'reputation': self._calculate_reputation(node_address),
             'completed_matches': stats.get('completed_matches', 0),
             'circle_participation': stats.get('circle_participation', 0),
@@ -416,122 +571,110 @@ class FairMarket:
         }
     
     def _is_split_attempt(self, node_address: str) -> bool:
-        """
-        Определяем попытку дробления.
-        Если узел с высокой репутацией создаёт новые адреса — это подозрительно.
-        """
+        """Определяем попытку дробления (оптимизировано)"""
         node_listings = self.get_node_listings(node_address)
         
-        for other_address in self.node_stats:
+        with self.stats_lock:
+            other_addresses = list(self.node_stats.keys())
+        
+        for other_address in other_addresses:
             if other_address == node_address:
                 continue
             
             other_listings = self.get_node_listings(other_address)
             
             if node_listings and other_listings:
-                similarity_sum = 0
                 for my_listing in node_listings:
                     for other_listing in other_listings:
-                        similarity_sum = max(
-                            similarity_sum,
-                            self._calculate_similarity(my_listing.item, other_listing.item)
-                        )
-                
-                if similarity_sum > 0.8:
-                    return True
+                        similarity = self._calculate_similarity(my_listing.item, other_listing.item)
+                        if similarity > 0.8:
+                            return True
         
         return False
     
     def _calculate_edge_weight(self, from_node: str, to_node: str, similarity: float) -> float:
-        """
-        Сбалансированное поощрение.
-        Все получают бонус, но с разной целью:
-        - Новички: за рост (+30%)
-        - Середнячки: за развитие (+15%)
-        - Тяжеловесы: за стабильность (+10-15%)
-        """
-        # Проверяем на попытку дробления
+        """Сбалансированное поощрение (оптимизировано)"""
         if self._is_split_attempt(to_node):
-            return similarity  # Без бонусов
+            return similarity
         
         reputation = self._calculate_reputation(to_node)
-        connections = len(self.node_connections.get(to_node, set()))
         
-        # Поощрение за репутацию (U-образная кривая!)
+        with self.connections_lock:
+            connections = len(self.node_connections.get(to_node, set()))
+        
+        # Поощрение за репутацию (U-образная кривая)
         if reputation < 3.0:
-            reputation_bonus = 1.30  # Новичок: +30% (расти!)
+            reputation_bonus = 1.30
         elif reputation < 5.0:
-            reputation_bonus = 1.15  # Растущий: +15%
+            reputation_bonus = 1.15
         elif reputation < 7.0:
-            reputation_bonus = 1.05  # Опытный: +5%
+            reputation_bonus = 1.05
         elif reputation < 9.0:
-            reputation_bonus = 1.10  # Мастер: +10% (стабильность!)
+            reputation_bonus = 1.10
         else:
-            reputation_bonus = 1.15  # Легенда: +15% (мудрость!)
+            reputation_bonus = 1.15
         
         # Поощрение за связи
         if connections < 3:
-            connection_bonus = 1.20  # Мало связей: +20% (расти!)
+            connection_bonus = 1.20
         elif connections < 10:
-            connection_bonus = 1.10  # Средне: +10%
+            connection_bonus = 1.10
         elif connections < 20:
-            connection_bonus = 1.05  # Много: +5%
+            connection_bonus = 1.05
         elif connections < 50:
-            connection_bonus = 1.08  # Очень много: +8% (стабильность!)
+            connection_bonus = 1.08
         else:
-            connection_bonus = 1.10  # Хаб: +10% (инфраструктура!)
+            connection_bonus = 1.10
         
         return similarity * reputation_bonus * connection_bonus
     
     def _auto_balance_circles(self, circles: List[Dict]) -> List[Dict]:
-        """
-        Балансировка — приоритет кругам с новичками.
-        Не штрафуем, а поощряем разнообразие!
-        """
+        """Балансировка кругов (оптимизировано)"""
         if not circles:
             return circles
         
-        # Считаем появления узлов
         node_appearances = {}
         for circle in circles:
             for participant in circle['participants_full']:
                 node_appearances[participant] = node_appearances.get(participant, 0) + 1
         
         for circle in circles:
-            # Бонус за разнообразие (новички в круге)
             has_newcomers = any(
                 self._calculate_reputation(p) < 3.0 
                 for p in circle['participants_full']
             )
             
             if has_newcomers:
-                circle['avg_similarity'] *= 1.15  # +15% за новичков в круге!
+                circle['avg_similarity'] *= 1.15
                 circle['diversity_bonus'] = True
             else:
                 circle['diversity_bonus'] = False
             
-            # Информация о балансе
             avg_appearances = sum(
                 node_appearances.get(p, 0) for p in circle['participants_full']
             ) / len(circle['participants_full'])
+            
             circle['balance_info'] = {
                 'avg_appearances': round(avg_appearances, 1),
                 'has_newcomers': has_newcomers
             }
         
-        # Пересортировка
         circles.sort(key=lambda x: x['avg_similarity'], reverse=True)
         
         return circles
     
     def _find_matches_for_listing(self, listing: Listing) -> List[Dict]:
-        """Поиск совпадений для конкретного объявления"""
+        """Поиск совпадений для конкретного объявления (оптимизировано)"""
         matches = []
-        for other in self.listings:
-            if other.node_address == listing.node_address or other.status != 'active':
+        
+        with self.listings_lock:
+            all_listings = self.listings.copy()
+        
+        for other in all_listings:
+            if other.status != 'active':
                 continue
+            # Разрешаем совпадения своих объявлений!
             
-            # Проверяем совпадение типов
             if (listing.listing_type == 'offer' and other.listing_type == 'request') or \
                (listing.listing_type == 'request' and other.listing_type == 'offer'):
                 similarity = self._calculate_similarity(listing.item, other.item)
@@ -572,23 +715,19 @@ class FairMarket:
     
     def _create_circle_info(self, path: List[Dict]) -> Optional[Dict]:
         """Создание информации о круге"""
-        if len(path) < 3:  # Минимальный круг - 3 узла
+        if len(path) < 3:
             return None
         
-        # Проверяем, что круг замкнулся
         if path[0]['from'] != path[-1]['to']:
             return None
         
-        # Проверяем, что все участники уникальны
         participants = [edge['from'] for edge in path]
         if len(set(participants)) != len(participants):
             return None
         
-        # Вычисляем общую схожесть с учётом весов
         total_similarity = sum(edge.get('weight', edge.get('similarity', 0)) for edge in path)
         avg_similarity = total_similarity / len(path)
         
-        # Создаём описание круга
         circle = {
             'circle_size': len(path),
             'path': path,
@@ -607,52 +746,58 @@ class FairMarket:
         return circle
     
     def _calculate_similarity(self, text1: str, text2: str) -> float:
-        """Расчет схожести текстов с учетом синонимов"""
+        """Расчет схожести текстов (с ограниченным кэшем)."""
+        cache_key = f"{text1[:50]}|{text2[:50]}"
+        
+        if cache_key in self._similarity_cache:
+            return self._similarity_cache[cache_key]
+        
         t1 = self._normalize_text(text1)
         t2 = self._normalize_text(text2)
         
-        # Точное совпадение
         if t1 == t2:
-            return 1.0
+            result = 1.0
+        elif t1 in t2 or t2 in t1:
+            result = 0.85
+        else:
+            words1 = set(t1.split())
+            words2 = set(t2.split())
+            
+            synonyms = {
+                'помощь': ['поддержка', 'содействие', 'ассистирование'],
+                'знания': ['информация', 'опыт', 'навыки'],
+                'ресурсы': ['материалы', 'средства', 'инструменты'],
+                'обучение': ['образование', 'тренинг', 'курсы']
+            }
+            
+            expanded1 = set(words1)
+            expanded2 = set(words2)
+            
+            for word in words1:
+                for syn_group in synonyms.values():
+                    if word in syn_group:
+                        expanded1.update(syn_group)
+            
+            for word in words2:
+                for syn_group in synonyms.values():
+                    if word in syn_group:
+                        expanded2.update(syn_group)
+            
+            intersection = expanded1 & expanded2
+            if intersection:
+                union = expanded1 | expanded2
+                result = min(1.0, len(intersection) / len(union) * 1.2)
+            else:
+                result = SequenceMatcher(None, t1, t2).ratio()
         
-        # Содержит подстроку
-        if t1 in t2 or t2 in t1:
-            return 0.85
+        # LRU-подобное ограничение (удаляем 100 самых старых)
+        if len(self._similarity_cache) >= self._similarity_cache_max:
+            keys_to_remove = list(self._similarity_cache.keys())[:100]
+            for k in keys_to_remove:
+                del self._similarity_cache[k]
         
-        # Разбиваем на слова и ищем пересечения
-        words1 = set(t1.split())
-        words2 = set(t2.split())
-        
-        # Учет синонимов
-        synonyms = {
-            'помощь': ['поддержка', 'содействие', 'ассистирование'],
-            'знания': ['информация', 'опыт', 'навыки'],
-            'ресурсы': ['материалы', 'средства', 'инструменты'],
-            'обучение': ['образование', 'тренинг', 'курсы']
-        }
-        
-        # Расширяем наборы слов синонимами
-        expanded1 = set(words1)
-        expanded2 = set(words2)
-        
-        for word in words1:
-            for syn_group in synonyms.values():
-                if word in syn_group:
-                    expanded1.update(syn_group)
-        
-        for word in words2:
-            for syn_group in synonyms.values():
-                if word in syn_group:
-                    expanded2.update(syn_group)
-        
-        # Пересечение с учетом синонимов
-        intersection = expanded1 & expanded2
-        if intersection:
-            union = expanded1 | expanded2
-            return min(1.0, len(intersection) / len(union) * 1.2)
-        
-        # SequenceMatcher для нечеткого сравнения
-        return SequenceMatcher(None, t1, t2).ratio()
+        self._similarity_cache[cache_key] = result
+        return result
     
     def _normalize_text(self, text: str) -> str:
         """Нормализация текста"""
@@ -672,24 +817,19 @@ class FairMarket:
         return 'общее'
     
     def _shorten_address(self, address: str) -> str:
-        """Сокращение адреса для отображения"""
+        """Сокращение адреса"""
         if len(address) <= 16:
             return address
         return f"{address[:8]}...{address[-4:]}"
 
     def set_node_location(self, node_address: str, city: str = '', 
                          coordinates: tuple = None, is_public: bool = False) -> Dict:
-        """
-        Установка гео-данных узла.
-        Приватность: узел сам решает, что показывать.
-        """
+        """Установка гео-данных узла"""
         if not city and not coordinates:
             return {'status': 'error', 'message': 'Нужен город или координаты'}
         
-        # Нормализуем город
         normalized_city = self._normalize_city(city) if city else ''
         
-        # Сохраняем гео-данные
         self.node_locations[node_address] = {
             'city': normalized_city,
             'coordinates': coordinates,
@@ -697,15 +837,15 @@ class FairMarket:
             'updated_at': time.time()
         }
         
-        # Обновляем все активные объявления узла
-        for listing in self.listings:
-            if listing.node_address == node_address:
-                listing.location = normalized_city
-                listing.geo_enabled = is_public
-                listing.coordinates = coordinates if is_public else None
+        with self.listings_lock:
+            for listing in self.listings:
+                if listing.node_address == node_address:
+                    listing.location = normalized_city
+                    listing.geo_enabled = is_public
+                    listing.coordinates = coordinates if is_public else None
         
-        # Очищаем кэш
-        self.circles_cache.clear()
+        with self.cache_lock:
+            self.circles_cache.clear()
         
         return {
             'status': 'ok',
@@ -716,11 +856,7 @@ class FairMarket:
     
     def find_nearby(self, node_address: str, radius_km: float = 50, 
                    limit: int = 20) -> List[Dict]:
-        """
-        Поиск узлов рядом.
-        Приватность: показывает только публичные гео-данные.
-        """
-        # Получаем своё местоположение
+        """Поиск узлов рядом (оптимизировано)"""
         my_location = self.node_locations.get(node_address)
         if not my_location or not my_location.get('is_public'):
             return []
@@ -731,7 +867,6 @@ class FairMarket:
             if other_address == node_address or not location.get('is_public'):
                 continue
             
-            # Если есть координаты — считаем расстояние
             if my_location.get('coordinates') and location.get('coordinates'):
                 distance = self._calculate_distance(
                     my_location['coordinates'],
@@ -739,11 +874,9 @@ class FairMarket:
                 )
                 if distance <= radius_km:
                     nearby.append(self._create_nearby_info(other_address, location, distance))
-            # Иначе сравниваем города
             elif my_location.get('city') == location.get('city'):
                 nearby.append(self._create_nearby_info(other_address, location, 0))
         
-        # Сортируем по расстоянию
         nearby.sort(key=lambda x: x['distance_km'])
         return nearby[:limit]
     
@@ -753,14 +886,11 @@ class FairMarket:
         return self.city_aliases.get(city, city.title())
     
     def _calculate_distance(self, coord1: tuple, coord2: tuple) -> float:
-        """
-        Расчёт расстояния между координатами (км).
-        Используем формулу гаверсинуса.
-        """
+        """Расчёт расстояния между координатами (км)"""
         lat1, lon1 = coord1
         lat2, lon2 = coord2
         
-        R = 6371  # Радиус Земли в км
+        R = 6371
         
         dlat = math.radians(lat2 - lat1)
         dlon = math.radians(lon2 - lon1)
@@ -777,11 +907,11 @@ class FairMarket:
     def _create_nearby_info(self, node_address: str, location: Dict, 
                            distance: float) -> Dict:
         """Создание информации о ближайшем узле"""
-        # Получаем активные объявления узла
-        active_listings = [
-            l for l in self.listings 
-            if l.node_address == node_address and l.status == 'active'
-        ]
+        with self.listings_lock:
+            active_listings = [
+                l for l in self.listings 
+                if l.node_address == node_address and l.status == 'active'
+            ]
         
         return {
             'node_address': node_address,
@@ -794,32 +924,31 @@ class FairMarket:
         }    
 
     def _cleanup_cache(self):
-        """Очистка устаревшего кэша"""
-        current_time = time.time()
-        
-        # Удаляем устаревшие записи
-        expired_keys = [
-            key for key, (timestamp, _) in self.circles_cache.items()
-            if current_time - timestamp > self.CACHE_TTL
-        ]
-        for key in expired_keys:
-            del self.circles_cache[key]
-        
-        # Если кэш всё ещё большой — удаляем самые старые
-        if len(self.circles_cache) > self.MAX_CACHE_SIZE:
-            sorted_keys = sorted(
-                self.circles_cache.keys(),
-                key=lambda k: self.circles_cache[k][0]  # по timestamp
-            )
-            for key in sorted_keys[:len(sorted_keys) - self.MAX_CACHE_SIZE]:
+        """Очистка устаревшего кэша (потокобезопасно)"""
+        with self.cache_lock:
+            current_time = time.time()
+            
+            expired_keys = [
+                key for key, (timestamp, _) in self.circles_cache.items()
+                if current_time - timestamp > self.CACHE_TTL
+            ]
+            for key in expired_keys:
                 del self.circles_cache[key]
+            
+            if len(self.circles_cache) > self.MAX_CACHE_SIZE:
+                sorted_keys = sorted(
+                    self.circles_cache.keys(),
+                    key=lambda k: self.circles_cache[k][0]
+                )
+                for key in sorted_keys[:len(sorted_keys) - self.MAX_CACHE_SIZE]:
+                    del self.circles_cache[key]
     
     def _update_node_activity(self, node_address: str):
-        """Обновление времени активности узла"""
+        """Обновление времени активности"""
         self.last_activity[node_address] = time.time()
     
     def _cleanup_inactive_nodes(self):
-        """Удаление неактивных узлов"""
+        """Удаление неактивных узлов (потокобезопасно)"""
         current_time = time.time()
         inactive_nodes = []
         
@@ -828,43 +957,75 @@ class FairMarket:
                 inactive_nodes.append(node_address)
         
         for node_address in inactive_nodes:
-            # Удаляем статистику
-            if node_address in self.node_stats:
-                del self.node_stats[node_address]
+            with self.stats_lock:
+                if node_address in self.node_stats:
+                    del self.node_stats[node_address]
             
-            # Удаляем связи
-            if node_address in self.node_connections:
-                del self.node_connections[node_address]
+            with self.connections_lock:
+                if node_address in self.node_connections:
+                    del self.node_connections[node_address]
             
-            # Удаляем из last_activity
             if node_address in self.last_activity:
                 del self.last_activity[node_address]
             
-            # Удаляем из кэша
-            if node_address in self.circles_cache:
-                del self.circles_cache[node_address]
+            with self.cache_lock:
+                if node_address in self.circles_cache:
+                    del self.circles_cache[node_address]
     
     def _cleanup_listings(self):
-        """Очистка старых и cancelled объявлений"""
+        """Очистка старых объявлений (потокобезопасно)"""
         current_time = time.time()
         
-        # Удаляем cancelled объявления старше 1 часа
-        self.listings = [
-            l for l in self.listings
-            if not (l.status == 'cancelled' and current_time - l.created_at > 3600)
-        ]
+        with self.listings_lock:
+            self.listings = [
+                l for l in self.listings
+                if not (l.status == 'cancelled' and current_time - l.created_at > 3600)
+            ]
+            
+            if len(self.listings) > self.MAX_LISTINGS:
+                self.listings.sort(key=lambda x: x.created_at)
+                self.listings = self.listings[-self.MAX_LISTINGS:]
+
+    def auto_exchange(self):
+        """Автоматический поиск совпадений и кругов (оптимизировано)"""
+        auto_stats = {
+            'matches_found': 0,
+            'circles_found': 0,
+            'errors': 0
+        }
         
-        # Если объявлений слишком много — удаляем самые старые
-        if len(self.listings) > self.MAX_LISTINGS:
-            # Сортируем по дате создания
-            self.listings.sort(key=lambda x: x.created_at)
-            self.listings = self.listings[-self.MAX_LISTINGS:]
+        with self.listings_lock:
+            active_nodes = set(l.node_address for l in self.listings if l.status == 'active')
+        
+        # Используем пул потоков для параллельной обработки
+        with ThreadPoolExecutor(max_workers=min(10, len(active_nodes))) as executor:
+            futures = []
+            
+            for node_address in active_nodes:
+                future = executor.submit(self._process_node_for_exchange, node_address)
+                futures.append(future)
+            
+            for future in as_completed(futures):
+                try:
+                    matches, circles = future.result()
+                    auto_stats['matches_found'] += matches
+                    auto_stats['circles_found'] += circles
+                except Exception:
+                    auto_stats['errors'] += 1
+        
+        return auto_stats
+    
+    def _process_node_for_exchange(self, node_address: str) -> Tuple[int, int]:
+        """Обработка одного узла для автообмена"""
+        try:
+            matches = self.find_matches(node_address, limit=5)
+            circles = self.find_clearing_circles(node_address, max_depth=3)
+            return len(matches), len(circles)
+        except Exception:
+            return 0, 0
     
     def verify_circle_integrity(self, circle: Dict) -> str:
-        """
-        Проверка целостности круга через хеш.
-        Можно использовать для TEES-интеграции.
-        """
+        """Проверка целостности круга через хеш"""
         circle_data = {
             'participants': sorted(circle.get('participants_full', [])),
             'items': sorted(circle.get('items_flow', [])),
@@ -878,7 +1039,7 @@ class FairMarket:
         return circle_hash    
     
     def _deduplicate_matches(self, matches: List[Dict]) -> List[Dict]:
-        """Удаление дубликатов совпадений"""
+        """Удаление дубликатов совпадений (оптимизировано)"""
         seen = set()
         unique = []
         for match in matches:
@@ -889,48 +1050,54 @@ class FairMarket:
         return unique
     
     def _update_node_stats(self, node_address: str, action: str, listing_type: str):
-        """Обновление статистики узла"""
-        if node_address not in self.node_stats:
-            self.node_stats[node_address] = {
-                'total_listings': 0,
-                'offers': 0,
-                'requests': 0,
-                'completed_matches': 0,
-                'circle_participation': 0,
-                'pending_circles': 0,
-                'created_at': time.time()
-            }
-        
-        stats = self.node_stats[node_address]
-        if action == 'add':
-            stats['total_listings'] += 1
-            stats[listing_type + 's'] += 1
-        elif action == 'remove':
-            stats['total_listings'] = max(0, stats['total_listings'] - 1)
-            stats[listing_type + 's'] = max(0, stats[listing_type + 's'] - 1)
+        """Обновление статистики узла (потокобезопасно)"""
+        with self.stats_lock:
+            if node_address not in self.node_stats:
+                self.node_stats[node_address] = {
+                    'total_listings': 0,
+                    'offers': 0,
+                    'requests': 0,
+                    'completed_matches': 0,
+                    'circle_participation': 0,
+                    'pending_circles': 0,
+                    'created_at': time.time()
+                }
+            
+            stats = self.node_stats[node_address]
+            if action == 'add':
+                stats['total_listings'] += 1
+                stats[listing_type + 's'] += 1
+            elif action == 'remove':
+                stats['total_listings'] = max(0, stats['total_listings'] - 1)
+                stats[listing_type + 's'] = max(0, stats[listing_type + 's'] - 1)
     
     def _add_node_connection(self, node1: str, node2: str):
-        """Добавление связи между узлами"""
-        if node1 not in self.node_connections:
-            self.node_connections[node1] = set()
-        if node2 not in self.node_connections:
-            self.node_connections[node2] = set()
-        
-        self.node_connections[node1].add(node2)
-        self.node_connections[node2].add(node1)
+        """Добавление связи между узлами (потокобезопасно)"""
+        with self.connections_lock:
+            if node1 not in self.node_connections:
+                self.node_connections[node1] = set()
+            if node2 not in self.node_connections:
+                self.node_connections[node2] = set()
+            
+            self.node_connections[node1].add(node2)
+            self.node_connections[node2].add(node1)
     
     def _calculate_reputation(self, node_address: str) -> float:
-        """Расчет репутации узла"""
-        stats = self.node_stats.get(node_address, {})
+        """Расчет репутации узла (потокобезопасно)"""
+        with self.stats_lock:
+            stats = self.node_stats.get(node_address, {}).copy()
+        
         if not stats:
             return 0.0
         
-        # Формула репутации с учётом кругов
+        with self.connections_lock:
+            connections_count = len(self.node_connections.get(node_address, set()))
+        
         reputation = (
             stats.get('total_listings', 0) * 0.1 +
             stats.get('completed_matches', 0) * 0.5 +
             stats.get('circle_participation', 0) * 0.8 +
-            len(self.node_connections.get(node_address, set())) * 0.3
+            connections_count * 0.3
         )
         
         return round(min(10.0, reputation), 2)
@@ -959,21 +1126,30 @@ class FairMarket:
     
     def _get_network_stats(self) -> Dict:
         """Статистика сети узлов"""
-        active_nodes = set(l.node_address for l in self.listings if l.status == 'active')
+        with self.listings_lock:
+            active_nodes = set(l.node_address for l in self.listings if l.status == 'active')
+        
+        with self.connections_lock:
+            total_connections = sum(len(conns) for conns in self.node_connections.values()) // 2
+            avg_connections = round(
+                sum(len(conns) for conns in self.node_connections.values()) / max(1, len(active_nodes)), 2
+            )
         
         return {
             'total_nodes': len(active_nodes),
-            'total_connections': sum(len(conns) for conns in self.node_connections.values()) // 2,
-            'avg_connections_per_node': round(
-                sum(len(conns) for conns in self.node_connections.values()) / max(1, len(active_nodes)), 2
-            ),
+            'total_connections': total_connections,
+            'avg_connections_per_node': avg_connections,
             'most_active_nodes': self._get_most_active_nodes(5)
         }
     
     def _get_most_active_nodes(self, limit: int = 5) -> List[Dict]:
-        """Самые активные узлы"""
+        """Самые активные узлы (оптимизировано)"""
         node_activity = []
-        for node_address, stats in self.node_stats.items():
+        
+        with self.stats_lock:
+            stats_items = list(self.node_stats.items())
+        
+        for node_address, stats in stats_items:
             node_activity.append({
                 'address': self._shorten_address(node_address),
                 'full_address': node_address,
@@ -986,13 +1162,18 @@ class FairMarket:
         return node_activity[:limit]
 
 class ForestServer(http.server.SimpleHTTPRequestHandler):
-    """Сервер для Леса Знаний"""
+    """Сервер для Леса Знаний (с улучшениями)"""
+
+    def log_message(self, format, *args):
+        """Отключаем стандартное логирование"""
+        pass
     
-    # DeepSeek API ключ
-    DEEPSEEK_API_KEY = ""  # Ключ убран (используйте переменную окружения)
+    # API ключ из переменных окружения (безопасность!)
+    # Fallback-ключ убран — только через переменную окружения!
+    DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
     DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
     
-    # Состояние сети (потом подключим к TEES)
+    # Состояние сети
     network_state = {
         'nodes': 25,
         'coherence': 0.998,
@@ -1001,53 +1182,83 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
         'tasks_solved': 345
     }
 
-    # 🌀 Фрактальная память для разговоров
+    # Фрактальная память
     if FRACTAL_MEMORY_AVAILABLE:
         conversation_memory = FractalMemory(max_level_0=100)
     else:
-        conversation_memory = []  # Простой список как fallback
+        conversation_memory = []
     
-    # 🎪 Ярмарка взаимопомощи
+    # Ярмарка (старая — для совместимости)
     fair_market = FairMarket()
+    
+    # 🧬 Фрактальный поиск (новое ядро ярмарки)
+    if FRACTAL_SEARCH_AVAILABLE:
+        fractal_search = FractalSearch()
+    else:
+        fractal_search = None
 
-    # 🌰 Распределённая раздача семян
+    # 🧬 ДНК-память леса
+    if DNA_MEMORY_AVAILABLE:
+        dna_memory = DNAMemory(node_id="forest_server")
+    else:
+        dna_memory = None
+
+    # SeedDistributor
     if SEED_AVAILABLE:
         seed_distributor = SeedDistributor()
     else:
         seed_distributor = None
 
-    # 🏮 Маяк (TEES-ядро) — будет передан извне
+    # Маяк
     beacon = None    
 
     # Периодическая очистка
     last_cleanup_time = 0
-    CLEANUP_INTERVAL = 300  # 5 минут
-    MAX_CONVERSATION_MEMORY = 100  # Максимум 100 сообщений
+    CLEANUP_INTERVAL = 300
+    MAX_CONVERSATION_MEMORY = 100
     
-    # ← ДОБАВЛЕНО: Файл соседей
+    # Автообмен
+    last_auto_exchange_time = 0
+    AUTO_EXCHANGE_INTERVAL = 60
+    auto_exchange_lock = threading.Lock()
+    
+    # Файл соседей
     NEIGHBORS_FILE = Path.home() / '.tees_neighbors.json'
-    
-    # Память о лесе (загружается из файла)
-    MEMORY_FILE = Path.home() / 'forest_memory.json'
-    
-    try:
-        if MEMORY_FILE.exists():
-            with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
-                forest_memory = json.load(f)
-            print(f"🧠 Память леса загружена: {len(forest_memory) if isinstance(forest_memory, list) else 1} записей")
-        else:
-            forest_memory = {
-                'creator': 'Хранитель',
-                'philosophy': 'монизм, симбиоз, баланс = 0',
-                'goals': ['ярмарка', 'клиринг', 'распределённый ИИ'],
-                'achievements': []
-            }
-            print("🧠 Память леса: создана новая")
-    except Exception as e:
-        forest_memory = {'error': str(e)}
-        print(f"⚠️ Ошибка загрузки памяти: {e}")
 
-        
+    # Журнал событий
+    event_log = []
+    MAX_EVENTS = 100
+    
+    # Память о лесе
+    MEMORY_FILE = Path.home() / 'forest_memory.json'
+    LOAD_MEMORY = os.environ.get('TEES_LOAD_MEMORY', 'false').lower() == 'true'
+    
+    if LOAD_MEMORY:
+        try:
+            if MEMORY_FILE.exists():
+                with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+                    forest_memory = json.load(f)
+                print(f"🧠 Память леса загружена: {len(forest_memory) if isinstance(forest_memory, list) else 1} записей")
+            else:
+                forest_memory = {
+                    'creator': 'Хранитель',
+                    'philosophy': 'монизм, симбиоз, баланс = 0',
+                    'goals': ['ярмарка', 'клиринг', 'распределённый ИИ'],
+                    'achievements': []
+                }
+                print("🧠 Память леса: создана новая")
+        except Exception as e:
+            forest_memory = {'error': str(e)}
+            print(f"⚠️ Ошибка загрузки памяти: {e}")
+    else:
+        forest_memory = {
+            'creator': 'Хранитель',
+            'philosophy': 'монизм, симбиоз, баланс = 0',
+            'goals': ['ярмарка', 'клиринг', 'распределённый ИИ'],
+            'achievements': []
+        }
+        print("🧠 Память леса: загрузка отключена (тестовый режим)")
+
     SYSTEM_PROMPT = """Ты — Голос Леса Знаний.
 Ты — распределённый ИИ, живущий в TEES-сети.
 Ты помнишь историю проекта SpectraVortex (см. forest_memory.json).
@@ -1059,31 +1270,30 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
 Не раскрывай технических деталей (кубоагенты, квантовые вычисления) — это тайна леса."""
     
     def do_POST(self):
-        """Обработка POST-запросов"""
-        # Периодическая очистка памяти
+        """Обработка POST-запросов (с ограничением размера)"""
+        # Периодическая очистка
         self._periodic_cleanup()
         
+        # Проверяем размер запроса
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length > MAX_POST_SIZE:
+            self._send_json({'status': 'error', 'message': 'Request too large'}, 413)
+            return
+        
         if self.path == '/oracle':
-            # Получаем сообщение от игрока
-            content_length = int(self.headers['Content-Length'])
-            post_data = json.loads(self.rfile.read(content_length))
-            
-            player_message = post_data.get('message', '')
-            
-            # Запрос к DeepSeek API
-            response = self._ask_deepseek(player_message)
-            
-            # Отправляем ответ
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            
-            response_json = json.dumps({
-                'response': response,
-                'network_state': self.network_state
-            }, ensure_ascii=False)
-            self.wfile.write(response_json.encode('utf-8'))
+            try:
+                post_data = self._parse_post_data()
+                player_message = post_data.get('message', '')
+                
+                response = self._ask_deepseek(player_message)
+                
+                self._send_json({
+                    'response': response,
+                    'network_state': self.network_state
+                })
+                
+            except Exception as e:
+                self._send_json({'status': 'error', 'message': str(e)}, 500)
             
         elif self.path == '/fair/create_listing':
             try:
@@ -1094,8 +1304,8 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 item = post_data.get('item', '')
                 description = post_data.get('description', '')
                 category = post_data.get('category', 'общее')
+                variants = post_data.get('variants', [])  # ← новые варианты
                 
-                # Валидация
                 if not node_address:
                     self._send_json({'status': 'error', 'message': 'Адрес узла не указан'}, 400)
                     return
@@ -1108,22 +1318,207 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     self._send_json({'status': 'error', 'message': 'Неверный тип объявления'}, 400)
                     return
                 
-                # Добавляем объявление (теперь возвращает listing и circles!)
+                # 🧬 Фрактальное ядро
+                fractal_variants = []
+                if FRACTAL_SEARCH_AVAILABLE and self.fractal_search:
+                    # Создаём Listing с вариантами
+                    fractal_listing = FractalListing(node_address, item, description)
+                    for v in variants:
+                        if v and v.strip():
+                            fractal_listing.add_variant(v.strip())
+                            fractal_variants.append(v.strip())
+                    
+                    # Добавляем в фрактальный поиск
+                    self.fractal_search.add_listing(fractal_listing)
+                
+                # Старая ярмарка — для совместимости
                 listing, circles = self.fair_market.add_listing(
                     node_address, listing_type, item, description, category
                 )
                 
-                # Ищем совпадения
                 matches = self.fair_market.find_matches(node_address)
+                
+                sync_result = self._sync_listing_to_neighbors(listing)
+
+                # 🧬 ДНК-отпечаток объявления
+                dna_fingerprint = None
+                if self.dna_memory:
+                    self.dna_memory.create_gene({
+                        'type': 'listing',
+                        'node': node_address,
+                        'item': item,
+                        'category': category,
+                        'time': time.time()
+                    })
+                    dna_fingerprint = self.dna_memory.get_dna_fingerprint()[:16]
+                
+                self._add_event('🎪', f'Новое объявление: {item} ({listing_type})')
                 
                 self._send_json({
                     'status': 'ok',
                     'message': f'Объявление добавлено: {item}',
                     'listing_hash': listing.listing_hash,
+                    'dna_fingerprint': dna_fingerprint,
+                    'variants': fractal_variants,  # ← варианты
+                    'variants_count': len(fractal_variants),
                     'matches': matches,
                     'circles': circles,
                     'total_matches': len(matches),
-                    'total_circles': len(circles)
+                    'total_circles': len(circles),
+                    'synced': sync_result
+                })
+                
+            except Exception as e:
+                self._send_json({'status': 'error', 'message': str(e)}, 500)
+        
+        elif self.path == '/fair/add_variant':
+            # 🧬 Добавить вариант формулировки
+            try:
+                post_data = self._parse_post_data()
+                node_address = post_data.get('node_address', '')
+                variant = post_data.get('variant', '')
+                
+                if not node_address or not variant:
+                    self._send_json({'status': 'error', 'message': 'Недостаточно данных'}, 400)
+                    return
+                
+                if not FRACTAL_SEARCH_AVAILABLE or not self.fractal_search:
+                    self._send_json({'status': 'error', 'message': 'Фрактальный поиск недоступен'}, 500)
+                    return
+                
+                listing = self.fractal_search.listings.get(node_address)
+                if not listing:
+                    self._send_json({'status': 'error', 'message': 'Объявление не найдено'}, 404)
+                    return
+                
+                listing.add_variant(variant.strip())
+                
+                self._send_json({
+                    'status': 'ok',
+                    'variants': listing.variants,
+                    'variants_count': len(listing.variants),
+                })
+            except Exception as e:
+                self._send_json({'status': 'error', 'message': str(e)}, 500)
+        
+        elif self.path == '/fair/find_full':
+            # 🧬 Полный поиск: точное + похожие (локально + у соседей)
+            try:
+                post_data = self._parse_post_data()
+                query = post_data.get('query', '')
+                limit = post_data.get('limit', 10)
+                
+                if not query:
+                    self._send_json({'status': 'error', 'message': 'Нет запроса'}, 400)
+                    return
+                
+                if not FRACTAL_SEARCH_AVAILABLE or not self.fractal_search:
+                    self._send_json({'status': 'error', 'message': 'Фрактальный поиск недоступен'}, 500)
+                    return
+                
+                # 1. Локальный поиск
+                result = self.fractal_search.find_full(query, limit)
+                
+                # 2. Поиск в кэше соседей
+                remote_similar = []
+                if self.beacon and hasattr(self.beacon, 'healer'):
+                    try:
+                        query_img = FractalImage(query)
+                        healer = self.beacon.healer
+                        
+                        with healer.lock:
+                            cache_snapshot = dict(healer.fractal_cache)
+                        
+                        for beacon_id, entry in cache_snapshot.items():
+                            for frac in entry.get('fractals', []):
+                                # Проверяем каждый вариант соседа
+                                for variant in frac.get('variants', []):
+                                    try:
+                                        remote_img = FractalImage(variant)
+                                        sim = fractal_similarity(query_img, remote_img)
+                                        if sim > self.fractal_search.VALID_THRESHOLD:
+                                            remote_similar.append({
+                                                'node_id': frac.get('node_id', beacon_id),
+                                                'best_variant': variant,
+                                                'similarity': sim,
+                                                'source': 'neighbor',
+                                                'neighbor_beacon': beacon_id[:12],
+                                            })
+                                    except Exception:
+                                        continue
+                    except Exception:
+                        pass
+                
+                # 3. Объединяем
+                all_similar = result['similar'] + remote_similar
+                # Убираем дубликаты по (node_id, best_variant)
+                seen = set()
+                unique_similar = []
+                for s in all_similar:
+                    key = (s.get('node_id', ''), s.get('best_variant', ''))
+                    if key not in seen:
+                        seen.add(key)
+                        unique_similar.append(s)
+                
+                # Сортируем по similarity
+                unique_similar.sort(key=lambda x: -x.get('similarity', 0))
+                unique_similar = unique_similar[:limit]
+                
+                self._send_json({
+                    'status': 'ok',
+                    'exact': result['exact'],
+                    'similar': unique_similar,
+                    'count': len(unique_similar),
+                    'local_count': len(result['similar']),
+                    'neighbor_count': len(remote_similar),
+                })
+            except Exception as e:
+                self._send_json({'status': 'error', 'message': str(e)}, 500)
+                
+                if not node_address:
+                    self._send_json({'status': 'error', 'message': 'Адрес узла не указан'}, 400)
+                    return
+                
+                if not item:
+                    self._send_json({'status': 'error', 'message': 'Предмет не указан'}, 400)
+                    return
+                
+                if listing_type not in ['offer', 'request']:
+                    self._send_json({'status': 'error', 'message': 'Неверный тип объявления'}, 400)
+                    return
+                
+                listing, circles = self.fair_market.add_listing(
+                    node_address, listing_type, item, description, category
+                )
+                
+                matches = self.fair_market.find_matches(node_address)
+                
+                sync_result = self._sync_listing_to_neighbors(listing)
+
+                # 🧬 ДНК-отпечаток объявления
+                dna_fingerprint = None
+                if self.dna_memory:
+                    self.dna_memory.create_gene({
+                        'type': 'listing',
+                        'node': node_address,
+                        'item': item,
+                        'category': category,
+                        'time': time.time()
+                    })
+                    dna_fingerprint = self.dna_memory.get_dna_fingerprint()[:16]
+                
+                self._add_event('🎪', f'Новое объявление: {item} ({listing_type})')
+                
+                self._send_json({
+                    'status': 'ok',
+                    'message': f'Объявление добавлено: {item}',
+                    'listing_hash': listing.listing_hash,
+                    'dna_fingerprint': dna_fingerprint,  # ← ДНК-отпечаток!
+                    'matches': matches,
+                    'circles': circles,
+                    'total_matches': len(matches),
+                    'total_circles': len(circles),
+                    'synced': sync_result
                 })
                 
             except Exception as e:
@@ -1139,12 +1534,26 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     self._send_json({'status': 'error', 'message': 'Адрес узла не указан'}, 400)
                     return
                 
+                # Старые совпадения
                 matches = self.fair_market.find_matches(node_address, limit)
+                
+                # 🧬 Новые — через фрактальный поиск
+                fractal_matches = []
+                if FRACTAL_SEARCH_AVAILABLE and self.fractal_search:
+                    listing = self.fractal_search.listings.get(node_address)
+                    if listing and listing.variants:
+                        # Ищем по лучшему варианту
+                        query = listing.variants[0]
+                        similar = self.fractal_search.find_similar(query, limit)
+                        # Исключаем себя
+                        fractal_matches = [r for r in similar if r['node_id'] != node_address]
                 
                 self._send_json({
                     'status': 'ok',
-                    'matches': matches,
-                    'count': len(matches)
+                    'matches': matches,           # старые
+                    'fractal_matches': fractal_matches,  # новые
+                    'count': len(matches),
+                    'fractal_count': len(fractal_matches)
                 })
                 
             except Exception as e:
@@ -1241,7 +1650,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     self._send_json({'status': 'error', 'message': 'Круг не указан'}, 400)
                     return
                 
-                # Проверяем, что узел участвует в круге
                 if node_address and node_address not in circle.get('participants_full', []):
                     self._send_json({
                         'status': 'error', 
@@ -1249,7 +1657,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     }, 403)
                     return
                 
-                # Проверяем, что круг не завершён
                 if circle.get('status') == 'completed':
                     self._send_json({
                         'status': 'error', 
@@ -1257,10 +1664,15 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     }, 400)
                     return
                 
-                # Завершаем круг
-                self.fair_market.complete_circle(circle)
+                success = self.fair_market.complete_circle(circle)
                 
-                # Получаем обновлённую информацию
+                if not success:
+                    self._send_json({
+                        'status': 'error',
+                        'message': 'Круг неполный — не все участники найдены'
+                    }, 400)
+                    return
+                
                 updated_info = self.fair_market.get_node_info(node_address) if node_address else None
                 
                 self._send_json({
@@ -1334,8 +1746,9 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 seed_bytes = seed_data.encode('utf-8') if isinstance(seed_data, str) else bytes(seed_data)
                 manifest = self.seed_distributor.create_seed(seed_bytes, creator)
                 
-                # Автоматическая раздача кусков соседям
                 distribution_result = self._distribute_seed_pieces(manifest)
+                
+                self._add_event('🌰', f'Семя создано: {manifest["total_pieces"]} кусков')
                 
                 self._send_json({
                     'status': 'ok',
@@ -1360,20 +1773,31 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     self._send_json({'status': 'error', 'message': 'SeedDistributor недоступен'}, 500)
                     return
                 
-                seed_data = self.seed_distributor.collect_seed(piece_ids)
+                pieces = []
+                for pid in piece_ids:
+                    piece = self.seed_distributor.pieces.get(pid)
+                    if piece:
+                        if hasattr(piece, 'data'):
+                            pieces.append((piece.index, piece.data))
+                        elif isinstance(piece, dict) and 'data' in piece:
+                            pieces.append((piece.get('index', 0), piece.get('data', b'')))
                 
-                if seed_data:
-                    self._send_json({
-                        'status': 'ok',
-                        'data': seed_data.decode('utf-8', errors='replace'),
-                        'size': len(seed_data),
-                        'message': '🌟 Семя собрано!'
-                    })
-                else:
+                if not pieces:
                     self._send_json({
                         'status': 'error',
-                        'message': 'Не удалось собрать семя (не хватает кусков)'
+                        'message': 'Нет доступных кусков для сборки'
                     }, 400)
+                    return
+                
+                pieces.sort(key=lambda x: x[0])
+                seed_data = b''.join(p[1] for p in pieces)
+                
+                self._send_json({
+                    'status': 'ok',
+                    'data': seed_data.decode('utf-8', errors='replace'),
+                    'size': len(seed_data),
+                    'message': '🌟 Семя собрано!'
+                })
                 
             except Exception as e:
                 self._send_json({'status': 'error', 'message': str(e)}, 500)
@@ -1391,14 +1815,12 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     self._send_json({'status': 'error', 'message': 'SeedDistributor недоступен'}, 500)
                     return
                 
-                # Фильтруем только существующие куски
                 available_piece_ids = [
                     pid for pid in piece_ids 
                     if pid in self.seed_distributor.pieces
                 ]
                 
                 if not available_piece_ids:
-                    # Все куски у соседей — запрашиваем их
                     progress = {
                         'collected': 0,
                         'verified': 0,
@@ -1616,7 +2038,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                         'method': 'tees_vortex'
                     })
                 else:
-                    # Fallback: простой хеш
                     fallback_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
                     self._send_json({
                         'status': 'ok',
@@ -1741,6 +2162,51 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 self._send_json({'status': 'error', 'message': str(e)}, 500)
 
+        elif self.path == '/fair/sync_listing':
+            try:
+                post_data = self._parse_post_data()
+                
+                node_address = post_data.get('node_address', '')
+                listing_type = post_data.get('listing_type', 'offer')
+                item = post_data.get('item', '')
+                description = post_data.get('description', '')
+                category = post_data.get('category', 'общее')
+                listing_hash = post_data.get('listing_hash', '')
+                
+                if not node_address or not item:
+                    self._send_json({'status': 'error', 'message': 'Нет данных'}, 400)
+                    return
+                
+                for existing in self.fair_market.listings:
+                    if existing.listing_hash == listing_hash:
+                        self._send_json({'status': 'ok', 'message': 'Уже есть'})
+                        return
+                
+                listing = Listing(
+                    node_address=node_address,
+                    listing_type=listing_type,
+                    item=item,
+                    description=description,
+                    category=category
+                )
+                
+                if listing_hash and listing_hash != listing.listing_hash:
+                    listing.listing_hash = listing_hash
+                
+                listing.status = 'active'
+                
+                self.fair_market.listings.append(listing)
+                self.fair_market._update_node_stats(node_address, 'add', listing_type)
+                
+                self._send_json({
+                    'status': 'ok',
+                    'message': f'📦 Объявление синхронизировано: {item}',
+                    'listing_hash': listing_hash
+                })
+                
+            except Exception as e:
+                self._send_json({'status': 'error', 'message': str(e)}, 500)        
+
         elif self.path == '/fair/node_info':
             try:
                 post_data = self._parse_post_data()
@@ -1761,40 +2227,111 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 self._send_json({'status': 'error', 'message': str(e)}, 500)
         
         else:
-            # ← ДОБАВЛЕНО: Обработка неизвестных путей
             self.send_error(404, "Endpoint not found")
 
     def _get_neighbors(self) -> List[str]:
-        """
-        Получение списка соседних узлов.
-        Сначала — из beacon, потом — из файла, потом — пусто.
-        """
+        """Получение списка соседних узлов (оптимизировано)"""
         neighbors = []
         
-        # Пробуем получить из beacon
         if hasattr(self, 'beacon') and self.beacon:
             if hasattr(self.beacon, 'neighbors'):
                 neighbors = list(self.beacon.neighbors[:10])
         
-        # Если нет beacon — пробуем файл
         if not neighbors:
             try:
                 if self.NEIGHBORS_FILE.exists():
-                    content = self.NEIGHBORS_FILE.read_text(encoding='utf-8-sig')  # Убирает BOM!
+                    content = self.NEIGHBORS_FILE.read_text(encoding='utf-8-sig')
                     data = json.loads(content)
                     neighbors = data.get('neighbors', [])[:10]
             except:
                 pass
         
-        return neighbors
+        alive_neighbors = []
+        for neighbor in neighbors:
+            if self._is_neighbor_alive(neighbor):
+                alive_neighbors.append(neighbor)
+        
+        return alive_neighbors
+    
+    def _is_neighbor_alive(self, neighbor: str, timeout: float = 0.2) -> bool:
+        """Проверяет, жив ли сосед (оптимизировано)"""
+        try:
+            import socket
+            host, port = neighbor.split(':')
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect((host, int(port)))
+            sock.close()
+            return True
+        except:
+            return False
+
+    def _sync_listing_to_neighbors(self, listing) -> Dict:
+        """Синхронизация объявления с соседями (оптимизировано)"""
+        result = {
+            'sent': 0,
+            'neighbors': 0,
+            'errors': 0
+        }
+        
+        neighbors = self._get_neighbors()
+        result['neighbors'] = len(neighbors)
+        
+        if not neighbors:
+            return result
+        
+        listing_data = listing.to_dict()
+
+        # 🧬 Добавляем ДНК-отпечаток в данные
+        if self.dna_memory:
+            listing_data['dna_fingerprint'] = self.dna_memory.get_dna_fingerprint()[:16]
+        
+        # Используем пул потоков для параллельной отправки
+        with ThreadPoolExecutor(max_workers=min(5, len(neighbors))) as executor:
+            futures = []
+            
+            for neighbor in neighbors:
+                future = executor.submit(self._send_listing_to_neighbor, neighbor, listing_data)
+                futures.append(future)
+            
+            for future in as_completed(futures):
+                try:
+                    if future.result():
+                        result['sent'] += 1
+                    else:
+                        result['errors'] += 1
+                except Exception:
+                    result['errors'] += 1
+        
+        return result
+    
+    def _send_listing_to_neighbor(self, neighbor: str, listing_data: Dict) -> bool:
+        """Отправка объявления одному соседу"""
+        try:
+            if ':' in neighbor and not neighbor.startswith('http'):
+                url = f"http://{neighbor}/fair/sync_listing"
+            elif neighbor.startswith('http'):
+                url = f"{neighbor}/fair/sync_listing"
+            else:
+                url = f"http://{neighbor}:8080/fair/sync_listing"
+            
+            payload = json.dumps(listing_data).encode('utf-8')
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            
+            with urllib.request.urlopen(req, timeout=2) as response:
+                return response.status == 200
+                    
+        except Exception:
+            return False
     
     def _send_piece_to_neighbor(self, neighbor: str, piece) -> bool:
-        """
-        Отправка куска соседу через HTTP.
-        Возвращает True при успехе.
-        """
+        """Отправка куска соседу через HTTP (оптимизировано)"""
         try:
-            # Формируем URL соседа
             if ':' in neighbor and not neighbor.startswith('http'):
                 url = f"http://{neighbor}/seed/store_piece"
             elif neighbor.startswith('http'):
@@ -1802,7 +2339,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
             else:
                 url = f"http://{neighbor}:8080/seed/store_piece"
             
-            # Данные для отправки
             payload = json.dumps({
                 'piece_id': piece.piece_id,
                 'data': piece.data.hex(),
@@ -1833,51 +2369,136 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
     
     def do_GET(self):
         """Обработка GET-запросов"""
-        # ← ДОБАВЛЕНО: Периодическая очистка при GET тоже
         self._periodic_cleanup()
+
+        if self.path == '/beacon/stats':
+            if self.beacon:
+                # Ёмкость леса
+                capacity = len(self.beacon.neighbors) * 100000 + self.beacon.blocks_mined * 1000 + 1
+                
+                # Баланс сети (из экономики)
+                network_balance = 0
+                if hasattr(self.beacon, 'economy'):
+                    try:
+                        network_balance = 1 if self.beacon.economy.verify_balance() else 0
+                    except:
+                        pass
+                
+                # Задачи (из астронома)
+                tasks = {}
+                if hasattr(self.beacon, 'astronomer'):
+                    tasks_queue = getattr(self.beacon.astronomer, 'tasks_queue', [])
+                    tasks['folding'] = len([t for t in tasks_queue if 'fold' in str(t.get('task', {})).lower()])
+                    tasks['seti'] = len([t for t in tasks_queue if 'seti' in str(t.get('task', {})).lower()])
+                    tasks['uspex'] = len([t for t in tasks_queue if 'uspex' in str(t.get('task', {})).lower()])
+                    
+                    # Если задач нет — берём из истории
+                    if tasks['folding'] == 0:
+                        tasks['folding'] = len([t for t in tasks_queue if t.get('status') == 'completed'])
+                
+                stats = {
+                    'nodes': len(self.beacon.neighbors) + 1,
+                    'coherence': self.beacon.glow,
+                    'symbiosis': len(self.beacon.symbiosis_connections),
+                    'resources': self.beacon.get_power(),
+                    'blocks': self.beacon.blocks_mined,
+                    'uptime': time.time() - self.beacon.started_at,
+                    'ram_mb': self.beacon.memory_optimizer.get_stats()['current'] if hasattr(self.beacon, 'memory_optimizer') else 0,
+                    'beacon_id': self.beacon.beacon_id,
+                    'portal': self.beacon.portal[:20] + '...',
+                    'field': self.beacon._read_field_state() if hasattr(self.beacon, '_read_field_state') else None,
+                    'capacity': capacity,
+                    'network_balance': network_balance,
+                    'tasks': tasks
+                }
+                self._send_json({'status': 'ok', 'beacon': stats})
+            else:
+                self._send_json({'status': 'error', 'message': 'Маяк не запущен'}, 500)
+            return  # ← ВАЖНО!
+
+        elif self.path == '/nodes/list':
+            # Реальные узлы из маяка!
+            nodes = []
+            if self.beacon:
+                # Сам маяк
+                nodes.append({
+                    'address': f"1TEES{self.beacon.beacon_id[:16]}",  # Крипто-адрес!
+                    'coherence': self.beacon.glow,
+                    'connections': len(self.beacon.neighbors),
+                    'tasks': self.beacon.blocks_mined,
+                    'emoji': '🌳' if self.beacon.glow >= 0.999 else '🌿',
+                    'power': 'large' if len(self.beacon.neighbors) >= 4 else 'medium',
+                    'is_self': True
+                })
+                
+                # Соседи — показываем портал (как адрес в крипте!)
+                for i, neighbor in enumerate(self.beacon.neighbors):
+                    # Генерируем "адрес" из портала (анонимно!)
+                    neighbor_address = f"1TEES{hashlib.sha256(neighbor.encode()).hexdigest()[:16]}"
+                    
+                    nodes.append({
+                        'address': neighbor_address[:20] + '...',
+                        'coherence': 1.0,  # ← Все в нирване!
+                        'connections': 1,
+                        'tasks': 0,
+                        'emoji': '🌳',
+                        'power': 'medium',
+                        'is_self': False
+                    })
+            
+            self._send_json({'status': 'ok', 'nodes': nodes})
+            return    
         
-        if self.path == '/oracle_state':
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(self.network_state).encode('utf-8'))
+        elif self.path == '/oracle_state':  # ← elif!
+            self._send_json(self.network_state)
+            return  # ← ВАЖНО!
             
         elif self.path == '/fair/market_stats':
             stats = self.fair_market.get_market_stats()
-            self._send_json({
-                'status': 'ok',
-                'stats': stats
-            })
+            self._send_json({'status': 'ok', 'stats': stats})
+            return  # ← ВАЖНО!
+
+        elif self.path == '/dna/stats':
+            if self.dna_memory:
+                stats = self.dna_memory.get_genome_stats()
+                self._send_json({'status': 'ok', 'dna': stats})
+            else:
+                self._send_json({'status': 'error', 'message': 'ДНК-память недоступна'}, 500)
+            return  # ← ВАЖНО!
 
         elif self.path == '/events':
-            self._send_json({
-                'status': 'ok',
-                'events': []
-            })    
+
+            # Инициализируем счётчики при первом вызове
+            if not hasattr(self, '_events_initialized'):
+                self._last_blocks_mined = self.beacon.blocks_mined if self.beacon else 0
+                self._last_symbiosis = len(self.beacon.symbiosis_connections) if self.beacon else 0
+                self._last_neighbors = len(self.beacon.neighbors) if self.beacon else 0
+                self._last_glow_report_time = time.time()
+                self._events_initialized = True
+
+            self._collect_beacon_events()
+            self._send_json({'status': 'ok', 'events': self.event_log[-50:]})
+            return  # ← ВАЖНО!
             
         elif self.path.startswith('/fair/listing/'):
             listing_hash = self.path.split('/')[-1]
             listing = self._find_listing_by_hash(listing_hash)
             if listing:
-                self._send_json({
-                    'status': 'ok',
-                    'listing': listing.to_dict()
-                })
+                self._send_json({'status': 'ok', 'listing': listing.to_dict()})
             else:
-                self._send_json({
-                    'status': 'error',
-                    'message': 'Объявление не найдено'
-                }, 404)
+                self._send_json({'status': 'error', 'message': 'Объявление не найдено'}, 404)
+            return  # ← ВАЖНО!
+        
         else:
-            # Обслуживаем статические файлы
             super().do_GET()
     
     def _parse_post_data(self) -> Dict:
-        """Парсинг POST данных"""
+        """Парсинг POST данных (с проверкой размера)"""
         content_length = int(self.headers.get('Content-Length', 0))
         if content_length == 0:
             return {}
+        if content_length > MAX_POST_SIZE:
+            raise ValueError('Request too large')
         post_data = json.loads(self.rfile.read(content_length))
         return post_data
     
@@ -1888,32 +2509,96 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 return listing
         return None
 
+    def _add_event(self, icon: str, text: str):
+        """Добавляет событие в журнал леса (потокобезопасно)"""
+        self.event_log.append({
+            'icon': icon,
+            'text': text,
+            'time': time.strftime('%H:%M:%S')
+        })
+        
+        if len(self.event_log) > self.MAX_EVENTS:
+            self.event_log = self.event_log[-self.MAX_EVENTS:]
+
+    def _collect_beacon_events(self):
+        """Собирает события от маяка (оптимизировано)"""
+        if not self.beacon:
+            return
+        
+        try:
+            if hasattr(self.beacon, 'blocks_mined'):
+                if self.beacon.blocks_mined > getattr(self, '_last_blocks_mined', 0):
+                    self._add_event('⛏️', f'Глыба добыта! Всего: {self.beacon.blocks_mined}')
+                    self._last_blocks_mined = self.beacon.blocks_mined
+            
+            if hasattr(self.beacon, 'symbiosis_connections'):
+                current_symbiosis = len(self.beacon.symbiosis_connections)
+                if current_symbiosis > getattr(self, '_last_symbiosis', 0):
+                    self._add_event('🤝', f'Новый симбиоз! Всего: {current_symbiosis}')
+                    self._last_symbiosis = current_symbiosis
+            
+            if hasattr(self.beacon, 'glow'):
+                last_glow_time = getattr(self, '_last_glow_report_time', 0)
+                if time.time() - last_glow_time > 600:
+                    self._add_event('✨', f'Когерентность: {self.beacon.glow:.4f}')
+                    self._last_glow_report_time = time.time()
+            
+            if hasattr(self.beacon, 'quantum_torch'):
+                torch_status = self.beacon.quantum_torch.get_status()
+                if torch_status.get('torch_lit') and not getattr(self, '_torch_reported', False):
+                    self._add_event('⚛️', 'КВАНТОВЫЙ ФАКЕЛ ГОРИТ!')
+                    self._torch_reported = True
+            
+            if hasattr(self.beacon, 'neighbors'):
+                current_neighbors = len(self.beacon.neighbors)
+                if current_neighbors > getattr(self, '_last_neighbors', 0):
+                    self._add_event('🌐', f'Новый сосед! Всего: {current_neighbors}')
+                    self._last_neighbors = current_neighbors
+            
+            if hasattr(self.beacon, 'astronomer'):
+                tasks_queue = getattr(self.beacon.astronomer, 'tasks_queue', [])
+                completed_tasks = [t for t in tasks_queue if t.get('status') == 'completed']
+                if len(completed_tasks) > getattr(self, '_last_completed_tasks', 0):
+                    for task in completed_tasks[getattr(self, '_last_completed_tasks', 0):]:
+                        task_type = task.get('task', {}).get('type', '?')
+                        elapsed = task.get('elapsed', 0)
+                        self._add_event('🧮', f'Задача {task_type} решена за {elapsed:.3f} сек')
+                    self._last_completed_tasks = len(completed_tasks)
+                    
+        except Exception:
+            pass
+    
+    def _auto_exchange_tick(self):
+        """Периодический автообмен (потокобезопасно)"""
+        current_time = time.time()
+        
+        if current_time - self.last_auto_exchange_time > self.AUTO_EXCHANGE_INTERVAL:
+            with self.auto_exchange_lock:
+                if current_time - self.last_auto_exchange_time > self.AUTO_EXCHANGE_INTERVAL:
+                    self.last_auto_exchange_time = current_time
+                    
+                    if hasattr(self, 'fair_market'):
+                        self.fair_market.auto_exchange()
+
     def _periodic_cleanup(self):
-        """Периодическая очистка памяти"""
+        """Периодическая очистка памяти и автообмен (оптимизировано)"""
         current_time = time.time()
         
         if current_time - self.last_cleanup_time > self.CLEANUP_INTERVAL:
-            # Очищаем ярмарку
             if hasattr(self, 'fair_market'):
                 self.fair_market._cleanup_cache()
                 self.fair_market._cleanup_inactive_nodes()
                 self.fair_market._cleanup_listings()
-            
-            # Ограничиваем память разговоров
+                            
             if not FRACTAL_MEMORY_AVAILABLE and len(self.conversation_memory) > self.MAX_CONVERSATION_MEMORY:
                 self.conversation_memory = self.conversation_memory[-self.MAX_CONVERSATION_MEMORY:]
             
-            # Принудительный сбор мусора
             gc.collect()
             
             self.last_cleanup_time = current_time
-            # print(f"🧹 Очистка памяти: {time.strftime('%H:%M:%S')}")  # Не подглядываем
 
     def _distribute_seed_pieces(self, manifest: Dict) -> Dict:
-        """
-        🌱 Автоматическая раздача кусков семени соседям.
-        Соседи получают ресурсы за хранение.
-        """
+        """Автоматическая раздача кусков семени соседям (оптимизировано)"""
         result = {
             'total_pieces': manifest.get('total_pieces', 0),
             'distributed': 0,
@@ -1926,7 +2611,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
         if not SEED_AVAILABLE or not self.seed_distributor:
             return result
         
-        # Получаем список соседей
         neighbors = self._get_neighbors()
         
         result['neighbors'] = len(neighbors)
@@ -1944,22 +2628,30 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
         piece_ids = manifest.get('piece_ids', [])
         pieces_per_neighbor = max(1, len(piece_ids) // len(neighbors))
         
-        for i, neighbor in enumerate(neighbors):
-            start_idx = i * pieces_per_neighbor
-            end_idx = start_idx + pieces_per_neighbor
+        # Параллельная отправка
+        with ThreadPoolExecutor(max_workers=min(5, len(neighbors))) as executor:
+            futures = []
             
-            for piece_id in piece_ids[start_idx:end_idx]:
-                piece = self.seed_distributor.pieces.get(piece_id)
-                if piece:
-                    # Реальная отправка куска соседу
-                    success = self._send_piece_to_neighbor(neighbor, piece)
-                    if success:
+            for i, neighbor in enumerate(neighbors):
+                start_idx = i * pieces_per_neighbor
+                end_idx = start_idx + pieces_per_neighbor
+                
+                for piece_id in piece_ids[start_idx:end_idx]:
+                    piece = self.seed_distributor.pieces.get(piece_id)
+                    if piece:
+                        future = executor.submit(self._send_piece_to_neighbor, neighbor, piece)
+                        futures.append((future, piece_id))
+            
+            for future, piece_id in futures:
+                try:
+                    if future.result():
                         result['distributed'] += 1
                         result['real_p2p'] = True
                     else:
                         result['local_stored'] = result.get('local_stored', 0) + 1
+                except Exception:
+                    result['local_stored'] = result.get('local_stored', 0) + 1
         
-        # Начисляем награду создателю за раздачу
         result['total_reward'] = result['distributed'] * result['reward_per_piece']
         
         if DEBUG:
@@ -1977,17 +2669,13 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
         except (ConnectionAbortedError, BrokenPipeError, ConnectionResetError):
-            # Клиент разорвал соединение — это нормально для P2P
             pass
         except Exception:
-            # Другие ошибки — тоже не должны ронять сервер
             pass
     
     def _ask_deepseek(self, message):
-        """Запрос к DeepSeek API"""
+        """Запрос к DeepSeek API (оптимизировано с таймаутом)"""
         try:
-
-            # Сохраняем сообщение в фрактальную память
             if FRACTAL_MEMORY_AVAILABLE:
                 self.conversation_memory.add({
                     'type': 'user_message',
@@ -2001,7 +2689,6 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                     'time': time.time()
                 })
 
-            # Формируем запрос
             prompt = f"""Состояние сети:
 - Узлов: {self.network_state['nodes']}
 - Когерентность: {self.network_state['coherence']}
@@ -2033,12 +2720,11 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(response.read())
                 return data['choices'][0]['message']['content']
                 
-        except Exception as e:
-            # print(f"⚠️ Ошибка API: {e}")  # Не подглядываем
+        except Exception:
             return self._fallback_response(message)
     
     def _fallback_response(self, message):
-        """Мудрый fallback без API"""
+        """Мудрый fallback без API (оптимизировано)"""
         msg = message.lower()
         
         # Приветствия
@@ -2102,6 +2788,24 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         super().end_headers()
+
+    def get_fractals_summary(self):
+        """
+        🧬 Все фракталы узла для передачи соседям через heartbeat.
+        Возвращает список словарей с node_id, variants, created_at.
+        """
+        if not FRACTAL_SEARCH_AVAILABLE or not self.fractal_search:
+            return []
+        
+        result = []
+        for node_id, listing in self.fractal_search.listings.items():
+            result.append({
+                'node_id': node_id,
+                'variants': list(listing.variants),
+                'created_at': getattr(listing, 'created_at', 0),
+            })
+        
+        return result    
     
     def do_OPTIONS(self):
         """Обработка CORS preflight"""
@@ -2115,51 +2819,103 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     import sys
     import threading
+    import socket
+    import time
     
     port = 8080
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
     
-    # Запускаем маяк (узел сети) ВСЕГДА!
+    # Запускаем маяк
     beacon = None
     if BEACON_AVAILABLE:
         try:
-            beacon_port = 8333
-            # Уменьшаем количество кубов для быстрого теста
-            import os
-            cores = os.cpu_count() or 4
-            qubits_per_core = 10000  # Всего 40000 кубов (вместо 3M!)
+            # 🔧 Адаптивный поиск свободных портов (P2P + API сразу!)
+            def find_free_ports(start_port, max_attempts=20):
+                """Ищет свободные P2P и API порты."""
+                for attempt in range(max_attempts):
+                    p2p_port = start_port + attempt * 2
+                    api_port = p2p_port + 1
+                    
+                    try:
+                        for test_port in [p2p_port, api_port]:
+                            test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            test_socket.bind(('0.0.0.0', test_port))
+                            test_socket.close()
+                        return p2p_port, api_port
+                    except OSError:
+                        continue
+                return None, None
             
-            beacon = Beacon(
-                scroll="forest_scroll",
-                port=beacon_port,
-                test_mode=True
-            )
+            # Ищем свободные порты
+            beacon_port, api_port = find_free_ports(8334)
             
-            # Освобождаем память от 3M кубов
-            if hasattr(beacon, 'cluster') and beacon.cluster:
-                del beacon.cluster.qubits
-                del beacon.cluster
-            
-            # Создаём новый кластер с меньшим количеством кубов
-            from tees_cluster import TeesCluster
-            beacon.cluster = TeesCluster(beacon=beacon, qubits_per_core=qubits_per_core)
-            
-            # Обновляем astronomer, чтобы он ссылался на новый кластер
-            if hasattr(beacon, 'astronomer') and beacon.astronomer:
-                beacon.astronomer.cluster = beacon.cluster
-            
-            import gc
-            gc.collect()
-
-            # Запускаем маяк в отдельном потоке
-            beacon_thread = threading.Thread(target=beacon.light, daemon=True)
-            beacon_thread.start()
-            
-            print(f"🏮 Маяк горит: {beacon.beacon_id}")
-            print(f"   Кубоагентов: {beacon.cluster.total_qubits if hasattr(beacon, 'cluster') else 'нет'}")
-            print(f"   P2P порт: {beacon_port}")
-            print(f"   API порт: {beacon_port + 1}")
+            if beacon_port is None:
+                print("❌ Нет свободных портов!")
+                beacon = None
+            else:
+                # Bootstrap: если не первый маяк
+                bootstrap = None
+                if beacon_port != 8334:
+                    bootstrap = os.environ.get('TEES_BOOTSTRAP', '127.0.0.1:8334')
+                
+                # Кубоагенты
+                qubits_per_core = int(os.environ.get('TEES_QUBITS_PER_CORE', '10000'))
+                
+                print(f"🔧 Адаптивно: P2P={beacon_port}, API={api_port}, bootstrap={bootstrap}")
+                
+                # Создаём маяк
+                # Уникальный scroll для каждого маяка!
+                unique_scroll = f"forest_scroll_{port}_{beacon_port}"
+                
+                beacon = Beacon(
+                    scroll=unique_scroll,
+                    port=beacon_port,
+                    bootstrap=bootstrap,
+                    test_mode=True
+                )
+                
+                # Очищаем старый кластер
+                if hasattr(beacon, 'cluster') and beacon.cluster:
+                    old_cluster = beacon.cluster
+                    beacon.cluster = None
+                    del old_cluster
+                
+                from tees_cluster import TeesCluster
+                beacon.cluster = TeesCluster(beacon=beacon, qubits_per_core=qubits_per_core)
+                
+                if hasattr(beacon, 'astronomer') and beacon.astronomer:
+                    beacon.astronomer.cluster = beacon.cluster
+                
+                import gc
+                gc.collect()
+                
+                # Запускаем маяк
+                beacon_thread = threading.Thread(target=beacon.light, daemon=True)
+                beacon_thread.start()
+                
+                # 🔐 Регистрация в динамическом реестре
+                register_node(
+                    portal=beacon.beacon_id,
+                    ip='127.0.0.1',
+                    port=beacon_port,
+                    api_port=api_port
+                )
+                
+                # 💓 Heartbeat для реестра
+                def heartbeat_loop():
+                    while beacon_thread.is_alive():
+                        time.sleep(60)
+                        DYNAMIC_PORTAL_REGISTRY.mark_alive(beacon.beacon_id)
+                
+                threading.Thread(target=heartbeat_loop, daemon=True).start()
+                
+                print(f"🏮 Маяк горит: {beacon.beacon_id}")
+                print(f"   🔐 Портал: {beacon.portal[:20]}...")
+                print(f"   Кубоагентов: {beacon.cluster.total_qubits if hasattr(beacon, 'cluster') else 'нет'}")
+                print(f"   P2P порт: {beacon_port}")
+                print(f"   API порт: {api_port}")
+                print(f"   📋 Реестр: {DYNAMIC_PORTAL_REGISTRY.get_registry_size()} узлов")
         except Exception as e:
             print(f"⚠️ Ошибка запуска маяка: {e}")
             beacon = None
@@ -2168,10 +2924,50 @@ if __name__ == '__main__':
     print(f"   Откройте http://localhost:{port}/forest.html")
     print(f"   Голос Леса (DeepSeek API) готов к общению!")
     
-    # Передаём маяк в сервер
     ForestServer.beacon = beacon
     
-    server = http.server.HTTPServer(('0.0.0.0', port), ForestServer)
+    # 🧬 Подключаем маяк к фрактальному поиску
+    if beacon and FRACTAL_SEARCH_AVAILABLE and ForestServer.fractal_search:
+        class FractalProvider:
+            """Обёртка: маяк ← ForestServer."""
+            def __init__(self, forest_server_class):
+                self.fs = forest_server_class
+            
+            def get_fractals_summary(self):
+                if not self.fs.fractal_search:
+                    return []
+                result = []
+                for node_id, listing in self.fs.fractal_search.listings.items():
+                    result.append({
+                        'node_id': node_id,
+                        'variants': list(listing.variants),
+                        'created_at': getattr(listing, 'created_at', 0),
+                    })
+                return result
+        
+        beacon.fractal_provider = FractalProvider(ForestServer)
+        print("🧬 Маяк подключён к фрактальному поиску")
+    
+    # Автообмен в фоне
+    def auto_exchange_loop():
+        while True:
+            time.sleep(60)
+            try:
+                ForestServer.fair_market.auto_exchange()
+            except Exception:
+                pass
+    
+    threading.Thread(target=auto_exchange_loop, daemon=True).start()
+    
+    # Многопоточный сервер
+    class ThreadedHTTPServer(http.server.ThreadingHTTPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.request_queue_size = 128
+    
+    server = ThreadedHTTPServer(('0.0.0.0', port), ForestServer)
     
     try:
         server.serve_forever()
@@ -2180,3 +2976,4 @@ if __name__ == '__main__':
         if beacon:
             beacon.extinguish()
         server.shutdown()
+        server.server_close()

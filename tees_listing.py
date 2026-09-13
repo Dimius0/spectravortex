@@ -1,6 +1,7 @@
 # tees_listing.py
 # 📦 Объявление с вариантами формулировок
 
+import time
 from typing import List, Dict, Any, Optional
 from tees_fractal_image import FractalImage
 
@@ -22,6 +23,7 @@ class Listing:
         
         # Фракталы для каждого варианта
         self.fractals: Dict[int, FractalImage] = {}
+        self.created_at = time.time()
         self._rebuild()
     
     def add_variant(self, text: str):

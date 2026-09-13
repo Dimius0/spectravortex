@@ -552,7 +552,7 @@ class Beacon:
         # Состояние
         self.lit = False
         self.started_at = time.time()  # Для аптайма
-        self.glow = 0.994  # Стартовая когерентность
+        self.glow = 1.0  # Рождается в нирване! (эмерджентное состояние)
         self.warmth = 30.0
         self.entropy = 0.0
         self.glow_lock = threading.Lock()
@@ -585,6 +585,9 @@ class Beacon:
         self.MAX_EXTERNAL_ECHOES = 100     # Ограничение памяти
         self.signal_repeat_count = {}      # Счётчик повторов по частотам
         self._recognized_patterns = set()  # Частоты, о которых уже печатали
+        # 🧬 Провайдер фракталов — callback на ForestServer
+        # Если установлен — heartbeat будет передавать фракталы соседям
+        self.fractal_provider = None
 
         self.MAX_HOT_CONNECTIONS = 100  # Максимум горячих связей в RAM
         self.MAX_CHAT_MESSAGES = 50
@@ -629,7 +632,7 @@ class Beacon:
         self.healer = SelfHealingMesh(self)
 
         # ⚛️ TEES-кластер — вычислительное ядро - кубы на ядро
-        self.cluster = TeesCluster(beacon=self, qubits_per_core=750000) 
+        self.cluster = TeesCluster(beacon=self, qubits_per_core=7500) 
         
         # 🔭 Звездочёт — модуль управления
         self.astronomer = AstroModule(self)
@@ -718,11 +721,17 @@ class Beacon:
                 if sender == portal and not is_network:
                     power -= trade.get('amount', 0) + trade.get('energy', 0)
         
+        # 💎 Добавляем баланс из экономики!
+        if hasattr(self, 'economy') and self.economy:
+            try:
+                economy_balance = self.economy.get_balance(self)
+                power += economy_balance
+            except:
+                pass
+        
+        # Кэшируем — очищаем перед записью (кэш на 1 запись)
+        self._balance_cache.clear()
         self._balance_cache[ck] = max(0.0, power)
-        if len(self._balance_cache) > self._balance_cache_max_size:
-            old_keys = list(self._balance_cache.keys())[:-10]
-            for k in old_keys:
-                del self._balance_cache[k]
         
         return self._balance_cache[ck]
     
@@ -1054,7 +1063,6 @@ class Beacon:
 ╠══════════════════════════════════════════════════════════╣
 ║  Портал: {self.portal[:34]}  ║
 ║  Свечение: {self.glow:.4f}                          ║
-║  Тепло: {self.warmth:.1f}°                         ║
 ║  Соседей: {len(self.neighbors)}                           ║
 ║  Глыб: {len(self.adventure_map)}                              ║
 ╚══════════════════════════════════════════════════════════╝
@@ -1071,16 +1079,28 @@ class Beacon:
         
         def heartbeat_loop():
             while self.lit:
+                # 🧬 Собираем состояние
+                state = {
+                    'portal': self.portal,
+                    'glow': self.glow,
+                    'blocks': len(self.adventure_map),
+                    'neighbors': len(self.neighbors)
+                }
+                
+                # 🧬 Если есть провайдер фракталов — добавляем
+                if self.fractal_provider is not None:
+                    try:
+                        fractals = self.fractal_provider.get_fractals_summary()
+                        if fractals:
+                            state['fractals'] = fractals
+                    except Exception:
+                        pass
+                
                 self._broadcast({
                     'type': 'heartbeat',
                     'beacon_id': self.beacon_id,
                     'port': self.port,
-                    'state': {
-                        'portal': self.portal,
-                        'glow': self.glow,
-                        'blocks': len(self.adventure_map),
-                        'neighbors': len(self.neighbors)
-                    }
+                    'state': state
                 })
                 time.sleep(15)
         
@@ -1101,6 +1121,15 @@ class Beacon:
         sys.exit(0)
 
     def extinguish(self):
+        # 🌙 Прощальный сигнал соседям!
+        if self.lit:
+            self._broadcast({
+                'type': 'beacon_goodbye',
+                'beacon_id': self.beacon_id,
+                'port': self.port,
+                'reason': 'extinguish'
+            })
+        
         self.lit = False
         self._save_map()
         self._cleanup_lock()
@@ -1271,6 +1300,19 @@ class Beacon:
                     self.healer.store_fragment(lost_id, fragment['data'])
                 else:
                     self.healer.store_fragment(lost_id, fragment)
+
+        elif t == 'beacon_goodbye':
+            # Сосед прощается — удаляем его!
+            goodbye_id = msg.get('beacon_id', '')
+            goodbye_port = msg.get('port', addr[1])
+            goodbye_addr = f"{addr[0]}:{goodbye_port}"
+            
+            with self.neighbors_lock:
+                if goodbye_addr in self.neighbors:
+                    self.neighbors.remove(goodbye_addr)
+                    print(f"  👋 Сосед {goodbye_id[:8]}... погас. Удаляем!")
+            
+            return {'type': 'goodbye_ack', 'status': 'removed'}            
         
         elif t == 'chat':
             chat_msg = msg.get('message', '')
@@ -2082,8 +2124,7 @@ class Beacon:
                 elif torch_status['next_level']:
                     torch_note = f" | 🏮 {torch_status['current_level']}/{torch_status['next_level']['threshold']}"
                 
-                print(f"  📊 Тепло: {self.warmth:.1f}° | "
-                      f"Фрагментов: {stats['fragments_stored']} | "
+                print(f"  📊 Фрагментов: {stats['fragments_stored']} | "
                       f"Симбиозов: {len(self.symbiosis_connections)} | "
                       f"Наблюдаем: {stats['watching']} маяков | "
                       f"RAM: {mem_stats['current']:.1f}MB | "
@@ -2104,13 +2145,15 @@ class Beacon:
                     self._mine_block()
                     last_block_mine = current_time
             
-            # Адаптивный sleep — ключевая оптимизация
-            if self.glow >= 0.999:
-                sleep_time = 5  # В нирване — меньше работы
+            # Адаптивный sleep — зависит от активности сети!
+            if self.glow >= 0.99999:
+                sleep_time = 5  # Глубокая нирвана — можно спать!
+            elif self.glow >= 0.999:
+                sleep_time = 2  # Почти нирвана — лёгкий сон!
             elif len(self.neighbors) == 0:
-                sleep_time = 3  # Нет соседей — нечего делать
-            
-            time.sleep(sleep_time)
+                sleep_time = 3  # Одинокий — ждём!
+            else:
+                sleep_time = 1  # Активная работа!
     
     # ═══════════════════════════════════════════════════════════
     # 📡 API
@@ -2391,8 +2434,8 @@ class Beacon:
 
     def update_glow(self):
         """
-        Живая когерентность — сеть сама знает к чему стремиться.
-        Оптимизированная версия с кэшированием.
+        Живая когерентность — ВСЕГДА стремится к 1.0!
+        Скорость зависит от сложности сети.
         """
         # Кэшируем значения
         if not hasattr(self, '_glow_cache'):
@@ -2418,21 +2461,58 @@ class Beacon:
             'symbiosis': symbiosis_count
         })
         
-        neighbors_bonus = min(0.01, neighbors_count * 0.001)
-        symbiosis_bonus = min(0.005, symbiosis_count * 0.0005)
+        # 🎯 НОВАЯ МОДЕЛЬ: Всегда к 1.0, сложность ускоряет!
+        # Коэффициент ускорения от сложности
+        acceleration = 1.0 + neighbors_count * 0.05 + symbiosis_count * 0.03
+
+        # Поправка от состояния поля
+        try:
+            field_neighbors = neighbors_count
+            field_symbiosis = symbiosis_count
+            field_glow = self.glow
+
+            # Поле мягко уточняет
+            if field_neighbors > 0:
+                acceleration *= (1.0 + min(field_neighbors, 50) * 0.005)
+        except Exception:
+            pass
         
-        target = min(1.0, 0.994 + neighbors_bonus + symbiosis_bonus)
+        # Базовая скорость
+        base_rate = 0.01
         
         with self.glow_lock:
-            new_glow = self.glow + (target - self.glow) * 0.1
-            self.glow = max(0.9, min(1.0, new_glow))
+            # Всегда стремимся к 1.0!
+            # Адаптивно: чем ближе к 1.0, тем точнее!
+            delta = (1.0 - self.glow) * base_rate * acceleration
             
-            if self.glow >= 0.9999:
-                self.glow = 1.0  # Нирвана!
+            self.glow += delta
+            
+            # Плавное достижение 1.0 без скачков!
+            if self.glow > 0.99999:
+                self.glow = 1.0  # Практически нирвана!
         
         # Обновляем факел
         total_nodes = neighbors_count + 1
         self.quantum_torch.check(total_nodes, self.glow)
+
+    def _read_field_state(self):
+        """Внутреннее считывание состояния поля."""
+        if not self.lit:
+            return None
+
+        try:
+            cluster_coh = self.cluster.measure_internal_coherence()
+            avg_coh = cluster_coh.get('avg', self.glow)
+        except Exception:
+            avg_coh = self.glow
+
+        return {
+            'glow': self.glow,
+            'coherence': avg_coh,
+            'neighbors': len(self.neighbors),
+            'symbiosis': len(self.symbiosis_connections),
+            'ram_mb': self.memory_optimizer.get_stats().get('current', 0),
+        }    
 
     def _listen_external_world(self):
         """
@@ -2617,7 +2697,7 @@ class Beacon:
     def _get_neighbor_connections(self, neighbor):
         """
         Спрашиваем у соседа сколько у него связей.
-        С кэшированием чтобы не спамить.
+        С кэшированием и TTL-очисткой.
         """
         # Проверяем кэш
         cached = self.neighbor_connections_cache.get(neighbor)
@@ -2639,21 +2719,27 @@ class Beacon:
             }).encode())
             resp = json.loads(sock.recv(4096).decode())
             count = resp.get('connections', 0)
-            
-            # Сохраняем в кэш
-            self.neighbor_connections_cache[neighbor] = (count, time.time())
-            
-            return count
         except:
-            # Недоступен — кэшируем 0 на короткое время
-            self.neighbor_connections_cache[neighbor] = (0, time.time())
-            return 0
+            count = 0
         finally:
             if sock:
                 try:
                     sock.close()
                 except:
                     pass
+        
+        # Чистим устаревшие при записи
+        if len(self.neighbor_connections_cache) >= 100:
+            now = time.time()
+            expired = [
+                k for k, (_, ts) in self.neighbor_connections_cache.items()
+                if now - ts > self.CACHE_TTL
+            ]
+            for k in expired:
+                del self.neighbor_connections_cache[k]
+        
+        self.neighbor_connections_cache[neighbor] = (count, time.time())
+        return count
 
     def _relax_connections(self):
         """

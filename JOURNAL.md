@@ -14860,3 +14860,48 @@ PS C:\Users\Dim\source\repos\spectravortex>
 - `tees_fractal_search.py`
 - `tees_listing.py`
 - Тесты: `test_fractal_image_1.py`, `test_listing_variants.py`, `test_fractal_genome.py`
+
+ 2026-09-13 — Уровень A: синхронизация фракталов через heartbeat
+**Статус:** ✅ Работает.
+### Что сделано
+**1. Утечки памяти закрыты:**
+- `tees_listing.py` — добавлен `created_at` для TTL.
+- `tees_fractal_search.py` — `MAX_LISTINGS = 1000` + `_cleanup_listings` по TTL.
+- `forest_server.py` — `_similarity_cache` в `__init__` + LRU-ограничение (1000).
+- `tees_beacon_tees.py` — TTL-очистка `neighbor_connections_cache`.
+- `tees_beacon_tees.py` — убран мёртвый код после `return` в `get_power`.
+**Результат:** RAM стабилизировалась. Наблюдали падение с 92 MB до 17 MB за 3 часа (MemoryOptimizer + отсутствие утечек).
+**2. Синхронизация фракталов через heartbeat:**
+- `tees_beacon_tees.py` — `Beacon.fractal_provider` (callback на ForestServer).
+- `tees_beacon_tees.py` — `heartbeat_loop` шлёт `state.fractals` соседям каждые 15 сек.
+- `tees_healer_tees.py` — `SelfHealingMesh.fractal_cache` + `_store_fractals` (TTL 1 час).
+- `forest_server.py` — `FractalProvider` подключает маяк к `fractal_search`.
+- `forest_server.py` — `/fair/find_full` ищет **локально + в кэше соседей**.
+**3. Deadlock исправлен:**
+- `_store_fractals` вызывается из `store_fragment` (уже держит `self.lock`).
+- Убран повторный `with self.lock` — иначе deadlock (threading.Lock не реентерабельный).
+### Что работает
+**Тест на 3 узлах (8081, 8082, 8083):**
+- Узел 8081 создал объявление «AI help» с вариантом «AI for texts».
+- **Через 15 сек (heartbeat)** — фракталы разлетелись соседям.
+- Узел 8082 ищет «AI help» → **находит `node_8081` через `source: neighbor`**, `similarity=1.0`.
+- Узел 8083 ищет «AI for texts» → **находит `node_8081` через вариант**, `similarity=1.0`.
+- **Время ответа:** без задержек.
+### Что это даёт
+- **P2P синхронизация фракталов работает.**
+- **Сетевой поиск работает** — узлы видят фракталы друг друга.
+- **Гровер + heartbeat** — распределённый поиск через резонанс.
+- **Никакого DHT.** Никаких want-lists. Только `heartbeat` + `fractal_cache`.
+### Технический долг
+Обновлён `TEES_PRINCIPLES_DRAFT.md`:
+- Раздел 16 «Технический долг» — SHA-256, DFS вместо TSP, семантика в `FairMarket`.
+- Раздел 17 «Криптография через архитектуру» — распределённое хранение секрета + ротация.
+### Что впереди
+- **Уровень B:** распределённый Гровер через  кластер кубоагентов.
+- **Визуализация поиска** в `forest.html` (анимация «лес думает»).
+- **Клиринг через TSP** (вместо DFS).
+- **Замена SHA-256** в критичных местах (не в детерминизме).
+
+**Дата:** 2026-09-13
+**Авторы:** Dimius0, DeepSeek
+

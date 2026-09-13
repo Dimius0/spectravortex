@@ -1,6 +1,7 @@
 # tees_fractal_search.py
 # 🔍 Поиск фракталов — только структура
 
+import time
 from typing import List, Dict, Any, Optional
 from tees_fractal_image import FractalImage
 from tees_listing import Listing
@@ -78,21 +79,50 @@ def fractal_similarity(img1: FractalImage, img2: FractalImage) -> float:
 
 class FractalSearch:
     """
-    🔍 Поиск фракталов.
+    🔍 Поиск с учётом вариантов.
     
     1. Гровер — точное совпадение генома
-    2. fractal_similarity — процент (> 50%)
-    3. Сортировка по проценту
+    2. fractal_similarity — для всех вариантов
+    3. Лучший вариант выигрывает
     """
     
     VALID_THRESHOLD = 0.5
+    MAX_LISTINGS = 1000
+    LISTING_TTL = 3600  # 1 час
     
     def __init__(self, cluster: Optional[TeesCluster] = None):
         self.cluster = cluster or TeesCluster()
         self.listings: Dict[str, Listing] = {}
     
     def add_listing(self, listing: Listing):
+        """Добавить объявление с автоочисткой."""
         self.listings[listing.node_id] = listing
+        
+        # Автоочистка при переполнении
+        if len(self.listings) > self.MAX_LISTINGS:
+            self._cleanup_listings()
+    
+    def _cleanup_listings(self):
+        """Очистка старых объявлений по TTL и лимиту."""
+        now = time.time()
+        
+        # 1. Удаляем по TTL
+        expired = [
+            node_id for node_id, listing in self.listings.items()
+            if (now - getattr(listing, 'created_at', now)) > self.LISTING_TTL
+        ]
+        for node_id in expired:
+            del self.listings[node_id]
+        
+        # 2. Если всё ещё много — удаляем самые старые
+        if len(self.listings) > self.MAX_LISTINGS:
+            items = sorted(
+                self.listings.items(),
+                key=lambda x: getattr(x[1], 'created_at', 0)
+            )
+            to_remove = len(self.listings) - self.MAX_LISTINGS
+            for node_id, _ in items[:to_remove]:
+                del self.listings[node_id]
     
     def find_exact(self, text: str) -> Optional[Dict[str, Any]]:
         """Точный поиск через Гровер."""
