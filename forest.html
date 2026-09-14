@@ -52,12 +52,7 @@
             height: 2px;
             background: white;
             border-radius: 50%;
-            animation: twinkle 3s infinite;
-        }
-        
-        @keyframes twinkle {
-            0%, 100% { opacity: 0.3; }
-            50% { opacity: 1; }
+            opacity: 0.7;
         }
         
         /* Основной контейнер */
@@ -73,7 +68,6 @@
         .panel-left {
             width: 380px;
             background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
             padding: 15px;
             overflow: hidden;
             display: flex;
@@ -208,7 +202,6 @@
         .panel-center {
             flex: 1;
             background: rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(10px);
             padding: 15px;
             overflow-y: auto;
             min-width: 0;
@@ -269,7 +262,6 @@
         .panel-right {
             width: 280px;
             background: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
             padding: 15px;
             overflow-y: auto;
             flex-shrink: 0;
@@ -370,7 +362,6 @@
             position: relative;
             z-index: 2;
             background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
             border-top: 1px solid rgba(122, 199, 12, 0.3);
             transition: all 0.3s;
         }
@@ -481,7 +472,6 @@
             position: sticky;
             bottom: 0;
             background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
             z-index: 5;
         }
         
@@ -571,6 +561,59 @@
             text-align: center;
             min-width: 350px;
             max-width: 90%;
+        }
+
+        /* Визуализация поиска — "лес думает" */
+        .search-progress {
+            padding: 12px 15px;
+            margin: 10px 0;
+            background: rgba(0, 20, 0, 0.6);
+            border: 1px solid rgba(122, 199, 12, 0.3);
+            border-radius: 10px;
+            text-align: left;
+        }
+        
+        .search-step {
+            padding: 6px 10px;
+            margin: 4px 0;
+            background: rgba(122, 199, 12, 0.08);
+            border-radius: 6px;
+            font-size: 0.85em;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.3s;
+        }
+        
+        .search-step.done {
+            color: #a0a0a0;
+            background: rgba(122, 199, 12, 0.03);
+        }
+        
+        .search-step .step-icon {
+            flex-shrink: 0;
+            font-size: 1.1em;
+        }
+        
+        .search-step .step-text {
+            flex: 1;
+        }
+        
+        .search-step .step-result {
+            color: #7ac70c;
+            font-size: 0.8em;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .search-step-spinner {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
         
         .modal-emoji {
@@ -662,7 +705,7 @@
         <div class="panel-center">
             <div class="event-log">
                 <h3>📡 События леса</h3>
-                <div id="eventLog"></div>
+                <div id="eventLog" class="event-log-content"></div>
             </div>
         </div>
 
@@ -869,57 +912,69 @@
     <script>
         // Базовый URL сервера (автоматически определяется)
         const SERVER_URL = window.location.origin;
-        // Данные узлов
-        const nodeData = [
-            { address: '1GkZf79QzzTY8ARWxT4MaMoxtiACdcy33b', coherence: 0.994, connections: 0, tasks: 0, power: 'small', emoji: '🌱' },
-            { address: '1JS6gmLKZpZkAj5Xrk3gZUiSqBVyDgUhF6', coherence: 0.996, connections: 3, tasks: 12, power: 'medium', emoji: '🌿' },
-            { address: '1HEoZDLWCLzB2GGNPDY7ff87keL1QUfLea', coherence: 0.998, connections: 7, tasks: 45, power: 'large', emoji: '🌳' },
-            { address: '1B6kqEwXfWhC...', coherence: 0.999, connections: 5, tasks: 89, power: 'medium', emoji: '🍄' },
-            { address: '1PRIZE0000000000000000000000000000000', coherence: 0.997, connections: 4, tasks: 23, power: 'small', emoji: '🌸' },
-            { address: '1A2bC3dE4fG5hI6jK7lM8nO9pQ0rS1tU2v', coherence: 0.995, connections: 2, tasks: 8, power: 'medium', emoji: '🌲' },
-            { address: '1X9yZ8wV7uT6sR5qP4oN3mL2kJ1iH0gF2e', coherence: 0.996, connections: 6, tasks: 34, power: 'large', emoji: '🌿' },
-            { address: '1QwErTyUiOpAsDfGhJkLzXcVbNm123456', coherence: 1.000, connections: 11, tasks: 156, power: 'large', emoji: '🌳' },
-            { address: '1MnBvCxZaLkJhGfDsApOiUyTrEwQ987654', coherence: 0.999, connections: 9, tasks: 234, power: 'large', emoji: '🍄' },
-            { address: '1ZxCvBnMaLkJhGfDsApOiUyTrEwQ112233', coherence: 0.993, connections: 1, tasks: 2, power: 'small', emoji: '🌱' },
-            { address: '1PoIuYtReWqAsDfGhJkLzXcVbNm445566', coherence: 0.998, connections: 8, tasks: 67, power: 'medium', emoji: '🌸' },
-            { address: '1LkJhGfDsApOiUyTrEwQMnBvCxZa778899', coherence: 1.000, connections: 15, tasks: 345, power: 'large', emoji: '🌲' }
-        ];
         
+        // 🔐 Адрес узла — уникальный для каждой вкладки!
+        const NODE_ADDRESS = 'node_' + window.location.port;
+        console.log('🔐 Адрес узла:', NODE_ADDRESS);
+        
+        // Данные узлов (загружаются с сервера)
+        let nodeData = [];
+        
+        // Создание статичных звёзд (без анимации)
         function createStars() {
             const starsContainer = document.getElementById('stars');
-            for (let i = 0; i < 150; i++) {
-                const star = document.createElement('div');
-                star.className = 'star';
-                star.style.left = Math.random() * 100 + '%';
-                star.style.top = Math.random() * 100 + '%';
-                star.style.animationDelay = Math.random() * 3 + 's';
-                star.style.opacity = Math.random() * 0.7 + 0.3;
-                starsContainer.appendChild(star);
+            const starsHTML = [];
+            
+            for (let i = 0; i < 30; i++) {
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const opacity = Math.random() * 0.7 + 0.3;
+                
+                starsHTML.push(`<div class="star" style="left: ${left}%; top: ${top}%; opacity: ${opacity};"></div>`);
             }
+            
+            starsContainer.innerHTML = starsHTML.join('');
         }
         
+        // Создание списка узлов с делегированием событий
         function createNodeList() {
             const nodeList = document.getElementById('nodeList');
-            nodeList.innerHTML = '';
+            const nodesHTML = [];
             
             nodeData.forEach((node, index) => {
-                const item = document.createElement('div');
-                item.className = 'node-item';
-                item.innerHTML = `
-                    <div class="node-emoji ${node.power}">${node.emoji}</div>
-                    <div class="node-info">
-                        <div class="node-address">${node.address}</div>
-                        <div class="node-stats">
-                            <span>🤝 ${node.connections}</span>
-                            <span>📊 ${node.tasks}</span>
+                nodesHTML.push(`
+                    <div class="node-item" data-index="${index}" data-address="${node.address.toLowerCase()}">
+                        <div class="node-emoji ${node.power}">${node.emoji}</div>
+                        <div class="node-info">
+                            <div class="node-address">${node.address}</div>
+                            <div class="node-stats">
+                                <span>🤝 ${node.connections}</span>
+                                <span>📊 ${node.tasks}</span>
+                            </div>
                         </div>
+                        <span class="node-badge">${node.coherence.toFixed(3)}</span>
                     </div>
-                    <span class="node-badge">${node.coherence.toFixed(3)}</span>
-                `;
-                item.onclick = () => selectNode(index);
-                item.dataset.address = node.address.toLowerCase();
-                nodeList.appendChild(item);
+                `);
             });
+            
+            nodeList.innerHTML = nodesHTML.join('');
+            
+            // Делегирование событий
+            nodeList.addEventListener('click', (e) => {
+                const item = e.target.closest('.node-item');
+                if (item) {
+                    const index = parseInt(item.dataset.index);
+                    selectNode(index);
+                }
+            });
+        }
+
+        // Закрытие модального окна с очисткой памяти
+        function closeModal(overlay) {
+            if (overlay) {
+                overlay.innerHTML = '';
+                overlay.remove();
+            }
         }
 
         // Посадка дерева (создание и сборка семени)
@@ -953,7 +1008,7 @@
                     <div id="seedResult" style="display: none; margin-bottom: 15px;"></div>
                     
                     <div style="text-align: center;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1071,7 +1126,7 @@
         
         function showNodeDetails(node) {
             const oldModal = document.querySelector('.modal-overlay');
-            if (oldModal) oldModal.remove();
+            if (oldModal) closeModal(oldModal);
             
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
@@ -1089,7 +1144,7 @@
                         <button class="modal-btn" onclick="alert('🤝 Симбиоз с узлом')">🤝 Симбиоз</button>
                         <button class="modal-btn" onclick="alert('💬 Чат с узлом')">💬 Чат</button>
                         <button class="modal-btn" onclick="alert('📦 Задача узлу')">📦 Задача</button>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1219,7 +1274,7 @@
                     </div>
 
                     <div style="text-align: center;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1234,7 +1289,7 @@
             const listingType = document.getElementById('fairType').value;
             const item = document.getElementById('fairItem').value;
             const description = document.getElementById('fairDescription').value;
-            const category = document.getElementById('fairCategory')?.value || 'общее';  // ← НОВОЕ!
+            const category = document.getElementById('fairCategory')?.value || 'общее';
             
             if (!item) {
                 alert('Укажите предмет!');
@@ -1246,7 +1301,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd',  // Пока тестовый адрес
+                        node_address: NODE_ADDRESS,
                         type: listingType,
                         item: item,
                         description: description,
@@ -1259,7 +1314,6 @@
                 if (data.status === 'ok') {
                     let message = data.message;
                     
-                    // Если есть круги — добавляем информацию
                     if (data.total_circles && data.total_circles > 0) {
                         message += `\n🔄 Найдено кругов: ${data.total_circles}!`;
                     }
@@ -1267,16 +1321,13 @@
                     alert(message);
                     loadMyListings();
                     
-                    // Если есть круги — обновляем их отображение
                     if (data.circles && data.circles.length > 0) {
                         findCircles();
                     }
                     
-                    // Очищаем поля
                     document.getElementById('fairItem').value = '';
                     document.getElementById('fairDescription').value = '';
-                }
-                 else {
+                } else {
                     alert('Ошибка: ' + data.message);
                 }
             } catch (error) {
@@ -1294,7 +1345,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd'
+                        node_address: NODE_ADDRESS
                     })
                 });
                 
@@ -1335,49 +1386,279 @@
             }
         }
 
-        // Поиск совпадений
+        // Визуализация поиска — "лес думает"
+        function showSearchProgress(container) {
+            container.innerHTML = `
+                <div class="search-progress" id="searchProgress">
+                    <div id="searchSteps"></div>
+                </div>
+            `;
+            return document.getElementById('searchSteps');
+        }
+
+        async function addSearchStep(text, duration = 400) {
+            const container = document.getElementById('searchSteps');
+            if (!container) return null;
+            
+            const step = document.createElement('div');
+            step.className = 'search-step';
+            step.innerHTML = `
+                <span class="step-icon search-step-spinner">⏳</span>
+                <span class="step-text">${text}</span>
+            `;
+            container.appendChild(step);
+            
+            await new Promise(r => setTimeout(r, duration));
+            
+            step.classList.add('done');
+            step.querySelector('.step-icon').classList.remove('search-step-spinner');
+            step.querySelector('.step-icon').textContent = '✅';
+            
+            return step;
+        }
+
+        function finishSearchStep(step, resultText) {
+            if (!step) return;
+            step.classList.add('done');
+            const icon = step.querySelector('.step-icon');
+            icon.classList.remove('search-step-spinner');
+            icon.textContent = '✅';
+            
+            if (resultText) {
+                const result = document.createElement('span');
+                result.className = 'step-result';
+                result.textContent = resultText;
+                step.appendChild(result);
+            }
+        }
+
+        // 🧬 Новый поиск через /fair/find_full
+        async function findFullSearch(query) {
+            const response = await fetch(SERVER_URL + '/fair/find_full', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: query,
+                    limit: 10
+                })
+            });
+            return await response.json();
+        }
+
         async function findMatches() {
             const container = document.getElementById('fairMatches');
             if (!container) return;
             
-            container.innerHTML = '<p style="color: #a0a0a0;">Поиск...</p>';
+            const queryText = prompt('Введите запрос для поиска:', '');
+            if (!queryText) return;
             
+            // Показываем анимацию
+            showSearchProgress(container);
+            
+            // Запускаем оба поиска параллельно
+            const searchPromiseOld = fetch(SERVER_URL + '/fair/find_match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    node_address: NODE_ADDRESS,
+                    limit: 10
+                })
+            }).then(r => r.json()).catch(e => ({ status: 'error', message: String(e) }));
+            
+            const searchPromiseNew = findFullSearch(queryText);
+            
+            // Анимация шагов
+            await addSearchStep('🔍 Поиск в сети...', 300);
+            const step1 = await addSearchStep('🌿 Локальные фракталы...', 400);
+            const step2 = await addSearchStep('📡 Запрос соседям...', 500);
+            
+            // Ждём оба
+            let dataOld, dataNew;
             try {
-                const response = await fetch(SERVER_URL + '/fair/find_match', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        node_address: '0x1234...abcd',
-                        limit: 10
-                    })
-                });
+                [dataOld, dataNew] = await Promise.all([searchPromiseOld, searchPromiseNew]);
+            } catch (e) {
+                dataOld = { status: 'error' };
+                dataNew = { status: 'error', message: String(e) };
+            }
+            
+            // Показываем результат
+            const step3 = await addSearchStep('✅ Сбор ответов...', 300);
+            
+            // Дополняем шаги результатами
+            if (dataNew.status === 'ok') {
+                finishSearchStep(step1, `(${dataNew.local_count || 0})`);
+                finishSearchStep(step2, `(${dataNew.neighbor_count || 0})`);
+                finishSearchStep(step3, `(${dataNew.count || 0})`);
+            }
+            
+            // Небольшая пауза — чтобы анимация "устоялась"
+            await new Promise(r => setTimeout(r, 400));
+            
+            // Рендер результатов
+            renderCombinedResults(container, dataOld, dataNew, queryText);
+        }
+
+        function renderSearchResults(container, data, queryText) {
+            if (data.status !== 'ok') {
+                container.innerHTML = `<p style="color: #ff6464;">Ошибка: ${data.message || 'неизвестно'}</p>`;
+                return;
+            }
+            
+            const exact = data.exact;
+            const similar = data.similar || [];
+            
+            let html = '';
+            
+            // Точное совпадение
+            if (exact) {
+                html += `
+                    <div style="padding: 12px; margin-bottom: 8px; background: rgba(122,199,12,0.15); border-radius: 8px; border: 1px solid #7ac70c;">
+                        <div style="color: #7ac70c; font-weight: bold; margin-bottom: 4px;">
+                            🎯 Точное совпадение
+                        </div>
+                        <div style="color: #e0e0e0; font-size: 0.9em;">
+                            ${exact.variant}
+                        </div>
+                        <div style="color: #a0a0a0; font-size: 0.75em; margin-top: 4px;">
+                            Узел: ${exact.node_id}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Похожие
+            if (similar.length > 0) {
+                html += `
+                    <div style="color: #7ac70c; font-size: 0.85em; margin: 12px 0 8px; font-weight: bold;">
+                        ✨ Похожие (${similar.length})
+                    </div>
+                `;
                 
-                const data = await response.json();
-                
-                if (data.status === 'ok' && data.matches.length > 0) {
-                    container.innerHTML = data.matches.map(match => `
-                        <div style="padding: 10px; margin-bottom: 8px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
+                html += similar.map(s => {
+                    const source = s.source === 'neighbor' 
+                        ? `📡 сосед ${s.neighbor_beacon || ''}` 
+                        : '🌿 локально';
+                    const similarity = Math.round((s.similarity || 0) * 100);
+                    
+                    return `
+                        <div style="padding: 10px; margin-bottom: 6px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <span style="color: #7ac70c; font-size: 0.9em;">
-                                    ${match.type === 'offer_match' ? '🌳 Ваше предложение' : '🌱 Ваш запрос'}: ${match.my_item}
+                                    ${s.best_variant || s.variant || '—'}
                                 </span>
-                                ${match.weight ? `<span style="color: #ffd700; font-size: 0.75em;">⚡ ${match.weight}</span>` : ''}
+                                <span style="color: #ffd700; font-size: 0.8em;">
+                                    ${similarity}%
+                                </span>
                             </div>
-                            <div style="color: #e0e0e0; font-size: 0.85em; margin-top: 3px;">
-                                ↔ ${match.their_item} (${match.node_short})
-                            </div>
-                            <div style="color: #a0a0a0; font-size: 0.75em; margin-top: 3px;">
-                                Совпадение: ${Math.round(match.similarity * 100)}%
-                                ${match.reputation ? ` | Репутация: ${match.reputation}★` : ''}
+                            <div style="color: #a0a0a0; font-size: 0.75em; margin-top: 4px;">
+                                ${s.node_id || ''} · ${source}
                             </div>
                         </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = '<p style="color: #a0a0a0;">Совпадений пока нет</p>';
-                }
-            } catch (error) {
-                container.innerHTML = '<p style="color: #a0a0a0;">Недоступно</p>';
+                    `;
+                }).join('');
             }
+            
+            if (!exact && similar.length === 0) {
+                html = `
+                    <div style="text-align: center; padding: 20px; color: #a0a0a0;">
+                        <p style="font-size: 0.9em;">🌱 Ничего не найдено</p>
+                        <p style="font-size: 0.75em;">Попробуйте другой запрос или добавьте варианты</p>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function renderCombinedResults(container, dataOld, dataNew, queryText) {
+            // Собираем все совпадения в один список
+            const allMatches = [];
+            
+            // Из старой ярмарки
+            if (dataOld.status === 'ok' && dataOld.matches) {
+                for (const m of dataOld.matches) {
+                    allMatches.push({
+                        source: 'market',
+                        node_id: m.node_address || m.node_short || '',
+                        variant: m.their_item || '',
+                        my_item: m.my_item || '',
+                        reputation: m.reputation || 0,
+                    });
+                }
+            }
+            
+            // Из фрактального поиска — exact
+            if (dataNew.status === 'ok' && dataNew.exact) {
+                const e = dataNew.exact;
+                allMatches.push({
+                    source: 'fractal',
+                    node_id: e.node_id || '',
+                    variant: e.variant || '',
+                    my_item: queryText,
+                    reputation: 0,
+                });
+            }
+            
+            // Из фрактального поиска — similar
+            if (dataNew.status === 'ok' && dataNew.similar) {
+                for (const s of dataNew.similar) {
+                    allMatches.push({
+                        source: s.source === 'neighbor' ? 'neighbor' : 'fractal',
+                        node_id: s.node_id || '',
+                        variant: s.best_variant || s.variant || '',
+                        my_item: queryText,
+                        reputation: 0,
+                    });
+                }
+            }
+            
+            // Убираем дубликаты по (node_id + variant)
+            const seen = new Set();
+            const unique = [];
+            for (const m of allMatches) {
+                const key = `${m.node_id}|${(m.variant || '').toLowerCase()}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    unique.push(m);
+                }
+            }
+            
+            // Рендер
+            if (unique.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 20px; color: #a0a0a0;">
+                        <p style="font-size: 0.9em;">🌱 Ничего не найдено</p>
+                        <p style="font-size: 0.75em;">Попробуйте другой запрос или добавьте варианты</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div style="color: #7ac70c; font-size: 0.85em; margin: 8px 0; font-weight: bold;">
+                    ✨ Найдено: ${unique.length}
+                </div>
+            `;
+            
+            html += unique.map(m => {
+                const sourceIcon = 
+                    m.source === 'neighbor' ? '📡' :
+                    m.source === 'market' ? '🌿' :
+                    '🌀';
+                
+                return `
+                    <div style="padding: 10px; margin-bottom: 6px; background: rgba(122,199,12,0.08); border-radius: 8px; border: 1px solid rgba(122,199,12,0.2);">
+                        <div style="color: #e0e0e0; font-size: 0.9em;">
+                            ${m.variant}
+                        </div>
+                        <div style="color: #a0a0a0; font-size: 0.75em; margin-top: 4px;">
+                            ${sourceIcon} ${m.node_id}${m.reputation ? ` · ${m.reputation}★` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html;
         }
 
         // Удаление объявления
@@ -1396,7 +1677,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd',
+                        node_address: NODE_ADDRESS,
                         listing_hash: listingHash
                     })
                 });
@@ -1405,7 +1686,7 @@
                 
                 if (data.status === 'ok') {
                     addChronicle('🗑️', 'Объявление удалено');
-                    loadMyListings();  // Обновляем список
+                    loadMyListings();
                 } else {
                     alert('Ошибка: ' + data.message);
                 }
@@ -1428,7 +1709,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd',
+                        node_address: NODE_ADDRESS,
                         max_depth: parseInt(maxDepth)
                     })
                 });
@@ -1525,7 +1806,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         circle: circle,
-                        node_address: '0x1234...abcd'
+                        node_address: NODE_ADDRESS
                     })
                 });
                 
@@ -1553,25 +1834,25 @@
                     <p style="color: #a0a0a0; margin-bottom: 20px;">Лес умеет считать, искать и сворачивать вихри!</p>
                     
                     <div style="text-align: left; margin-bottom: 20px;">
-                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(122,199,12,0.1); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showTSP();">
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(122,199,12,0.1); border-radius: 8px; cursor: pointer;" onclick="closeModal(this.closest('.modal-overlay')); showTSP();">
                             <span style="font-size: 1.2em;">🗺️</span>
                             <span style="color: #e0e0e0;">Маршрут (TSP)</span>
                             <span style="color: #a0a0a0; font-size: 0.8em;"> — оптимизация пути</span>
                         </div>
                         
-                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showSHA();">
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="closeModal(this.closest('.modal-overlay')); showSHA();">
                             <span style="font-size: 1.2em;">🔐</span>
                             <span style="color: #e0e0e0;">Хеш (SHA-256)</span>
                             <span style="color: #a0a0a0; font-size: 0.8em;"> — мгновенное хеширование</span>
                         </div>
                         
-                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showGrover();">
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="closeModal(this.closest('.modal-overlay')); showGrover();">
                             <span style="font-size: 1.2em;">🔍</span>
                             <span style="color: #e0e0e0;">Поиск (Гровер)</span>
                             <span style="color: #a0a0a0; font-size: 0.8em;"> — квантовый поиск</span>
                         </div>
                         
-                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="this.closest('.modal-overlay').remove(); showVortex();">
+                        <div style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; cursor: pointer;" onclick="closeModal(this.closest('.modal-overlay')); showVortex();">
                             <span style="font-size: 1.2em;">🌀</span>
                             <span style="color: #e0e0e0;">TEES-вихрь</span>
                             <span style="color: #a0a0a0; font-size: 0.8em;"> — вихревое преобразование</span>
@@ -1579,7 +1860,7 @@
                     </div>
                     
                     <div style="text-align: center;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1605,7 +1886,7 @@
                     <div id="tspResult" style="margin-top: 15px; display: none;"></div>
                     
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1631,7 +1912,7 @@
                     <div id="shaResult" style="margin-top: 15px; display: none;"></div>
                     
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1657,7 +1938,7 @@
                     <div id="groverResult" style="margin-top: 15px; display: none;"></div>
                     
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1683,7 +1964,7 @@
                     <div id="vortexResult" style="margin-top: 15px; display: none;"></div>
                     
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -1824,7 +2105,6 @@
                 geoLocation.style.display = geoEnabled ? 'block' : 'none';
             }
             
-            // Если выключили — скрываем гео
             if (!geoEnabled) {
                 setLocation(false);
             }
@@ -1845,7 +2125,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd',
+                        node_address: NODE_ADDRESS,
                         city: geoEnabled ? city : '',
                         is_public: geoEnabled
                     })
@@ -1876,7 +2156,7 @@
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    node_address: '0x1234...abcd',
+                                    node_address: NODE_ADDRESS,
                                     coordinates: [latitude, longitude],
                                     is_public: true
                                 })
@@ -1910,7 +2190,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        node_address: '0x1234...abcd',
+                        node_address: NODE_ADDRESS,
                         radius_km: 50
                     })
                 });
@@ -1998,7 +2278,7 @@
                     </div>
                     
                     <div style="text-align: center;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -2057,9 +2337,10 @@
                             <span style="flex: 1;">Сенсоры устройства</span>
                             <button class="modal-btn" id="signalSensors" onclick="toggleSignal('sensors', 'Сенсоры')" style="background: rgba(122,199,12,0.4);">Вкл</button>
                         </div>
+                    </div>
                     
                     <div style="text-align: center;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -2082,7 +2363,7 @@
                     </div>
                     <div class="modal-actions">
                         <button class="modal-btn" onclick="alert('✅ Ресурсы отправлены!')">Отправить</button>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Отмена</button>
                     </div>
                 </div>
             `;
@@ -2112,7 +2393,7 @@
                         <p>📜 <b>Свиток</b> — история леса</p>
                     </div>
                     <div style="text-align: center; margin-top: 15px;">
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">Закрыть</button>
                     </div>
                 </div>
             `;
@@ -2162,7 +2443,6 @@
                 const messageText = input.value;
                 input.value = '';
                 
-                // Показываем "думает..."
                 const thinkingMsg = document.createElement('div');
                 thinkingMsg.className = 'message oracle';
                 thinkingMsg.textContent = '🌿 Лес думает...';
@@ -2171,7 +2451,6 @@
                 messages.scrollTop = messages.scrollHeight;
                 
                 try {
-                    // Отправляем запрос к серверу
                     const response = await fetch(SERVER_URL + '/oracle', {
                         method: 'POST',
                         headers: {
@@ -2190,11 +2469,9 @@
                     
                     const data = await response.json();
                     
-                    // Убираем "думает..."
                     const thinking = document.getElementById('thinkingMessage');
                     if (thinking) thinking.remove();
                     
-                    // Показываем ответ
                     const oracleMsg = document.createElement('div');
                     oracleMsg.className = 'message oracle';
                     oracleMsg.textContent = data.response;
@@ -2202,7 +2479,6 @@
                     messages.scrollTop = messages.scrollHeight;
                     
                 } catch (error) {
-                    // Если сервер недоступен
                     const thinking = document.getElementById('thinkingMessage');
                     if (thinking) thinking.remove();
                     
@@ -2238,7 +2514,6 @@
             
             eventLog.push({ icon, text, time: timeStr });
             
-            // Ограничиваем лог 50 событиями
             if (eventLog.length > 50) {
                 eventLog.shift();
             }
@@ -2258,7 +2533,6 @@
                 </div>
             `).join('');
             
-            // Прокрутка вниз
             container.scrollTop = container.scrollHeight;
         }
         
@@ -2278,8 +2552,114 @@
             }
         }
         
-        // Обновляем события каждые 3 секунды
-        setInterval(loadEvents, 3000);
+        // Загрузка реальных данных маяка
+        async function loadBeaconStats() {
+            try {
+                const response = await fetch(SERVER_URL + '/beacon/stats');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    const beacon = data.beacon;
+                    
+                    // Обновляем статистику
+                    updateStat('Узлов', beacon.nodes);
+                    updateStat('Симбиозов', beacon.symbiosis);
+                    updateStat('Когерентность', beacon.coherence.toFixed(4));
+                    updateStat('Аптайм', formatUptime(beacon.uptime));
+                    
+                    updateStat('Мои ресурсы', beacon.resources.toFixed(1));
+                    updateStat('Прирост', '+' + beacon.blocks + ' глыб');
+                    
+                    // Ёмкость леса
+                    const capacityEl = document.querySelector('.capacity-value');
+                    if (capacityEl && beacon.capacity) {
+                        capacityEl.textContent = beacon.capacity.toLocaleString('ru-RU');
+                    }
+                    
+                    // Баланс сети
+                    updateStat('Баланс сети', beacon.network_balance === 1 ? '✓' : '0');
+                    
+                    // Задачи
+                    if (beacon.tasks) {
+                        updateStat('Folding@Home', beacon.tasks.folding || 0);
+                        updateStat('SETI', beacon.tasks.seti || 0);
+                        updateStat('USPEX', beacon.tasks.uspex || 0);
+                    }
+                }
+            } catch (error) {
+                // Маяк не запущен — оставляем заглушки
+            }
+        }
+
+        // Загрузка реальных узлов
+        async function loadNodes() {
+            try {
+                const response = await fetch(SERVER_URL + '/nodes/list');
+                const data = await response.json();
+                
+                if (data.status === 'ok' && data.nodes.length > 0) {
+                    nodeData = data.nodes;
+                    createNodeList();
+                }
+            } catch (error) {
+                // Маяк не запущен — оставляем заглушки
+            }
+        }
+        
+        function updateStat(statName, value) {
+            document.querySelectorAll('.stat-item').forEach(item => {
+                const nameEl = item.querySelector('.stat-name');
+                const valueEl = item.querySelector('.stat-value');
+                
+                if (nameEl && valueEl) {
+                    const cleanName = nameEl.textContent.replace(/[^\w\sа-яА-ЯёЁ]/g, '').trim();
+                    const cleanSearch = statName.replace(/[^\w\sа-яА-ЯёЁ]/g, '').trim();
+                    
+                    if (cleanName === cleanSearch) {
+                        valueEl.textContent = value;
+                    }
+                }
+            });
+        }
+        
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}ч ${minutes.toString().padStart(2, '0')}м`;
+        }
+        
+        // Обновление только при активности вкладки
+        let updateInterval;
+        
+        function startUpdates() {
+            if (updateInterval) clearInterval(updateInterval);
+            
+            updateInterval = setInterval(() => {
+                if (!document.hidden) {
+                    loadEvents();
+                    loadBeaconStats();
+                }
+            }, 60000); // Раз в минуту
+        }
+        
+        function stopUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+        }
+        
+        // Обработчики видимости вкладки
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopUpdates();
+            } else {
+                startUpdates();
+                // Немедленное обновление при возврате
+                loadEvents();
+                loadBeaconStats();
+            }
+        });
         
         // Добавляем первые события
         addEvent('🌱', 'Лес пробуждается...');
@@ -2287,8 +2667,10 @@
         
         // Инициализация
         createStars();
-        createNodeList();
-        toggleBottomPanel();        
+        loadNodes();  // ← Загружаем узлы!
+        loadBeaconStats();
+        startUpdates();
+        toggleBottomPanel();
         
     </script>
 </body>
