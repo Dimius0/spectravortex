@@ -117,7 +117,11 @@ class SelfHealingMesh:
 
             # 🧬 Если в данных есть фракталы — сохраняем в кэш
             if 'fractals' in data:
-                self._store_fractals(beacon_id, data['fractals'])    
+                self._store_fractals(beacon_id, data['fractals'])
+
+            # 💬 Если в данных есть сообщения — сохраняем
+            if 'messages' in data:
+                self._store_messages(beacon_id, data['messages'])        
             
             # ✅ Ограничиваем общее количество фрагментов
             total_fragments = sum(len(f) for f in self.fragments.values())
@@ -155,7 +159,54 @@ class SelfHealingMesh:
             if now - entry.get('updated_at', 0) > self.FRACTAL_TTL
         ]
         for bid in expired:
-            del self.fractal_cache[bid]                
+            del self.fractal_cache[bid]
+
+    def _store_messages(self, beacon_id: str, messages: list):
+        """💬 Сохранить сообщения от соседа.
+        
+        ВАЖНО: вызывается из store_fragment, который УЖЕ держит self.lock.
+        Не берём lock повторно — это deadlock!
+        """
+        if not messages or not isinstance(messages, list):
+            return
+        
+        # Ленивая инициализация кэша сообщений
+        if not hasattr(self, 'messages_cache'):
+            self.messages_cache = {}
+            self.MESSAGES_TTL = 3600  # 1 час
+        
+        if beacon_id not in self.messages_cache:
+            self.messages_cache[beacon_id] = {
+                'messages': [],
+                'updated_at': time.time(),
+            }
+        
+        entry = self.messages_cache[beacon_id]
+        existing_ids = {m.get('id', '') for m in entry['messages']}
+        
+        # Добавляем только новые
+        for msg in messages:
+            if not isinstance(msg, dict):
+                continue
+            msg_id = msg.get('id', '')
+            if msg_id and msg_id not in existing_ids:
+                entry['messages'].append(msg)
+                existing_ids.add(msg_id)
+        
+        # Ограничиваем
+        if len(entry['messages']) > 100:
+            entry['messages'] = entry['messages'][-100:]
+        
+        entry['updated_at'] = time.time()
+        
+        # Чистим устаревшие записи
+        now = time.time()
+        expired = [
+            bid for bid, e in self.messages_cache.items()
+            if now - e.get('updated_at', 0) > self.MESSAGES_TTL
+        ]
+        for bid in expired:
+            del self.messages_cache[bid]                        
     
     def heal(self, lost_beacon_id: str):
         # ✅ Не пытаемся лечить себя

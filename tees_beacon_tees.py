@@ -13,6 +13,7 @@ import time
 import math
 import signal
 import sys
+from collections import deque
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
@@ -623,7 +624,7 @@ class Beacon:
         signal.signal(signal.SIGTERM, self._signal_handler)
 
         # Чат
-        self.chat_messages = []
+        self.chat_messages = deque(maxlen=500)
         
         # Один маяк на устройство
         self.lock_file = Path.home() / '.tees_beacon.lock'
@@ -1078,7 +1079,12 @@ class Beacon:
         print("🔥 Маяк поставлен! Свет распространяется...")
         
         def heartbeat_loop():
+            # 💬 Сохраняем время последней отправки
+            _last_sent = 0
+            
             while self.lit:
+                now = time.time()
+                
                 # 🧬 Собираем состояние
                 state = {
                     'portal': self.portal,
@@ -1096,13 +1102,50 @@ class Beacon:
                     except Exception:
                         pass
                 
+                # 💬 Только новые сообщения
+                try:
+                    if hasattr(self, 'chat_messages') and self.chat_messages:
+                        new_messages = [
+                            m for m in self.chat_messages
+                            if m.get('time', 0) > _last_sent
+                        ]
+                        if new_messages:
+                            state['messages'] = [
+                                {
+                                    'id': m.get('id', ''),
+                                    'from': m.get('from', ''),
+                                    'from_node': m.get('from_node', ''),
+                                    'to': m.get('to', ''),
+                                    'message': m.get('message', ''),
+                                    'time': m.get('time', 0),
+                                }
+                                for m in new_messages[-20:]
+                            ]
+                except Exception:
+                    pass
+                
                 self._broadcast({
                     'type': 'heartbeat',
                     'beacon_id': self.beacon_id,
                     'port': self.port,
                     'state': state
                 })
-                time.sleep(15)
+                
+                _last_sent = now
+                
+                # ⚡ Адаптивная пауза — по свечению
+                if self.glow >= 0.99999:
+                    sleep_time = 1   # Нирвана — почти мгновенно
+                elif self.glow >= 0.999:
+                    sleep_time = 3   # Почти нирвана
+                elif self.glow >= 0.99:
+                    sleep_time = 5   # Высокая
+                elif len(self.neighbors) == 0:
+                    sleep_time = 15  # Одинокий — реже
+                else:
+                    sleep_time = 10  # Активная работа
+                
+                time.sleep(sleep_time)
         
         threading.Thread(target=heartbeat_loop, daemon=True).start()
         threading.Thread(target=self._console_loop, daemon=True).start()

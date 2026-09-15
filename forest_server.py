@@ -15,6 +15,9 @@ import math
 import threading
 import os
 import socket
+import uuid
+import logging
+from collections import deque
 from pathlib import Path
 from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass, field
@@ -80,6 +83,9 @@ DEBUG = os.environ.get('TEES_DEBUG', 'false').lower() == 'true'
 
 # Максимальный размер POST-запроса (10 МБ)
 MAX_POST_SIZE = 10 * 1024 * 1024
+
+# Максимальная длина сообщения чата
+MAX_MSG_LEN = 4096
 
 # 🔐 Динамический реестр порталов (в RAM!)
 import threading
@@ -2225,6 +2231,98 @@ class ForestServer(http.server.SimpleHTTPRequestHandler):
                 
             except Exception as e:
                 self._send_json({'status': 'error', 'message': str(e)}, 500)
+
+        elif self.path == '/chat/send':
+            # 💬 Отправить сообщение узлу (полевой способ)
+            try:
+                if self.beacon is None:
+                    self._send_json({'status': 'error', 'message': 'Beacon недоступен'}, 503)
+                    return
+                
+                post_data = self._parse_post_data() or {}
+                to_node = post_data.get('to_node', '').strip()
+                from_node = post_data.get('from_node', '').strip()
+                message = post_data.get('message', '')
+                
+                if not to_node or not message or not from_node:
+                    self._send_json({'status': 'error',
+                                     'message': 'Нужны from_node, to_node и message'}, 400)
+                    return
+                
+                if len(message) > MAX_MSG_LEN:
+                    self._send_json({'status': 'error',
+                                     'message': f'Сообщение длиннее {MAX_MSG_LEN} символов'}, 413)
+                    return
+                
+                msg = {
+                    'id': uuid.uuid4().hex,
+                    'from': self.beacon.portal,
+                    'from_node': from_node,
+                    'to': to_node,
+                    'message': message,
+                    'time': time.time(),
+                    'sent': True,  # в поле — долетит через heartbeat
+                }
+                
+                self.beacon.chat_messages.append(msg)
+                
+                self._send_json({'status': 'ok', 'delivered': True, 'id': msg['id']})
+            except Exception as e:
+                logging.exception('chat/send error')
+                self._send_json({'status': 'error', 'message': str(e)}, 500)
+
+        elif self.path == '/chat/messages':
+            # 💬 Получить сообщения (локальные + из кэша соседей)
+            try:
+                if self.beacon is None:
+                    self._send_json({'status': 'error', 'message': 'Beacon недоступен'}, 503)
+                    return
+
+                post_data = self._parse_post_data() or {}
+                node_address = post_data.get('node_address', '').strip()
+                if not node_address:
+                    self._send_json({'status': 'error', 'message': 'Адрес узла не указан'}, 400)
+                    return
+
+                my_portal = self.beacon.portal
+                my_beacon = self.beacon.beacon_id
+                
+                # 1. Локальные сообщения
+                all_messages = list(self.beacon.chat_messages or [])
+                
+                # 2. Из кэша соседей
+                if hasattr(self.beacon, 'healer') and hasattr(self.beacon.healer, 'messages_cache'):
+                    for _bid, entry in self.beacon.healer.messages_cache.items():
+                        if isinstance(entry, dict):
+                            all_messages.extend(entry.get('messages', []))
+                
+                # 3. Фильтр — только мои
+                filtered = [
+                    m for m in all_messages
+                    if (m.get('to') in ('', my_portal, my_beacon, node_address) or
+                        m.get('from') in (my_portal, my_beacon, node_address) or
+                        m.get('from_node') == node_address or
+                        m.get('to') in ('', 'broadcast'))
+                ]
+                
+                # 4. Убираем дубли по id
+                seen = set()
+                unique = []
+                for m in filtered:
+                    mid = m.get('id', '')
+                    if mid and mid not in seen:
+                        seen.add(mid)
+                        unique.append(m)
+                    elif not mid:
+                        unique.append(m)
+                
+                # 5. Сортируем по времени
+                unique.sort(key=lambda x: x.get('time', 0))
+                
+                self._send_json({'status': 'ok', 'messages': unique[-50:]})
+            except Exception as e:
+                logging.exception('chat/messages error')
+                self._send_json({'status': 'error', 'message': str(e)}, 500)        
         
         else:
             self.send_error(404, "Endpoint not found")
