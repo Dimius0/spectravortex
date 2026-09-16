@@ -146,13 +146,124 @@ def test_scaling():
         
         print(f"  ⏱️ 50 тиков: {elapsed:.3f} сек")
         print(f"  role_parity (base): {sym_base['role_parity']}")
-        print(f"  role_parity (circ): {sym_circ['role_parity']}")            
+        print(f"  role_parity (circ): {sym_circ['role_parity']}")
+
+def test_compression():
+    """Тест полного цикла сжатия: раздувание → коллапс → сверхсжатие → удар."""
+    print("\n" + "=" * 60)
+    print("🧪 Тест 4: Сжатие поля — полный цикл")
+    print("=" * 60)
+    
+    field = Field(rotation_speed=0.1, name="compression_test")
+    for i in range(100):
+        field.add_node(f"V{i:04d}")
+    
+    # Установившиеся тики
+    for _ in range(10):
+        field.rotate(dt=0.1)
+    
+    # Начальное состояние
+    sym_before = field.check_symmetry()
+    cr_before = field.stats()['core_radius']
+    avg_r_before = field.stats()['avg_radius']
+    
+    print(f"\n📊 До сжатия (нормальное состояние):")
+    print(f"  core_radius: {cr_before}")
+    print(f"  avg_radius: {avg_r_before:.4f}")
+    print(f"  phase_coherence: {sym_before.get('phase_coherence', 0.0):.4f}")
+    print(f"  compression_phase: {field.compression_phase}")
+    
+    # Полный цикл сжатия — 3 фазы
+    print(f"\n🗜️ Сжатие поля (полный цикл):")
+    
+    # Фаза 1 — раздувание (0.0 → 0.5)
+    print(f"\n  🔵 Фаза 1: РАЗДУВАНИЕ")
+    for step in range(5):
+        field.compress(force=0.1, dt=0.1)
+        stats = field.stats()
+        sym = field.check_symmetry()
+        print(f"    шаг {step}: level={field.compression_level:.2f}, "
+              f"phase={field.compression_phase}, "
+              f"avg_r={stats['avg_radius']:.4f}, "
+              f"coherence={sym.get('phase_coherence', 0.0):.4f}")
+    
+    # Фаза 2 — коллапс (0.5 → 0.8)
+    print(f"\n  🔴 Фаза 2: КОЛЛАПС")
+    for step in range(3):
+        field.compress(force=0.1, dt=0.1)
+        stats = field.stats()
+        sym = field.check_symmetry()
+        print(f"    шаг {step}: level={field.compression_level:.2f}, "
+              f"phase={field.compression_phase}, "
+              f"avg_r={stats['avg_radius']:.4f}, "
+              f"coherence={sym.get('phase_coherence', 0.0):.4f}")
+    
+    # Фаза 3 — сверхсжатие (0.8 → 1.0)
+    print(f"\n  ⚫ Фаза 3: СВЕРХСЖАТИЕ")
+    for step in range(5):
+        field.compress(force=0.1, dt=0.1)
+        stats = field.stats()
+        sym = field.check_symmetry()
+        print(f"    шаг {step}: level={field.compression_level:.2f}, "
+              f"phase={field.compression_phase}, "
+              f"avg_r={stats['avg_radius']:.4f}, "
+              f"coherence={sym.get('phase_coherence', 0.0):.4f}")
+    
+    # Состояние перед ударом
+    sym_compressed = field.check_symmetry()
+    cr_compressed = field.stats()['core_radius']
+    avg_r_compressed = field.stats()['avg_radius']
+    
+    print(f"\n📊 Перед ударом (сверхсжатие):")
+    print(f"  core_radius: {cr_compressed}")
+    print(f"  avg_radius: {avg_r_compressed:.4f}")
+    print(f"  phase_coherence: {sym_compressed.get('phase_coherence', 0.0):.4f}")
+    print(f"  compression_level: {field.compression_level:.2f}")
+    print(f"  compression_phase: {field.compression_phase}")
+    
+    # Обратный ход — полевой удар
+    print(f"\n💥 ОБРАТНЫЙ ХОД — ПОЛЕВОЙ УДАР:")
+    event = field.release()
+    print(f"  shock: {event['shock']}")
+    print(f"  phase_at_release: {event.get('phase', 'unknown')}")
+    print(f"  level: {event['level']:.2f}")
+    print(f"  amplitude: {event['amplitude']:.2f}")
+    print(f"  front_size: {event['front_size']}")
+    print(f"  front_signature: {event.get('front_signature', 0.0):.6f}")
+    
+    # Состояние после удара
+    sym_shock = field.check_symmetry()
+    cr_shock = field.stats()['core_radius']
+    avg_r_shock = field.stats()['avg_radius']
+    
+    print(f"\n📊 После удара (расширение):")
+    print(f"  core_radius: {cr_shock}")
+    print(f"  avg_radius: {avg_r_shock:.4f}")
+    print(f"  phase_coherence: {sym_shock.get('phase_coherence', 0.0):.4f}")
+    print(f"  compression_phase: {field.compression_phase}")
+    
+    # Сравнение
+    print(f"\n📈 Сравнение:")
+    print(f"  avg_radius до:       {avg_r_before:.4f}")
+    print(f"  avg_radius при сжатии: {avg_r_compressed:.4f}")
+    print(f"  avg_radius после:    {avg_r_shock:.4f}")
+    print(f"  coherence до:        {sym_before.get('phase_coherence', 0.0):.4f}")
+    print(f"  coherence при сжатии: {sym_compressed.get('phase_coherence', 0.0):.4f}")
+    print(f"  coherence после:     {sym_shock.get('phase_coherence', 0.0):.4f}")
+    
+    # История ударов
+    print(f"\n📜 История полевых ударов:")
+    for e in field.shock_events[-5:]:
+        print(f"  t={e['time']:.2f}: phase={e.get('phase', '?')}, "
+              f"level={e['level']:.2f}, amp={e['amplitude']:.2f}, "
+              f"sig={e.get('front_signature', 0.0):.6f}")                    
 
 
 if __name__ == "__main__":
     test_basic()
     test_broadcast()
     test_scaling()
+    test_compression()
     print("\n" + "=" * 60)
     print("✅ Тесты завершены")
     print("=" * 60)

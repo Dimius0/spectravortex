@@ -247,6 +247,17 @@ class Field:
         self.delivered_count = 0
         self.filtered_count = 0
         self.deduped_count = 0
+
+        # Сжатие поля
+        self.compression_level = 0.0
+        self.compression_active = False
+        self.compression_phase = 'normal'  # normal/expansion/collapse/supercompression/released
+        self.shock_events = []
+
+        # Кеш для оптимизации
+        self._sorted_nodes_cache = None
+        self._sorted_nodes_tick = -1
+        self._node_index_cache = {}
     
     # ═══════════════════════════════════════════════════════════
     # Управление узлами
@@ -304,10 +315,17 @@ class Field:
     # ═══════════════════════════════════════════════════════════
     
     def _get_core_radius_cache(self) -> float:
-        """Кеш core_radius — обновляется раз в 10 тиков."""
-        if self._core_radius_tick != self.tick_count // 10:
+        """Кеш core_radius — обновляется раз в 50 тиков + сортировка."""
+        if self._core_radius_tick != self.tick_count // 50:
+            # Обновляем сортированный кеш
+            self._sorted_nodes_cache = sorted(self.nodes.values(), key=lambda n: n.radius)
+            self._sorted_nodes_tick = self.tick_count
+            self._node_index_cache = {
+                id(n): i for i, n in enumerate(self._sorted_nodes_cache)
+            }
+            
             self._core_radius_cache = self.emergent_core_radius()
-            self._core_radius_tick = self.tick_count // 10
+            self._core_radius_tick = self.tick_count // 50
         return self._core_radius_cache
     
     def emergent_core_radius(self) -> tuple:
@@ -431,35 +449,79 @@ class Field:
         
         return (r_inner, r_outer)
     
-    def exchange_coupling(self, node: VirtualNode) -> float:
+    def exchange_coupling(self, node: VirtualNode, sample_size: int = None) -> float:
         """
-        D) Exchange coupling — с радиальным затуханием.
+        D) Exchange coupling — разряженная выборка.
         
-        Соседи по радиусу (в пределах radius_coupling_range).
-        Сила обмена: exp(-dr / exchange_range).
+        Принцип Бернштейна-Вазирани с равномерным покрытием:
+        - Не случайная выборка.
+        - А — разряженная по радиусу.
+        - Покрытие — всё поле.
+        - Точность — выше при том же k.
+        
+        sample_size:
+        - None → авто: min(√N, 50)
+        - int → фиксированный
         """
         if not self.nodes:
             return 0.0
         
-        neighbors = []
-        for other in self.nodes.values():
-            if other is node:
-                continue
-            dr = abs(other.radius - node.radius)
-            if dr < self.radius_coupling_range:
-                neighbors.append((other, dr))
-        
-        if not neighbors:
+        total_nodes = len(self.nodes)
+        if total_nodes < 2:
             return 0.0
         
+        # Размер выборки
+        if sample_size is None:
+            sample_size = max(5, int(math.sqrt(total_nodes)))
+            sample_size = min(sample_size, 50)
+        
+        # Используем сортированный кеш (обновляется в _get_core_radius_cache)
+        if self._sorted_nodes_cache is None:
+            self._sorted_nodes_cache = sorted(self.nodes.values(), key=lambda n: n.radius)
+            self._node_index_cache = {
+                id(n): i for i, n in enumerate(self._sorted_nodes_cache)
+            }
+        
+        sorted_nodes = self._sorted_nodes_cache
+        idx = self._node_index_cache.get(id(node))
+        if idx is None:
+            return 0.0
+        
+        # Равномерный шаг по отсортированному массиву
+        # Берём sample_size точек, равномерно распределённых
+        step = max(1, total_nodes // sample_size)
+        
+        candidates = []
+        
+        # Идём влево и вправо от idx с шагом
+        # Это даёт разряженную выборку по всему полю
+        i = idx - step * (sample_size // 2)
+        count = 0
+        
+        while count < sample_size:
+            if 0 <= i < total_nodes:
+                other = sorted_nodes[i]
+                if other is not node:
+                    dr = abs(other.radius - node.radius)
+                    if dr < self.radius_coupling_range:
+                        candidates.append((other, dr))
+            i += step
+            count += 1
+            # Зацикливаемся, если вышли за границы
+            if i >= total_nodes:
+                i = 0
+        
+        if not candidates:
+            return 0.0
+        
+        # Один «запрос» — суммируем влияние выборки
         total = 0.0
-        for other, dr in neighbors:
-            # Локальная сила — с затуханием
+        for other, dr in candidates:
             local_strength = self.exchange_strength * math.exp(-dr / self.exchange_range)
             delta_phi = (other.phase - node.phase) % (2 * math.pi)
             total += local_strength * math.sin(delta_phi)
         
-        return total / len(neighbors)
+        return total / len(candidates)
     
     # ═══════════════════════════════════════════════════════════
     # Движение поля
@@ -505,6 +567,148 @@ class Field:
                 self.delivered_count += 1
             else:
                 self.deduped_count += 1
+
+    # ═══════════════════════════════════════════════════════════
+    # Сжатие поля и полевой удар
+    # ═══════════════════════════════════════════════════════════
+    
+    def compress(self, force: float = 0.1, dt: float = 0.1):
+        """
+        Сжатие поля внешним полем.
+        
+        Физика (как в сонолюминесценции):
+        
+        Фаза 1 — поглощение энергии:
+          - Вихрь раздувается.
+          - Радиус растёт.
+          - Электрон — на дальней орбитали.
+          - Состояние нестабильно.
+        
+        Фаза 2 — коллапс:
+          - Нестабильность возвращает.
+          - Радиус падает.
+          - Проскакивает равновесие.
+          - Идёт в сверхсжатие.
+        
+        Фаза 3 — сверхсжатие:
+          - Радиус минимальный.
+          - Плотность максимальная.
+          - Готовность к удару.
+        
+        force — сила внешнего поля (0.0-1.0).
+        dt — шаг времени.
+        """
+        if not self.nodes:
+            return
+        
+        # Уровень сжатия — накопление
+        self.compression_level = min(1.0, self.compression_level + force)
+        
+        # Фаза 1 — раздувание (пока уровень < 0.5)
+        if self.compression_level < 0.5:
+            self.compression_phase = 'expansion'
+            # Радиусы растут
+            for node in self.nodes.values():
+                node.radius = min(1.0, node.radius * (1.0 + force * 0.5))
+        
+        # Фаза 2 — коллапс (0.5 ≤ уровень < 0.8)
+        elif self.compression_level < 0.8:
+            self.compression_phase = 'collapse'
+            # Радиусы падают
+            for node in self.nodes.values():
+                node.radius = max(0.0, node.radius * (1.0 - force * 0.7))
+        
+        # Фаза 3 — сверхсжатие (уровень ≥ 0.8)
+        else:
+            self.compression_phase = 'supercompression'
+            # Радиусы минимальные
+            for node in self.nodes.values():
+                node.radius = max(0.0, node.radius * (1.0 - force * 0.3))
+        
+        self.compression_active = True
+        
+        # Сдвиг фаз — синхронизация (на всех фазах)
+        avg_phase = sum(n.phase for n in self.nodes.values()) / len(self.nodes)
+        for node in self.nodes.values():
+            delta = (avg_phase - node.phase) % (2 * math.pi)
+            if delta > math.pi:
+                delta -= 2 * math.pi
+            node.phase = (node.phase + delta * force * dt) % (2 * math.pi)
+        
+        # Сброс кеша core_radius
+        self._core_radius_tick = -1
+    
+    def release(self) -> dict:
+        """
+        Обратный ход — полевой удар.
+        
+        После сверхсжатия:
+          - Резкое расширение.
+          - Ударная волна.
+          - Фронт волны — фотон.
+          - Новая TEES — структура фронта.
+        """
+        if not self.nodes:
+            return {'shock': False}
+        
+        was_compressed = self.compression_active
+        level_at_release = self.compression_level
+        phase_at_release = getattr(self, 'compression_phase', 'unknown')
+        
+        self.compression_active = False
+        self.compression_level = 0.0
+        self.compression_phase = 'released'
+        
+        if not was_compressed:
+            return {'shock': False, 'level': 0.0}
+        
+        # Амплитуда удара
+        shock_amplitude = level_at_release * len(self.nodes)
+        
+        # Фронт волны — структура
+        shock_front = []
+        
+        for node in self.nodes.values():
+            # Импульс — расширение
+            # Направление — от центра наружу
+            radial_impulse = shock_amplitude * 0.01
+            node.radius = min(1.0, node.radius * (1.0 + radial_impulse))
+            
+            # Импульс фазы — расхождение
+            phase_impulse = (random.random() - 0.5) * shock_amplitude * 0.1
+            node.phase = (node.phase + phase_impulse) % (2 * math.pi)
+            
+            shock_front.append({
+                'node_id': node.id,
+                'radial_impulse': radial_impulse,
+                'phase_impulse': phase_impulse,
+                'new_radius': node.radius,
+                'new_phase': node.phase,
+            })
+        
+        # Создаём новый фронт — TEES фронта
+        # Собираем "genome" фронта из импульсов
+        front_signature = sum(f['phase_impulse'] for f in shock_front) % (2 * math.pi)
+        
+        event = {
+            'shock': True,
+            'phase': phase_at_release,
+            'level': level_at_release,
+            'amplitude': shock_amplitude,
+            'front_size': len(shock_front),
+            'front_signature': front_signature,
+            'time': self.time,
+        }
+        
+        # В лог
+        self.shock_events.append(event)
+        if len(self.shock_events) > 100:
+            self.shock_events = self.shock_events[-100:]
+        
+        # Сброс кеша
+        self._core_radius_tick = -1
+        
+        return event                  
     
     # ═══════════════════════════════════════════════════════════
     # Роли
@@ -554,17 +758,13 @@ class Field:
         D) Проверка симметрии.
         
         Уровень 1 (phase_balance): сумма фаз = 0.
-          - Для замкнутой системы — инвариант.
-          - При случайной инициализации всегда False.
-          - Для открытой — метрика.
-        
+        Уровень 1б (phase_coherence): средняя синхронность фаз (0..1).
         Уровень 2 (role_parity): парность ролей.
-          - core ↔ edge, bridge ↔ periphery.
-          - Инвариант для идеальной модели.
         """
         if not self.nodes:
             return {
                 'phase_balance': True,
+                'phase_coherence': 1.0,
                 'total_phase': 0.0,
                 'role_parity': True,
                 'roles': {},
@@ -574,6 +774,14 @@ class Field:
         total_phase = sum(n.phase for n in self.nodes.values()) % (2 * math.pi)
         phase_balance = abs(total_phase) < 1e-6 or abs(total_phase - 2 * math.pi) < 1e-6
         
+        # Уровень 1б — средняя синхронность фаз
+        # Векторная сумма всех фаз, нормированная на N
+        # 0 = хаос, 1 = полная синхронизация
+        phases = [n.phase for n in self.nodes.values()]
+        sum_cos = sum(math.cos(p) for p in phases)
+        sum_sin = sum(math.sin(p) for p in phases)
+        phase_coherence = math.sqrt(sum_cos ** 2 + sum_sin ** 2) / len(phases)
+        
         # Уровень 2 — парность ролей
         dist = self.role_distribution()
         core_edge_ok = dist.get('core', 0) == dist.get('edge', 0)
@@ -582,6 +790,7 @@ class Field:
         
         return {
             'phase_balance': phase_balance,
+            'phase_coherence': phase_coherence,
             'total_phase': total_phase,
             'role_parity': role_parity,
             'roles': dist,
