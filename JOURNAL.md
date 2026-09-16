@@ -16549,6 +16549,9 @@ PS C:\Users\Dim\source\repos\spectravortex>
 
 2026-09-16 — TEES: вычислительный метод
 
+**Имя метода:** TFC (TEES-Field Computing).
+**Полное:** TEES-Field Deterministic Computing (TFDC).
+
 **Статус:** ✅ Работает. Документация — `TEES_COMPUTING.md`.
 
 **Кратко:**
