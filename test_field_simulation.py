@@ -256,7 +256,132 @@ def test_compression():
     for e in field.shock_events[-5:]:
         print(f"  t={e['time']:.2f}: phase={e.get('phase', '?')}, "
               f"level={e['level']:.2f}, amp={e['amplitude']:.2f}, "
-              f"sig={e.get('front_signature', 0.0):.6f}")                    
+              f"sig={e.get('front_signature', 0.0):.6f}")
+
+def test_funnel():
+    """Тест смесительной воронки."""
+    print("\n" + "=" * 60)
+    print("🧪 Тест 5: Смесительная воронка")
+    print("=" * 60)
+    
+    import time
+    
+    for N in [100, 500, 1000]:
+        print(f"\n📊 N = {N}")
+        
+        field = Field(rotation_speed=0.1, name=f"funnel_{N}")
+        for i in range(N):
+            field.add_node(f"V{i:05d}")
+        
+        # 10 обычных тиков — установка
+        for _ in range(10):
+            field.rotate(dt=0.1)
+        
+        sym_before = field.check_symmetry()
+        cr_before = field.stats()['core_radius']
+        
+        print(f"  До воронки:")
+        print(f"    core_radius: {cr_before}")
+        print(f"    phase_coherence: {sym_before['phase_coherence']:.4f}")
+        print(f"    phase_balance: {sym_before['phase_balance']}")
+        
+        # Замер воронки
+        t0 = time.time()
+        for _ in range(10):
+            field.funnel()
+        elapsed = time.time() - t0
+        
+        sym_after = field.check_symmetry()
+        cr_after = field.stats()['core_radius']
+        
+        print(f"  После воронки (10 проходов):")
+        print(f"    core_radius: {cr_after}")
+        print(f"    phase_coherence: {sym_after['phase_coherence']:.4f}")
+        print(f"    phase_balance: {sym_after['phase_balance']}")
+        print(f"    ⏱️ Время: {elapsed:.3f} сек ({elapsed/10*1000:.1f} мс на проход)")
+        print(f"    Изменение coherence: {sym_before['phase_coherence']:.4f} → {sym_after['phase_coherence']:.4f}")
+
+def test_vector_switch():
+    """Тест смены вектора потока и выброса информации."""
+    print("\n" + "=" * 60)
+    print("🧪 Тест 6: Смена вектора → выброс информации")
+    print("=" * 60)
+    
+    field = Field(rotation_speed=0.1, name="vector_switch")
+    for i in range(100):
+        field.add_node(f"V{i:04d}")
+    
+    # Установка
+    for _ in range(10):
+        field.rotate(dt=0.1)
+    
+    print("\n📊 Сжатие с отслеживанием fraction и coherence:")
+    print(f"  {'step':>4} | {'level':>6} | {'frac':>6} | {'coherence':>10} | {'band':>18} | {'avg_r':>8} | {'phase':>18}")
+    print("  " + "-" * 90)
+    
+    # Сжимаем с малым шагом — чтобы увидеть пик
+    for step in range(25):
+        field.compress(force=0.05, dt=0.1)
+        stats = field.stats()
+        sym = field.check_symmetry()
+        
+        frac = field.compression_fraction
+        coh = sym['phase_coherence']
+        avg_r = stats['avg_radius']
+        phase = field.compression_phase
+        
+        # Полоса срыва
+        band_low, band_high = field.compression_band
+        in_band = band_low <= coh <= band_high
+        
+        # Метка: в полосе или нет
+        band_str = f"[{band_low:.3f},{band_high:.3f}]"
+        marker = " ← В ПОЛОСЕ" if in_band else ""
+        
+        print(f"  {step:>4} | {field.compression_level:>6.3f} | {frac:>6.3f} | {coh:>10.4f} | {band_str:>18} | {avg_r:>8.4f} | {phase:>18}{marker}")
+    
+        # TEES-состояние
+        joint = field.tees_joint_state()
+        if joint['in_joint']:
+            print(f"       ⚡ TEES шарнир-смеситель: spiral={joint['spiral_weight']:.2f}, radial={joint['radial_weight']:.2f}, mixed={joint['mixed_weight']:.2f}")    
+
+    # Итоговая полоса срыва
+    band_low, band_high = field.compression_band
+    print(f"\n📊 Полоса срыва: [{band_low:.4f}, {band_high:.4f}]")
+    print(f"   Ширина полосы: {band_high - band_low:.4f}")
+    
+    # Статистика по полосе
+    coh_max = field._coh_max if hasattr(field, '_coh_max') else 0.0
+    coh_min = field._coh_min if hasattr(field, '_coh_min') else 1.0
+    print(f"   Coherence max: {coh_max:.4f}")
+    print(f"   Coherence min: {coh_min:.4f}")
+
+    # Удар
+    print("\n💥 Обратный ход — выброс:")
+    event = field.release()
+    sym = field.check_symmetry()
+
+    # 3D TEES состояние
+    s3d = field.tees_3d_state()
+    print(f"       3D TEES: z_mean={s3d.get('z_mean', 0):.3f}, "
+          f"z_spread={s3d.get('z_spread', 0):.3f}, "
+          f"volume={s3d.get('volume', 0):.3f}")
+    print(f"                spiral_corr={s3d.get('spiral_corr', 0):.3f}, "
+          f"radial_corr={s3d.get('radial_corr', 0):.3f}")
+
+    # Состояние шарнира TEES
+    joint = field.tees_joint_state()
+    joint_marker = " ⚡ШАРНИР" if joint['in_joint'] else ""
+    print(f"       TEES: spiral={joint['spiral_weight']:.2f}, radial={joint['radial_weight']:.2f}, mix={joint['mixing_intensity']:.2f}{joint_marker}")
+    
+    print(f"  shock: {event['shock']}")
+    print(f"  phase_at_release: {event.get('phase', '?')}")
+    print(f"  amplitude: {event['amplitude']:.2f}")
+    print(f"  front_signature: {event.get('front_signature', 0.0):.6f}")
+    print(f"  coherence после: {sym['phase_coherence']:.4f}")
+    print(f"  avg_radius после: {field.stats()['avg_radius']:.4f}")
+
+
 
 
 if __name__ == "__main__":
@@ -264,6 +389,8 @@ if __name__ == "__main__":
     test_broadcast()
     test_scaling()
     test_compression()
+    test_funnel()
+    test_vector_switch()
     print("\n" + "=" * 60)
     print("✅ Тесты завершены")
     print("=" * 60)

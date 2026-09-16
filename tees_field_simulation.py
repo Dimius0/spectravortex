@@ -43,10 +43,19 @@
 
 import math
 import random
+import struct
 import time
 import uuid
 from collections import deque, OrderedDict
 from typing import Dict, List, Optional
+
+# TEES-вихрь для воронки
+try:
+    from tees_core_tees import tees_recursive_vortex
+    TEES_VORTEX_AVAILABLE = True
+except ImportError:
+    TEES_VORTEX_AVAILABLE = False
+    print("⚠️ tees_recursive_vortex не найден, воронка недоступна")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -67,6 +76,7 @@ class VirtualNode:
     def __init__(self, node_id: str, field: 'Field'):
         self.id = node_id
         self.field = field
+        self.z = random.random()  # высота в 3D
         
         # Фаза в поле — уникальна для узла
         self.phase = random.random() * 2 * math.pi
@@ -232,11 +242,19 @@ class Field:
         self.coherence_threshold = coherence_threshold
         self.vortex_exponent = vortex_exponent
         self.radius_coupling_range = radius_coupling_range
+        self.compression_fraction = 0.0
+        self._coh_history = []
         
         self.nodes: Dict[str, VirtualNode] = {}
         self.phase = 0.0
         self.time = 0.0
         self.tick_count = 0
+
+        self._coh_max = 0.0
+        self._coh_min = 1.0
+        self._band_low = None
+        self._band_high = None
+        self.compression_band = (0.0, 1.0)
         
         # Кеш core_radius (обновляется раз в 10 тиков)
         self._core_radius_cache: float = 0.0
@@ -309,6 +327,94 @@ class Field:
         if node_id in self.nodes:
             node = self.nodes.pop(node_id)
             self.phase = (self.phase + node.phase / max(len(self.nodes) + 1, 1)) % (2 * math.pi)
+
+    def tees_3d_state(self) -> Dict:
+        """
+        3D TEES — единый смеситель.
+        
+        Все 2D-конструкции — проекции 3D-структуры.
+        
+        Измерения:
+        - phase: фаза (0..2π)
+        - radius: радиус (0..1)
+        - z: высота (0..1)
+        
+        Возвращает состояние 3D-структуры.
+        """
+        if not self.nodes:
+            return {}
+        
+        # Средние и разбросы
+        phases = [n.phase for n in self.nodes.values()]
+        radii = [n.radius for n in self.nodes.values()]
+        zs = [n.z for n in self.nodes.values()]
+        
+        # 3D-спираль: спираль на конусе
+        # φ(r, z) = k · ln(r) + z_factor · z
+        
+        # Объёмность — разброс по z
+        z_spread = max(zs) - min(zs) if zs else 0.0
+        
+        # Спиральность — корреляция фазы и логарифма радиуса
+        import statistics
+        log_radii = [math.log(max(r, 0.01)) for r in radii]
+        
+        if len(phases) > 1 and len(log_radii) > 1:
+            try:
+                # Ковариация
+                mean_phase = sum(phases) / len(phases)
+                mean_log_r = sum(log_radii) / len(log_radii)
+                
+                cov = sum(
+                    (p - mean_phase) * (lr - mean_log_r)
+                    for p, lr in zip(phases, log_radii)
+                ) / len(phases)
+                
+                # Нормировка
+                std_phase = statistics.stdev(phases) if len(phases) > 1 else 1.0
+                std_log_r = statistics.stdev(log_radii) if len(log_radii) > 1 else 1.0
+                
+                if std_phase > 0 and std_log_r > 0:
+                    spiral_corr = cov / (std_phase * std_log_r)
+                else:
+                    spiral_corr = 0.0
+            except Exception:
+                spiral_corr = 0.0
+        else:
+            spiral_corr = 0.0
+        
+        # Радиальность — корреляция фазы и радиуса
+        mean_phase = sum(phases) / len(phases)
+        mean_r = sum(radii) / len(radii)
+        
+        if len(phases) > 1:
+            try:
+                cov_r = sum(
+                    (p - mean_phase) * (r - mean_r)
+                    for p, r in zip(phases, radii)
+                ) / len(phases)
+                
+                std_phase = statistics.stdev(phases) if len(phases) > 1 else 1.0
+                std_r = statistics.stdev(radii) if len(radii) > 1 else 1.0
+                
+                if std_phase > 0 and std_r > 0:
+                    radial_corr = cov_r / (std_phase * std_r)
+                else:
+                    radial_corr = 0.0
+            except Exception:
+                radial_corr = 0.0
+        else:
+            radial_corr = 0.0
+        
+        return {
+            'phase_mean': mean_phase,
+            'radius_mean': mean_r,
+            'z_mean': sum(zs) / len(zs) if zs else 0.0,
+            'z_spread': z_spread,
+            'spiral_corr': spiral_corr,
+            'radial_corr': radial_corr,
+            'volume': z_spread * (max(radii) - min(radii)) if radii else 0.0,
+        }        
     
     # ═══════════════════════════════════════════════════════════
     # Эмерджентные свойства
@@ -569,73 +675,220 @@ class Field:
                 self.deduped_count += 1
 
     # ═══════════════════════════════════════════════════════════
+    # Смесительная воронка
+    # ═══════════════════════════════════════════════════════════
+    
+    def funnel(self):
+        """
+        🌪️ Смесительная воронка.
+        
+        Принцип: сколько вошло — столько вышло.
+        Все фазы → один TEES-вихрь → распределение обратно.
+        Все влияют на всех. Ничего не теряется.
+        
+        O(N) вместо O(N²).
+        """
+        if not TEES_VORTEX_AVAILABLE:
+            return
+        
+        if len(self.nodes) < 2:
+            return
+        
+        nodes_list = list(self.nodes.values())
+        
+        # Собираем все фазы в один поток байт
+        phases = [n.phase for n in nodes_list]
+        combined = b''.join(struct.pack('>d', p) for p in phases)
+        
+        # Вихрь — смешение всех фаз
+        mixed = tees_recursive_vortex(combined, b'funnel_seed', depth=3)
+        
+        # Распределяем обратно
+        # Гарантия: длина mixed >= N * 8 байт
+        mixed_len = len(mixed)
+        
+        for i, node in enumerate(nodes_list):
+            # Своя порция вихря
+            offset = (i * 8) % (mixed_len - 8)
+            chunk = mixed[offset:offset + 8]
+            raw = struct.unpack('>d', chunk)[0]
+            
+            # Новая фаза из вихря
+            # Нормализуем в 0..2π
+            new_phase = (raw % (2 * math.pi))
+            node.phase = new_phase
+        
+        # Сброс кеша core_radius
+        self._core_radius_tick = -1            
+
+    # ═══════════════════════════════════════════════════════════
     # Сжатие поля и полевой удар
     # ═══════════════════════════════════════════════════════════
     
     def compress(self, force: float = 0.1, dt: float = 0.1):
         """
-        Сжатие поля внешним полем.
+        Сжатие поля — полоса срыва.
         
-        Физика (как в сонолюминесценции):
+        Срыв — не точка, а диапазон когерентности.
+        Полоса срыва — свойство поля.
         
-        Фаза 1 — поглощение энергии:
-          - Вихрь раздувается.
-          - Радиус растёт.
-          - Электрон — на дальней орбитали.
-          - Состояние нестабильно.
+        Полоса определяется по истории coherence:
+        - Нижняя граница: где coherence начала падать
+        - Верхняя граница: где coherence упала до нового уровня
+        - Ширина: свойство поля
         
-        Фаза 2 — коллапс:
-          - Нестабильность возвращает.
-          - Радиус падает.
-          - Проскакивает равновесие.
-          - Идёт в сверхсжатие.
-        
-        Фаза 3 — сверхсжатие:
-          - Радиус минимальный.
-          - Плотность максимальная.
-          - Готовность к удару.
-        
-        force — сила внешнего поля (0.0-1.0).
-        dt — шаг времени.
+        В полосе — смешение режимов.
+        Вне полосы — чистые режимы.
         """
         if not self.nodes:
             return
         
-        # Уровень сжатия — накопление
+        # Инициализация
+        if not hasattr(self, '_spiral_weight'):
+            self._spiral_weight = 1.0
+            self._radial_weight = 0.0
+            self._peak_weight = 0.0
+            self._coh_history = []
+            self._last_coh = 0.0
+            self._coh_max = 0.0
+            self._coh_min = 1.0
+            self._band_low = None
+            self._band_high = None
+        
+        # Уровень сжатия
         self.compression_level = min(1.0, self.compression_level + force)
+        fraction = self.compression_level
+        self.compression_fraction = fraction
         
-        # Фаза 1 — раздувание (пока уровень < 0.5)
-        if self.compression_level < 0.5:
+        # Радиусы
+        if fraction < 0.5:
+            radius_factor = 1.0 + force * 0.3
+        else:
+            radius_factor = 1.0 - force * 0.5
+        
+        for node in self.nodes.values():
+            node.radius = max(0.01, node.radius * radius_factor)
+        
+        r_avg = sum(n.radius for n in self.nodes.values()) / len(self.nodes)
+        r_ref = max(r_avg, 0.01)
+        
+        # Coherence
+        coh = self.check_symmetry()['phase_coherence']
+        self._coh_history.append(coh)
+        if len(self._coh_history) > 20:
+            self._coh_history.pop(0)
+        
+        # Обновляем экстремумы
+        self._coh_max = max(self._coh_max, coh)
+        self._coh_min = min(self._coh_min, coh)
+        
+        # ОПРЕДЕЛЯЕМ ПОЛОСУ СРЫВА
+        # Полоса — это диапазон coherence вокруг пика
+        # Нижняя граница: coh_min + 0.7 * (coh_max - coh_min)
+        # Верхняя граница: coh_max
+        
+        if self._coh_max > 0 and len(self._coh_history) >= 3:
+            band_width = (self._coh_max - self._coh_min) * 0.3
+            self._band_low = self._coh_max - band_width
+            self._band_high = self._coh_max
+        else:
+            self._band_low = 0.0
+            self._band_high = 1.0
+        
+        # Определяем положение в полосе
+        in_band = False
+        if self._band_low is not None and self._band_high is not None:
+            if self._band_low <= coh <= self._band_high:
+                in_band = True
+        
+        # Положение внутри полосы (0 = низ, 1 = верх)
+        if in_band and self._band_high > self._band_low:
+            band_position = (coh - self._band_low) / (self._band_high - self._band_low)
+        else:
+            band_position = 0.0
+        
+        # ОПРЕДЕЛЯЕМ ВЕСА
+        # Чем ближе к полосе — тем больше peak_weight
+        # Вне полосы — доминирует spiral или radial по fraction
+        
+        if in_band:
+            # В полосе — peak доминирует
+            self._peak_weight = 1.0 - abs(band_position - 0.5) * 2
+            remaining = 1.0 - self._peak_weight
+            
+            # Внутри полосы распределяем между spiral и radial по fraction
+            self._spiral_weight = remaining * max(0.0, 1.0 - fraction)
+            self._radial_weight = remaining * max(0.0, fraction)
+        else:
+            # Вне полосы — чистые режимы
+            if fraction < 0.5:
+                self._spiral_weight = 1.0
+                self._radial_weight = 0.0
+                self._peak_weight = 0.0
+            else:
+                self._spiral_weight = 0.0
+                self._radial_weight = 1.0
+                self._peak_weight = 0.0
+        
+        # Фаза по доминирующему весу
+        weights = {
+            'spiral': self._spiral_weight,
+            'radial': self._radial_weight,
+            'peak': self._peak_weight,
+        }
+        dominant = max(weights, key=weights.get)
+        
+        if dominant == 'spiral':
             self.compression_phase = 'expansion'
-            # Радиусы растут
-            for node in self.nodes.values():
-                node.radius = min(1.0, node.radius * (1.0 + force * 0.5))
-        
-        # Фаза 2 — коллапс (0.5 ≤ уровень < 0.8)
-        elif self.compression_level < 0.8:
+        elif dominant == 'peak':
             self.compression_phase = 'collapse'
-            # Радиусы падают
-            for node in self.nodes.values():
-                node.radius = max(0.0, node.radius * (1.0 - force * 0.7))
-        
-        # Фаза 3 — сверхсжатие (уровень ≥ 0.8)
         else:
             self.compression_phase = 'supercompression'
-            # Радиусы минимальные
-            for node in self.nodes.values():
-                node.radius = max(0.0, node.radius * (1.0 - force * 0.3))
         
-        self.compression_active = True
+        # Записываем полосу в поле для stats
+        self.compression_band = (self._band_low or 0.0, self._band_high or 1.0)
         
-        # Сдвиг фаз — синхронизация (на всех фазах)
-        avg_phase = sum(n.phase for n in self.nodes.values()) / len(self.nodes)
+        # ПРИМЕНЯЕМ
+        k_spiral = 1.0 + fraction * 20.0
+        k_radial = 2 * math.pi * 4
+        
         for node in self.nodes.values():
-            delta = (avg_phase - node.phase) % (2 * math.pi)
+            r_norm = max(node.radius, 0.01)
+            
+            # Спиральная фаза
+            spiral_phase = k_spiral * math.log(r_norm / r_ref)
+            spiral_mod = spiral_phase % (2 * math.pi)
+            
+            # Радиальная фаза
+            radial_phase = (r_norm / r_ref) * k_radial
+            radial_mod = radial_phase % (2 * math.pi)
+            
+            # Взвешенная комбинация
+            cos_mix = (
+                self._spiral_weight * math.cos(spiral_mod) +
+                self._radial_weight * math.cos(radial_mod) +
+                self._peak_weight * math.cos(0.0)
+            )
+            sin_mix = (
+                self._spiral_weight * math.sin(spiral_mod) +
+                self._radial_weight * math.sin(radial_mod) +
+                self._peak_weight * math.sin(0.0)
+            )
+            
+            mag = math.sqrt(cos_mix ** 2 + sin_mix ** 2)
+            if mag > 1e-6:
+                cos_mix /= mag
+                sin_mix /= mag
+            
+            target_phase = math.atan2(sin_mix, cos_mix) % (2 * math.pi)
+            
+            delta = (target_phase - node.phase) % (2 * math.pi)
             if delta > math.pi:
                 delta -= 2 * math.pi
-            node.phase = (node.phase + delta * force * dt) % (2 * math.pi)
+            
+            node.phase = (node.phase + delta * force * 1.5) % (2 * math.pi)
         
-        # Сброс кеша core_radius
+        self.compression_active = True
         self._core_radius_tick = -1
     
     def release(self) -> dict:
@@ -795,6 +1048,73 @@ class Field:
             'role_parity': role_parity,
             'roles': dist,
         }
+
+    def tees_joint_state(self) -> Dict:
+        """
+        TEES — и шарнир, и смеситель.
+        
+        Веса — из положения в полосе срыва, а не из fraction.
+        В полосе — mix растёт.
+        """
+        # Полоса срыва
+        band_low = getattr(self, '_band_low', 0.0) or 0.0
+        band_high = getattr(self, '_band_high', 1.0) or 1.0
+        
+        coh = self.check_symmetry()['phase_coherence']
+        
+        # Положение в полосе
+        if band_high > band_low:
+            in_band_pos = (coh - band_low) / (band_high - band_low)
+            in_band_pos = max(0.0, min(1.0, in_band_pos))
+        else:
+            in_band_pos = 0.0
+        
+        in_band = band_low <= coh <= band_high
+        
+        # В полосе — mix от положения
+        if in_band:
+            # Mix максимален в центре полосы
+            mixing = 1.0 - abs(in_band_pos - 0.5) * 2
+            mixing = max(0.2, mixing)  # минимум 0.2 в полосе
+        else:
+            # Вне полосы — нет смешения
+            mixing = 0.0
+        
+        # Веса — из mixing, а не из fraction
+        # Если в полосе — доли равны (шарнир)
+        # Если вне — доминирует один режим
+        if in_band:
+            # Шарнир — оба вектора активны
+            mixed_w = mixing
+            remaining = 1.0 - mixed_w
+            
+            # Остаток — по положению в полосе
+            # 0 = spiral, 1 = radial
+            spiral_w = remaining * (1.0 - in_band_pos)
+            radial_w = remaining * in_band_pos
+        else:
+            # Вне полосы — по fraction
+            fraction = self.compression_fraction
+            mixed_w = 0.0
+            if fraction < 0.5:
+                spiral_w = 1.0
+                radial_w = 0.0
+            else:
+                spiral_w = 0.0
+                radial_w = 1.0
+        
+        # Без нормализации — веса как меры присутствия
+        # Сумма может быть больше или меньше 1.0
+        
+        return {
+            'spiral_weight': spiral_w,
+            'radial_weight': radial_w,
+            'mixed_weight': mixed_w,
+            'mixing_intensity': mixing,
+            'joint_position': in_band_pos,
+            'coherence': coh,
+            'in_joint': in_band and mixing > 0.3,
+        }    
     
     # ═══════════════════════════════════════════════════════════
     # Статистика
