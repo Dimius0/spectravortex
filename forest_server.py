@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Импортируем маяк (если доступен)
 try:
-    from tees_beacon_tees import Beacon
+    from network.tees_beacon_tees import Beacon
     BEACON_AVAILABLE = True
     print("🏮 Маяк загружен")
 except ImportError as e:
@@ -44,7 +44,7 @@ except ImportError as e:
 
 # Импортируем фрактальную память из TEES
 try:
-    from tees_beacon_tees import FractalMemory
+    from network.tees_beacon_tees import FractalMemory
     FRACTAL_MEMORY_AVAILABLE = True
 except ImportError:
     FRACTAL_MEMORY_AVAILABLE = False
