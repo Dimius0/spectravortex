@@ -52,7 +52,7 @@ except ImportError:
 
 # TEES-функции
 try:
-    from tees_core_tees import tees_recursive_vortex, tees_triad_collapse
+    from core.tees_core_tees import tees_recursive_vortex, tees_triad_collapse
     TEES_CORE_AVAILABLE = True
 except ImportError:
     TEES_CORE_AVAILABLE = False
@@ -69,9 +69,9 @@ except ImportError as e:
 
 # 🧬 Фрактальный геном смыслов (новое ядро ярмарки)
 try:
-    from tees_fractal_image import FractalImage
-    from tees_fractal_search import FractalSearch, fractal_similarity
-    from tees_listing import Listing as FractalListing
+    from core.tees_fractal_image import FractalImage
+    from core.tees_fractal_search import FractalSearch, fractal_similarity
+    from core.tees_listing import Listing as FractalListing
     FRACTAL_SEARCH_AVAILABLE = True
     print("🧬 Фрактальный поиск загружен")
 except ImportError as e:
@@ -2979,7 +2979,7 @@ if __name__ == '__main__':
                     beacon.cluster = None
                     del old_cluster
                 
-                from tees_cluster import TeesCluster
+                from core.tees_cluster import TeesCluster
                 beacon.cluster = TeesCluster(beacon=beacon, qubits_per_core=qubits_per_core)
                 
                 if hasattr(beacon, 'astronomer') and beacon.astronomer:

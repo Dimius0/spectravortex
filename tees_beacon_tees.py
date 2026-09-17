@@ -18,7 +18,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
 
-from tees_core_tees import (
+from core.tees_core_tees import (
     VERSION, GENESIS_HASH, PRIZE_PORTAL, PRIZE_AMOUNT,
     tees_sign, tees_recursive_vortex
 )
@@ -26,7 +26,7 @@ from tees_scroll_tees import scroll_to_portal, scroll_to_seed
 from tees_symbiosis_tees import SymbiosisCalculator, calculate_symbiosis_reward
 from tees_healer_tees import SelfHealingMesh
 from tees_stranger_tees import Stranger
-from tees_cluster import TeesCluster
+from core.tees_cluster import TeesCluster
 from tees_astronomer import AstroModule
 from tees_economy import TEESEconomy
 
