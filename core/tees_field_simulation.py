@@ -1114,7 +1114,99 @@ class Field:
             'joint_position': in_band_pos,
             'coherence': coh,
             'in_joint': in_band and mixing > 0.3,
-        }    
+        }
+
+    def compute_energy(self) -> float:
+        """
+        Вычисляет энергию поля.
+        
+        Энергия = сумма квадратов разностей фаз между соседями.
+        Чем больше разность — тем выше энергия.
+        """
+        if not self.nodes:
+            return 0.0
+        
+        nodes_list = list(self.nodes.values())
+        n = len(nodes_list)
+        
+        if n < 2:
+            return 0.0
+        
+        energy = 0.0
+        for i in range(n):
+            for j in range(i + 1, n):
+                phase_diff = nodes_list[i].phase - nodes_list[j].phase
+                # Кратчайший путь
+                if phase_diff > math.pi:
+                    phase_diff -= 2 * math.pi
+                elif phase_diff < -math.pi:
+                    phase_diff += 2 * math.pi
+                energy += phase_diff ** 2
+        
+        # Нормируем на число пар
+        energy /= (n * (n - 1) / 2)
+        return energy
+    
+    def compute_gradient_field(self) -> list:
+        """
+        Вычисляет градиент поля.
+        
+        Для каждого узла — разность фаз с соседями по радиусу.
+        Возвращает список градиентов.
+        """
+        if not self.nodes:
+            return []
+        
+        if self._sorted_nodes_cache is None:
+            self._sorted_nodes_cache = sorted(
+                self.nodes.values(), 
+                key=lambda n: n.radius
+            )
+        
+        sorted_nodes = self._sorted_nodes_cache
+        gradients = []
+        
+        for i, node in enumerate(sorted_nodes):
+            grad = 0.0
+            count = 0
+            
+            # Сосед слева
+            if i > 0:
+                left = sorted_nodes[i - 1]
+                dr = node.radius - left.radius
+                if dr > 1e-9:
+                    dphi = node.phase - left.phase
+                    if dphi > math.pi:
+                        dphi -= 2 * math.pi
+                    elif dphi < -math.pi:
+                        dphi += 2 * math.pi
+                    grad += dphi / dr
+                    count += 1
+            
+            # Сосед справа
+            if i < len(sorted_nodes) - 1:
+                right = sorted_nodes[i + 1]
+                dr = right.radius - node.radius
+                if dr > 1e-9:
+                    dphi = right.phase - node.phase
+                    if dphi > math.pi:
+                        dphi -= 2 * math.pi
+                    elif dphi < -math.pi:
+                        dphi += 2 * math.pi
+                    grad += dphi / dr
+                    count += 1
+            
+            if count > 0:
+                grad /= count
+            
+            gradients.append({
+                'node_id': node.id,
+                'radius': node.radius,
+                'phase': node.phase,
+                'gradient': grad,
+            })
+        
+        return gradients        
     
     # ═══════════════════════════════════════════════════════════
     # Статистика
